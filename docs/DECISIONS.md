@@ -28,6 +28,15 @@ slugs but never spells out the ten. `CardSlug` uses the fixed-width poker form
 uniform slices. This is a representation choice, not a rule — changing it touches
 only `RANKS` and the two derivation functions in `packages/domain/src/Card.ts`.
 
+**Only Postgres is containerized.** Per §10, `docker/docker-compose.yml` holds
+Postgres and nothing else; there are no Dockerfiles. `apps/api` and `apps/web` run
+natively against the container on `localhost:5433`. Confirmed as the intended
+scope — revisit only when Render deployment forces a choice of build mode.
+
+Note for anyone tempted to containerize dev to escape the host's inotify limits:
+Docker Desktop on Linux runs a VM whose default watch limits are typically _lower_
+than the host's. Raise the host limits instead — see the README.
+
 **TypeScript is pinned to 5.9.3, not 7.x.** TypeScript 7 (the Go rewrite) is
 `latest` on npm, but `typescript-eslint` declares `typescript >=4.8.4 <6.1.0`, and
 Effect is the most type-checker-demanding library in the stack. Revisit once
@@ -64,13 +73,18 @@ satisfied**, and it cannot be while TanStack Start is the frontend framework:
 All three are **build-time** dependencies of the Vite plugin, used to parse its
 own config. No first-party package depends on zod, and none ever should.
 
-What is enforced instead:
+**Accepted**, on the basis that the rule's intent is "we author validation with
+Effect Schema", and zod is unreachable from anything we write. Three independent
+things hold that line:
 
-- No `@cambio/*` package has zod in `dependencies` or `devDependencies`.
-- `no-restricted-imports` fails the build on any `import ... from "zod"` in any
-  package — see `packages/config/eslint.base.js`.
+1. No `@cambio/*` package has zod in `dependencies` or `devDependencies`.
+2. zod is **not resolvable** from any workspace package — pnpm's isolated
+   `node_modules` confines it to TanStack's own subtree, so even a deliberate
+   `import "zod"` in `apps/web` fails to resolve. Verify with:
+   `node -e "require.resolve('zod',{paths:['apps/api']})"` → throws.
+3. `no-restricted-imports` fails the build on any `import ... from "zod"` in any
+   package — see `packages/config/eslint.base.js`.
 
-This preserves the intent of §2 ("validation is Effect Schema, not Zod") while
-acknowledging that a bundler plugin's internal config parsing is invisible to our
-code. **This substitution has not been approved** — if the literal criterion
-matters more than the framework choice, the frontend framework has to change.
+The backend is Effect end to end: `domain`, `contracts`, `application` and
+`apps/api` depend on `effect` and never on zod. If TanStack Start is ever
+replaced, drop this section and the criterion becomes literally true again.
