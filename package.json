@@ -1,0 +1,26 @@
+{
+  "name": "cambio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=22.0.0 <23"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@cambio/config": "workspace:*",
+    "eslint": "10.8.0",
+    "prettier": "3.9.6",
+    "turbo": "2.10.8",
+    "typescript": "5.9.3"
+  }
+}

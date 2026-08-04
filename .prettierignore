@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.output/
+.turbo/
+.tanstack/
+coverage/
+pnpm-lock.yaml
+*.gen.ts
+docs/HANDOFF.md

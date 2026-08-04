@@ -1,0 +1,4 @@
+@import "@cambio/ui/styles.css";
+
+/* Tailwind v4 scans for class names relative to each @source root. */
+@source "./";

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "stream",
+  "globalDependencies": [".env", "packages/config/tsconfig.base.json"],
+  "globalEnv": ["NODE_ENV"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "!**/*.test.ts", "!**/*.test.tsx"],
+      "outputs": ["dist/**", ".output/**", ".tanstack/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "@cambio/web#build": {
+      "dependsOn": ["^build"],
+      // TanStack Start regenerates src/routeTree.gen.ts during the build. Left
+      // in the input set it invalidates its own cache entry on every run, so it
+      // is declared as an output instead.
+      "inputs": ["$TURBO_DEFAULT$", "!src/routeTree.gen.ts"],
+      "outputs": ["dist/**", ".output/**", ".tanstack/**", "src/routeTree.gen.ts"]
+    }
+  }
+}

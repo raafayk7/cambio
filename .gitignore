@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.output/
+.turbo/
+.tanstack/
+.nitro/
+.vinxi/
+coverage/
+*.tsbuildinfo
+.impeccable/
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+*.log

@@ -1,0 +1,27 @@
+{
+  "name": "@cambio/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tsconfig.node.json": "./tsconfig.node.json",
+    "./tsconfig.react.json": "./tsconfig.react.json",
+    "./eslint": "./eslint.base.js",
+    "./prettier": "./prettier.base.js"
+  },
+  "files": [
+    "tsconfig.*.json",
+    "eslint.base.js",
+    "prettier.base.js"
+  ],
+  "dependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint-plugin-boundaries": "7.1.0",
+    "typescript-eslint": "8.66.0"
+  },
+  "devDependencies": {
+    "eslint": "10.8.0",
+    "prettier": "3.9.6"
+  }
+}

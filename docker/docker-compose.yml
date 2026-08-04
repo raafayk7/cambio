@@ -1,0 +1,31 @@
+name: cambio
+
+# Postgres only. No Redis — in-memory room state plus Postgres is sufficient
+# for a single instance, and Redis becomes necessary only if the API scales
+# horizontally and needs pub/sub to route room events between instances (§6).
+# Do not add it pre-emptively.
+
+services:
+  postgres:
+    # Pinned to the major version the Supabase project runs. If that project is
+    # upgraded, change this too — matching production locally is the point.
+    image: postgres:17-alpine
+    container_name: cambio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cambio
+      POSTGRES_PASSWORD: cambio
+      POSTGRES_DB: cambio
+    ports:
+      # 5433 on the host so this never fights a locally installed Postgres.
+      - "5433:5432"
+    volumes:
+      - cambio-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cambio -d cambio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cambio-pgdata:
