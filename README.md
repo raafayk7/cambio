@@ -43,9 +43,18 @@ Web on http://localhost:3000, API on http://localhost:3001. The home page is a
 smoke test: it renders a shadcn primitive from `@cambio/ui` and shows the result
 of a TanStack Query call to the API's `/health`.
 
+Both apps read the single `.env` at the repo root — the API via Node's
+`--env-file-if-exists`, Vite via `loadEnv`. There is no per-app `.env` and
+nothing needs sourcing into your shell first.
+
 Ports are configurable via `WEB_PORT` and `PORT` in `.env`. The Vite dev server
 runs with `strictPort`, so a clash fails loudly instead of silently landing on
 the API's port.
+
+Note that Turborepo runs tasks in **strict env mode**: a variable not listed in
+`globalPassThroughEnv` (or a task's `env`) is stripped before the task sees it.
+Adding a new environment variable means adding it to `turbo.json` and
+`.env.example`, or it will silently read as undefined under `pnpm dev`.
 
 ## Checks
 
@@ -84,7 +93,8 @@ pnpm dlx shadcn@latest add <component>
 
 **`Error: ENOSPC: System limit for number of file watchers reached`** — the dev
 servers cannot watch files. This is a machine limit, not a repo problem; editors
-and Docker Desktop consume a lot of it. Raise it:
+consume a lot of it (a single VS Code / Cursor window over a large repo can hold
+40k+ watches). Raise it:
 
 ```bash
 sudo sysctl -w fs.inotify.max_user_watches=524288 fs.inotify.max_user_instances=512

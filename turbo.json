@@ -3,6 +3,19 @@
   "ui": "stream",
   "globalDependencies": [".env", "packages/config/tsconfig.base.json"],
   "globalEnv": ["NODE_ENV"],
+  // Turborepo 2 runs tasks in strict env mode: anything not declared here is
+  // stripped before the task sees it. These are runtime configuration, so they
+  // are passed through rather than hashed — changing DATABASE_URL must not
+  // invalidate every build artifact in the repo.
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "PORT",
+    "HOST",
+    "LOG_LEVEL",
+    "PRETTY_LOGS",
+    "WEB_ORIGIN",
+    "WEB_PORT"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -24,7 +37,8 @@
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": ["VITE_API_URL"]
     },
     "@cambio/web#build": {
       "dependsOn": ["^build"],
@@ -32,7 +46,10 @@
       // in the input set it invalidates its own cache entry on every run, so it
       // is declared as an output instead.
       "inputs": ["$TURBO_DEFAULT$", "!src/routeTree.gen.ts"],
-      "outputs": ["dist/**", ".output/**", ".tanstack/**", "src/routeTree.gen.ts"]
+      "outputs": ["dist/**", ".output/**", ".tanstack/**", "src/routeTree.gen.ts"],
+      // Hashed, not passed through: VITE_ vars are baked into the client bundle,
+      // so a change genuinely must produce a different build.
+      "env": ["VITE_API_URL"]
     }
   }
 }

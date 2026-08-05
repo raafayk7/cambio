@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "dev": "node --watch-path=src --import tsx src/index.ts",
+    "dev": "node --env-file-if-exists=../../.env --watch-path=src --import tsx src/index.ts",
     "start": "node dist/index.js",
-    "migrate": "tsx src/infra/migrate.ts",
+    "migrate": "node --env-file-if-exists=../../.env --import tsx src/infra/migrate.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint ."
   },
