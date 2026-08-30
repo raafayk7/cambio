@@ -4,8 +4,10 @@ A hidden-information, memory-based card game. Lowest score wins.
 
 **Read [`docs/HANDOFF.md`](docs/HANDOFF.md) before writing any code.** It is the
 source of truth for the game rules, the architecture, and the data model, and it
-is deliberately not a task list. [`docs/DECISIONS.md`](docs/DECISIONS.md) records
-what was decided while scaffolding.
+is deliberately not a task list. Decisions live in [`docs/adr/`](docs/adr/)
+([`docs/DECISIONS.md`](docs/DECISIONS.md) is the pre-ADR scaffold history). AI
+agents start at [`AGENTS.md`](AGENTS.md); skills and workflow commands live in
+`.agents/` (symlinked into `.claude/`).
 
 Current state: **scaffold only**. No game logic exists yet, by design.
 

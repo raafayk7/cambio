@@ -4,6 +4,11 @@
 was decided _during_ Task 1 (the scaffold) so those choices don't have to be
 re-derived. It does not supersede the handoff.
 
+> **Migrated to ADRs (2026-08-30).** The decisions below now live as
+> [docs/adr/](adr/) 0001–0006 and new decisions go there (see the `adr`
+> skill). This file is kept as history and for the §9 table; where wording
+> differs, the ADR wins.
+
 ## §9 open decisions — resolved
 
 | #   | Decision                          | Choice                                                   |
