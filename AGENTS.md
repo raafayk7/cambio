@@ -94,6 +94,12 @@ pnpm turbo build typecheck lint test                # the full gate
 Environment lives in `.env` at the repo root (copy from `.env.example`). Tests
 are vitest + `@effect/vitest`; domain work is test-first (HANDOFF §12).
 
+If the API or integration tests can't reach Postgres (`ECONNREFUSED` on
+localhost:5433), the container is simply off — run the `docker compose up -d`
+line above and retry. Data persists across restarts in the `cambio-pgdata`
+volume, so starting it is always safe. Migrations are idempotent; re-run
+`pnpm --filter @cambio/api migrate` after starting if in doubt.
+
 ## Frontend note
 
 The backend comes first. Frontend skills are deliberately deferred until the
