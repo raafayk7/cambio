@@ -220,7 +220,8 @@ parameterize a finished harness.
 
 *(updated continuously; newest last; timestamp each entry)*
 
-- [ ] —
+- [x] 2026-08-31 14:20 — M1 driver core complete: `test/sim/` rng, candidates, policy, driver; 17 new tests green (C1.1–C1.5, C3.1 single-game), typecheck/lint clean.
+- [x] 2026-08-31 14:22 — M2 invariant checkers complete and wired per-step; `Simulation.test.ts` batch plays 250 random games with zero violations on first contact (batch wall time ~0.6 s). Suite 150 tests green.
 
 ## Decision log
 

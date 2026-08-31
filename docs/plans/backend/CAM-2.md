@@ -649,8 +649,11 @@ Planned homes below; implement keeps them true.)*
 
 ## Progress
 
-- [ ] —
+- [x] 2026-08-31 14:20 — M1 complete. `rng.ts`, `candidates.ts`, `policy.ts`, `driver.ts` plus `counters.ts` (interface + `emptyCounters` only; `recordStep` lands in M5). `Driver.test.ts` 17 tests green; typecheck + lint clean.
+- [x] 2026-08-31 14:22 — M2 complete. `invariants.ts` + `Invariants.test.ts` (16 corrupt-state units); per-step checks wired into the driver; `Simulation.test.ts` batch skeleton green — 250 games, zero violations, ~0.6 s. Deviation: the driver validates *every* starting state (dealt or `initial`) against the full 52-card baseline at step 0 — Coverage scenarios must be full-partition states, which the plan already required; this makes the corrupted-initial test fail at step 0 rather than at first accepted command.
 
 ## Surprises & notes for the root plan
+
+- 2026-08-31 — **Policy fix found by the step-cap test:** `CallCambio` must be excluded from the uniform candidate pool (it is always legal in `AwaitingDraw`, so uniform choice ended ~⅓ of games on turn one, starving every rare path). It is now reachable only via the ramp/backstop — except when it is the *only* candidate, where it is taken directly. `chooseTurnCommand` also takes `state` as a first parameter (the zero-card take bias needs the active player's hand size), a small signature deviation from this plan's sketch.
 
 *(anything the root plan's Decision Log or the reviewer must know)*
