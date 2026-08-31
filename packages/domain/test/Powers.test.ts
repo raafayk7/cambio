@@ -208,7 +208,7 @@ describe("Q — look at any one card, then blind-swap (C3.4)", () => {
   })
 })
 
-describe("fizzles — no valid target (ADR-0010)", () => {
+describe("fizzles — no valid target (C3.5, ADR-0010)", () => {
   const drawInto = (deckTop: string, state: GameState) =>
     apply({ ...state, deck: [card(deckTop), ...state.deck] }, { _tag: "DrawFromDeck", playerId: p0 })
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import {
   BadPlayerCount,
+  EmptyDiscard,
   EmptySlotTarget,
   GameAlreadyEnded,
   type GameError,
@@ -11,6 +12,8 @@ import {
   NotYourTurn,
   PowerDiscardNotTakeable,
   SlamTooLate,
+  SwapTargetsIdentical,
+  UnknownPlayer,
   WindowStillOpen,
   WrongPeekTarget,
   WrongPhase,
@@ -20,7 +23,7 @@ import { slot, ts, uid } from "./fixtures.js"
 const p0 = uid(0)
 const p1 = uid(1)
 
-describe("GameError", () => {
+describe("GameError (C7.1)", () => {
   it("constructs every class with its fields and _tag", () => {
     const errors: ReadonlyArray<GameError> = [
       new BadPlayerCount({ count: 6 }),
@@ -36,9 +39,12 @@ describe("GameError", () => {
       new SlamTooLate({ closesAt: ts(1000), at: ts(2000) }),
       new WindowStillOpen({ closesAt: ts(2000), at: ts(1000) }),
       new NoCardToDraw(),
+      new UnknownPlayer({ playerId: p1 }),
+      new EmptyDiscard(),
+      new SwapTargetsIdentical({ target: { playerId: p0, slotIndex: slot(0) } }),
     ]
 
-    expect(new Set(errors.map((e) => e._tag)).size).toBe(13)
+    expect(new Set(errors.map((e) => e._tag)).size).toBe(16)
     const late = errors.find((e) => e._tag === "SlamTooLate")
     expect(late).toBeDefined()
     if (late?._tag === "SlamTooLate") expect(late.closesAt).toBe(ts(1000))

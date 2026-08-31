@@ -53,7 +53,7 @@ describe("gameScores and winnersOf (§1.8)", () => {
     ])
   })
 
-  it("a zero-card hand loses to a negative total", () => {
+  it("a zero-card hand loses to a negative total (C5.1)", () => {
     expect(winnersOf(gameScores(state))).toStrictEqual([p0])
   })
 

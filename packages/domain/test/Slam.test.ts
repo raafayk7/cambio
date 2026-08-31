@@ -47,7 +47,7 @@ const errorTag = (state: GameState, command: Parameters<typeof applyCommand>[1],
   return Either.isLeft(result) ? result.left._tag : "LEGAL"
 }
 
-describe("slam outcomes (C4.3)", () => {
+describe("slam outcomes (C4.3, C4.4)", () => {
   it("own card, correct: card to the pile, slot becomes a hole, indices unmoved", () => {
     const [after, events] = apply(base, {
       _tag: "Slam",
@@ -66,6 +66,33 @@ describe("slam outcomes (C4.3)", () => {
     expect(after.players[0]!.hand.map((s) => s.slotIndex)).toStrictEqual([0, 1])
     expect(after.discard).toStrictEqual([card("4H"), card("4S")])
     expect(after.phase).toStrictEqual(base.phase)
+  })
+
+  it("slamming out a middle slot leaves a hole — other indices do not shift (C4.3, §4.3)", () => {
+    const middleMatch: GameState = {
+      ...base,
+      players: [
+        {
+          id: p0,
+          hand: [
+            { slotIndex: slot(0), card: card("AS") },
+            { slotIndex: slot(1), card: card("4H") },
+            { slotIndex: slot(2), card: card("5D") },
+          ],
+        },
+        base.players[1]!,
+      ],
+    }
+    const [after] = apply(middleMatch, {
+      _tag: "Slam",
+      playerId: p0,
+      target: { playerId: p0, slotIndex: slot(1) },
+      giveSlot: null,
+    })
+    expect(after.players[0]!.hand).toStrictEqual([
+      { slotIndex: slot(0), card: card("AS") },
+      { slotIndex: slot(2), card: card("5D") },
+    ])
   })
 
   it("own card, incorrect: card stays, penalty into the lowest free slot", () => {
@@ -156,6 +183,25 @@ describe("rank-only matching (C4.2)", () => {
       giveSlot: null,
     })
     expect(events[0]!._tag).toBe("SlamFailed")
+  })
+
+  it("a power card on the pile is inert but slammable against (C3.6)", () => {
+    const jackTop: GameState = {
+      ...base,
+      discard: [card("JD")],
+      phase: { _tag: "SlamWindow", turnPlayerId: p0, closesAt, rank: "J" },
+      players: [
+        { id: p0, hand: [{ slotIndex: slot(0), card: card("JC") }] },
+        base.players[1]!,
+      ],
+    }
+    const [, events] = apply(jackTop, {
+      _tag: "Slam",
+      playerId: p0,
+      target: { playerId: p0, slotIndex: slot(0) },
+      giveSlot: null,
+    })
+    expect(events[0]!._tag).toBe("SlamSucceeded")
   })
 
   it("a black king matches a red king despite different scores", () => {

@@ -16,7 +16,7 @@ const dealt = (n: number, seed = 42) => {
 }
 
 describe("dealGame", () => {
-  it("rejects player counts outside 2–5 (§1.1)", () => {
+  it("rejects player counts outside 2–5 (C1.1, §1.1)", () => {
     for (const n of [0, 1, 6]) {
       const result = dealGame(Array.from({ length: n }, (_, i) => uid(i)), 1, config, now)
       expect(Either.isLeft(result)).toBe(true)
@@ -26,7 +26,7 @@ describe("dealGame", () => {
     }
   })
 
-  it("deals 4 cards to slots 0–3 per player, one discard, rest as deck (§1.1)", () => {
+  it("deals 4 cards to slots 0–3 per player, one discard, rest as deck (C1.2, §1.1)", () => {
     for (const n of [2, 3, 4, 5]) {
       const [state] = dealt(n)
       expect(state.players).toHaveLength(n)
@@ -39,7 +39,7 @@ describe("dealGame", () => {
     }
   })
 
-  it("partitions all 52 slugs with no duplicates (§4.5)", () => {
+  it("partitions all 52 slugs with no duplicates (C1.4, §4.5)", () => {
     const [state] = dealt(5)
     const cards = allCards(state)
     expect(cards).toHaveLength(52)
@@ -47,13 +47,13 @@ describe("dealGame", () => {
     expect([...cards].sort()).toStrictEqual([...ALL_CARD_SLUGS].sort())
   })
 
-  it("starts at AwaitingDraw for seat 0 — no opening peek (§1.1)", () => {
+  it("starts at AwaitingDraw for seat 0 — no opening peek (C1.3, §1.1)", () => {
     const [state, events] = dealt(3)
     expect(state.phase).toStrictEqual({ _tag: "AwaitingDraw", playerId: uid(0) })
     expect(events.map((e) => e._tag)).toStrictEqual(["GameStarted"])
   })
 
-  it("is deterministic and the GameStarted event matches the state", () => {
+  it("is deterministic and the GameStarted event matches the state (C1.3, C8.1)", () => {
     const a = dealt(3)
     const b = dealt(3)
     expect(a).toStrictEqual(b)

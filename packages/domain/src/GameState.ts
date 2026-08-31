@@ -99,6 +99,26 @@ export const occupiedSlots = (state: GameState): ReadonlyArray<SlotRef> =>
   )
 
 /**
+ * The card a phase holds outside deck/discard/hands, if any. Exhaustive on
+ * purpose: a future card-carrying phase case must fail to compile here
+ * rather than silently vanish from the partition.
+ */
+const phaseHeldCards = (phase: Phase): ReadonlyArray<CardSlug> => {
+  switch (phase._tag) {
+    case "HoldingCard":
+    case "ResolvingPower":
+    case "ResolvingQueenSwap":
+      return [phase.card]
+    case "AwaitingDraw":
+    case "SlamWindow":
+    case "Ended":
+      return []
+    default:
+      return phase satisfies never
+  }
+}
+
+/**
  * Deck + discard + hands + the phase-held card (a card in `HoldingCard`/
  * `ResolvingPower`/`ResolvingQueenSwap` lives in the phase, nowhere else):
  * the §4.5 partition-invariant workhorse — always all 52, no duplicates.
@@ -107,9 +127,5 @@ export const allCards = (state: GameState): ReadonlyArray<CardSlug> => [
   ...state.deck,
   ...state.discard,
   ...state.players.flatMap((p) => p.hand.map((s) => s.card)),
-  ...(state.phase._tag === "HoldingCard" ||
-  state.phase._tag === "ResolvingPower" ||
-  state.phase._tag === "ResolvingQueenSwap"
-    ? [state.phase.card]
-    : []),
+  ...phaseHeldCards(state.phase),
 ]

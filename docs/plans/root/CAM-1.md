@@ -397,3 +397,16 @@ flagged).
 **What should carry to CAM-2:** the two latent risks above (power card in
 `HoldingCard` via decoded state; `drawable` duplication), plus counting
 how often ADR-0011 skips and ADR-0012 empty-pile turns actually occur.
+
+**Fix cycle (2026-08-31, post-review):** both blocking findings addressed.
+(1) `allCards` now routes through an exhaustive `phaseHeldCards` switch and
+`legalCommandKinds` dispatches via an exhaustive switch, both with
+`satisfies never` defaults — a new `Phase` case is now a compile error at
+both sites. (2) Tests added: pre/post deep-compare in both C7.3 paths
+(illegal *and* legal), turn advance onto a zero-card seat, middle-slot
+slam pinning hole stability, C6.2's positive half
+(`["CallCambio","TakeDiscard"]` when draws are impossible), `KeepHeld`
+during `ResolvingPower`, a successful slam against a power-rank top
+(C3.6), all 16 error classes constructed, and clause tags added to test
+titles for the previously unnamed clauses. Gate re-run: 18/18 uncached,
+111/111 tests. Advisory items remain deferred as listed.

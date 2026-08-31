@@ -244,33 +244,43 @@ export const legalCommandKinds = (
 
   const kinds: Array<Command["_tag"]> = []
 
-  if (phase._tag === "AwaitingDraw" && phase.playerId === playerId) {
-    kinds.push("CallCambio")
-    const top = state.discard[0]
-    if (top !== undefined && !isPowerRank(rank(top))) kinds.push("TakeDiscard")
-    if (drawable(state)) kinds.push("DrawFromDeck")
-  }
-
-  if (phase._tag === "HoldingCard" && phase.playerId === playerId) {
-    const hand = Option.getOrElse(handOf(state, playerId), () => [])
-    if (hand.length > 0) kinds.push("SwapHeld")
-    if (phase.source === "deck") kinds.push("DiscardHeld")
-    if (hand.length === 0) kinds.push("KeepHeld")
-  }
-
-  if (phase._tag === "ResolvingPower" && phase.playerId === playerId) {
-    const power = rank(phase.card)
-    if (isPowerRank(power) && power !== "J") kinds.push("PowerPeek")
-    if (power === "J") kinds.push("PowerSwap")
-  }
-
-  if (phase._tag === "ResolvingQueenSwap" && phase.playerId === playerId) {
-    kinds.push("PowerSwap")
-  }
-
-  if (phase._tag === "SlamWindow") {
-    if (now < phase.closesAt && occupiedSlots(state).length > 0) kinds.push("Slam")
-    if (now >= phase.closesAt) kinds.push("CloseSlamWindow")
+  // Exhaustive on purpose: a new phase case must fail to compile here rather
+  // than silently enumerate no legal moves.
+  switch (phase._tag) {
+    case "AwaitingDraw": {
+      if (phase.playerId !== playerId) break
+      kinds.push("CallCambio")
+      const top = state.discard[0]
+      if (top !== undefined && !isPowerRank(rank(top))) kinds.push("TakeDiscard")
+      if (drawable(state)) kinds.push("DrawFromDeck")
+      break
+    }
+    case "HoldingCard": {
+      if (phase.playerId !== playerId) break
+      const hand = Option.getOrElse(handOf(state, playerId), () => [])
+      if (hand.length > 0) kinds.push("SwapHeld")
+      if (phase.source === "deck") kinds.push("DiscardHeld")
+      if (hand.length === 0) kinds.push("KeepHeld")
+      break
+    }
+    case "ResolvingPower": {
+      if (phase.playerId !== playerId) break
+      const power = rank(phase.card)
+      if (isPowerRank(power) && power !== "J") kinds.push("PowerPeek")
+      if (power === "J") kinds.push("PowerSwap")
+      break
+    }
+    case "ResolvingQueenSwap": {
+      if (phase.playerId === playerId) kinds.push("PowerSwap")
+      break
+    }
+    case "SlamWindow": {
+      if (now < phase.closesAt && occupiedSlots(state).length > 0) kinds.push("Slam")
+      if (now >= phase.closesAt) kinds.push("CloseSlamWindow")
+      break
+    }
+    default:
+      return phase satisfies never
   }
 
   return kinds

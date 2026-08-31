@@ -3,6 +3,7 @@ import { Either } from "effect"
 import { applyCommand } from "../src/Engine.js"
 import { decodeGameConfig } from "../src/GameConfig.js"
 import { allCards, type GameState } from "../src/GameState.js"
+import { legalCommandKinds } from "../src/Legality.js"
 import { prngStateFromSeed } from "../src/Prng.js"
 import { card, slot, ts, uid } from "./fixtures.js"
 
@@ -63,7 +64,7 @@ describe("CallCambio (C2.2)", () => {
 })
 
 describe("TakeDiscard (C2.3)", () => {
-  it("moves the top discard into held state, then a swap resolves the turn", () => {
+  it("moves the top discard into held state, then a swap resolves the turn (C2.3, C2.6, C4.1)", () => {
     const [holding, takeEvents] = apply(base, { _tag: "TakeDiscard", playerId: p0 })
     expect(holding.phase).toStrictEqual({
       _tag: "HoldingCard",
@@ -109,7 +110,7 @@ describe("TakeDiscard (C2.3)", () => {
     expect(errorTag(holding, { _tag: "DiscardHeld", playerId: p0 })).toBe("WrongPhase")
   })
 
-  it("becomes a keep for a zero-card player (ADR-0009)", () => {
+  it("becomes a keep for a zero-card player (C5.2, ADR-0009)", () => {
     const zero: GameState = {
       ...base,
       players: [{ id: p0, hand: [] }, base.players[1]!],
@@ -195,6 +196,7 @@ describe("DrawFromDeck (C2.4–5)", () => {
       "MustResolvePower",
     )
     expect(errorTag(holding, { _tag: "DiscardHeld", playerId: p0 })).toBe("MustResolvePower")
+    expect(errorTag(holding, { _tag: "KeepHeld", playerId: p0 })).toBe("MustResolvePower")
   })
 
   it("reshuffles the pile (keeping its top) when the deck is empty (C6.1)", () => {
@@ -235,5 +237,23 @@ describe("CloseSlamWindow (C4.6)", () => {
       { _tag: "SlamWindowClosed" },
       { _tag: "TurnAdvanced", playerId: p0 },
     ])
+  })
+
+  it("advances onto a zero-card seat — zero-card players are not skipped (C4.6, §1.6)", () => {
+    const zeroNext: GameState = {
+      ...window,
+      players: [base.players[0]!, { id: p1, hand: [] }],
+      phase: { _tag: "SlamWindow", turnPlayerId: p0, closesAt: ts(1_004_000), rank: "4" },
+    }
+    const [after, events] = apply(zeroNext, { _tag: "CloseSlamWindow" }, ts(1_004_000))
+    expect(after.phase).toStrictEqual({ _tag: "AwaitingDraw", playerId: p1 })
+    expect(events[1]).toStrictEqual({ _tag: "TurnAdvanced", playerId: p1 })
+  })
+})
+
+describe("exhausted-deck turn options (C6.2)", () => {
+  it("Cambio and a legal take remain available when no draw is possible", () => {
+    const dry: GameState = { ...base, deck: [], discard: [card("4S")] }
+    expect(legalCommandKinds(dry, p0, now)).toStrictEqual(["CallCambio", "TakeDiscard"])
   })
 })

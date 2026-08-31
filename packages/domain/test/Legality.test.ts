@@ -158,13 +158,22 @@ describe("powerHasValidTarget (ADR-0010)", () => {
 
 describe("applyCommand routing (C7.3)", () => {
   it("returns the checkCommand error and leaves state untouched", () => {
+    const before = structuredClone(base)
     const command = { _tag: "DrawFromDeck", playerId: p1 } as const
     const result = applyCommand(base, command, now)
     expect(Either.isLeft(result)).toBe(true)
     if (Either.isLeft(result)) {
       expect(result.left._tag).toBe("NotYourTurn")
     }
+    expect(base).toStrictEqual(before)
     const again = checkCommand(base, command, now)
     expect(Option.isSome(again)).toBe(true)
+  })
+
+  it("legal commands also leave the input state untouched (C7.3)", () => {
+    const before = structuredClone(base)
+    const result = applyCommand(base, { _tag: "DrawFromDeck", playerId: p0 }, now)
+    expect(Either.isRight(result)).toBe(true)
+    expect(base).toStrictEqual(before)
   })
 })

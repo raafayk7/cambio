@@ -5,7 +5,7 @@ import { card, slot, ts, uid } from "./fixtures.js"
 const p0 = uid(0)
 const p1 = uid(1)
 
-describe("GameEvent", () => {
+describe("GameEvent (C8.2)", () => {
   it("round-trips each member of the union", () => {
     const events: ReadonlyArray<GameEvent> = [
       {
