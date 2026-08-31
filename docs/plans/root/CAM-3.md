@@ -350,4 +350,87 @@ _(reconciled from backend child-plan drafting, same day)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+_(review 2026-08-31, two independent reviewers — contract + architecture — plus
+an uncached gate run)_
+
+**Verdict: fix-then-ship.** No contract clause is violated, no architecture
+rule is broken, and nothing in the diff can reach a client. The fix list is
+small and precise: one missing test assertion, three coverage-table rows that
+claim more than their tests assert, and a handful of unlogged minor
+deviations.
+
+**What passed**
+
+- Independently re-ran the gate uncached: `turbo build typecheck lint test
+--force` → 20/20 tasks green (50.3s); migrate re-run "no pending migrations
+  (2 applied)". `RT_GAMES=1000` deep run green (8m37s).
+- All 27 contract clauses adjudicated **satisfied** (C3.1/C3.2 satisfied in
+  code but their atomicity guarantee is untested — see findings).
+- Architecture: all checks pass with evidence — domain (src + testing +
+  test) imports `effect` only; ports/tags/layers per ADR-0015; no throw
+  crosses a boundary (both `Sync` codec call sites wrapped); every adapter
+  read/update filters `deleted_at IS NULL` (18-statement inventory);
+  `game_events` never updated/deleted; migration discipline intact; barrel
+  does not re-export testing (ADR-0016); `apps/web` untouched and unable to
+  resolve the new subpath; env declarations match turbo's documented
+  discipline.
+
+**Findings — fix before ship**
+
+1. **(F1) Rollback is untested and the coverage table says otherwise.** The
+   C3.1 row claims "a failed save leaves zero event rows", but the conflict
+   test fails at the transaction's _first_ statement, and the FK-violation
+   test (`GameRepository.test.ts`, C3.7) — which genuinely fails
+   mid-transaction after the `games` insert — asserts only the error tag,
+   never that the `games`/`decks`/event rows for that game were rolled back.
+   One count-assertion closes it.
+2. **(F4, F5) Coverage-table overclaims.** C1.3's row claims
+   `final_score`/`is_connected`/`is_bot` columns are asserted (no test
+   introspects them); C1.5's row claims holes-survive-uncompacted is pinned
+   (it rides probabilistically on load-equality). Strengthen the tests or
+   correct the rows.
+3. **(F3) The §4.5 partition sweep never exercises the phase-held-card
+   term.** Every RoundTrip game's last save is `Ended`, so `HOLDING_TAGS` is
+   dead code in practice — the partition is proven only at completion.
+   Persist one game left mid-flight (or sweep at a mid-flight point) so the
+   held-card branch runs.
+4. **(F6, F7) Unlogged deviations.** `final_score` is sticky
+   (`COALESCE(...)` never reverts it — an invariant C3.5 didn't ask for),
+   and a save of an `Ended` state whose batch lacks `GameEnded` would write
+   `completed` with null scores (unreachable today, unguarded);
+   `GameRepositoryLive` yields `PgClient.PgClient` though nothing pg-specific
+   remains after the `jsonb` helper replaced `sql.json` — inconsistent with
+   `user-repository.ts`. Log both (or normalize the tag).
+5. **(F9) Stale comment**: `0002_cambio_schema.sql`'s `actor_id` comment
+   omits `GameStarted` from the actorless list. The migration is applied, so
+   per the skill it is not edited — record the correction here and in the
+   child plan rather than touching the file.
+
+**Deferred / advisory** (logged, not blocking)
+
+- Upserts on `game_players`/`decks` conflict on the full PK and never reset
+  `deleted_at` — harmless today (nothing soft-deletes those tables), a real
+  trap once CAM-8's sweeper exists. Carry into CAM-8.
+- ESLint boundary deny-lists match exact package names, so
+  `@cambio/domain/testing` is not covered for `apps/web` (pnpm's strict
+  node_modules is the actual guard). Fold into the standing ESLint-gap task
+  along with the non-workspace-import gap.
+- `GameVersion.make` at three adapter sites throws-as-defect on invalid
+  input (unreachable; hygiene). The C3.2 UPDATE-branch race
+  (`expected:1, actual:2`) and the empty-`text[]` boundary
+  (`string_to_array('', ',') = {}`) are untested edges. Test setup TRUNCATE
+  has no `_test`-suffix guard beyond loud comments.
+- `user_cards` tombstones grow linearly with saves (soft-delete-then-
+  reinsert by design); CAM-8's sweeper is load-bearing, and `created_at` on
+  a card row means "last save", not "dealt at".
+- HANDOFF §4.3's sketch still lists `called_cambio_by` and a status enum;
+  the migration deviates (justified in-file and in the Decision log). An
+  eventual §4.3 amendment would close the loop.
+
+**Carry into next tasks:** CAM-5 consumes `GameRepository.save/load/getEvents`
+and `foldEvents` as designed; CAM-8 must address the upsert/`deleted_at`
+interaction and the tombstone volume; CAM-10's `HoldingCard` refinement now
+has a live decode path to harden (`games.phase` jsonb via `load`).
+
+**Verdict: fix-then-ship** — address findings 1–5, re-run the gate, then
+`/ship CAM-3`.
