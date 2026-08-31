@@ -13,8 +13,10 @@ symlinked from `.agents/`, which is the source of truth for skills and commands.
 - **[docs/HANDOFF.md](docs/HANDOFF.md)** — canonical game rules (§1),
   architecture (§3–§6), data model (§4), build order (§12). When anything
   conflicts with a habit or template you'd normally reach for, the handoff wins.
-- **[docs/adr/](docs/adr/)** — architecture decision records. Check them before
-  re-litigating a decision; supersede, don't silently contradict.
+- **[docs/adr/](docs/adr/)** — architecture decision records. Start from the
+  index at [docs/adr/README.md](docs/adr/README.md) instead of reading each
+  file; check them before re-litigating a decision; supersede, don't
+  silently contradict.
 - **[docs/DECISIONS.md](docs/DECISIONS.md)** — scaffold-era decisions, now
   migrated to ADRs; kept for history.
 

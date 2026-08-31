@@ -49,6 +49,10 @@ Use `gh pr create` with base = the release branch (never `main` or
 
 ## 4. Link and close out
 
+Opening the PR makes Linear's GitHub integration auto-move the issue to
+**In Review** — expected, not an error; the explicit move to Development
+Done below overrides it.
+
 The Linear GitHub integration auto-attaches the PR via the branch name and
 title; verify the attachment appeared on the issue (MCP `get_issue`), and if
 it didn't, attach the PR URL explicitly (`save_issue` with `links`). Post a

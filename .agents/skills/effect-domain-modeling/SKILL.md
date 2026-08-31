@@ -56,7 +56,19 @@ stored).
 Pattern-match with `Match.value` / `Match.tag` (or a `switch` on `_tag` with
 an exhaustiveness check) — never with `if`-chains that the compiler can't
 prove exhaustive. When you add a union case, the compiler should point at
-every site that must handle it.
+every site that must handle it. The standard exhaustiveness check is a
+`default` arm returning `value satisfies never`:
+
+```ts
+switch (phase._tag) {
+  // ...one case per member...
+  default:
+    return phase satisfies never
+}
+```
+
+An `if`-chain that "handles all the cases today" is still wrong — the CAM-1
+review caught exactly that silently breaking the card-partition invariant.
 
 ## Typed errors
 
@@ -72,6 +84,10 @@ export class IllegalMove extends Data.TaggedError("IllegalMove")<{
 Return them in `Either.left` (pure code) or the error channel of `Effect`
 (application code). One error type per *reason a caller could react
 differently*; don't create one error class per call site.
+
+A field-less error omits the generic entirely —
+`class NoCardToDraw extends Data.TaggedError("NoCardToDraw") {}` — never
+`<{}>`, which fails `@typescript-eslint/no-empty-object-type`.
 
 ## Single source of legality
 

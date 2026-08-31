@@ -27,6 +27,9 @@ read-only subagents in parallel — four total for fullstack:
 - **Contract reviewer:** receives the root plan's Functional Contract +
   acceptance criteria and the relevant diff. For each contract statement,
   verdict: satisfied / violated / not verifiable, with file:line evidence.
+  The child plan's Contract coverage table is the starting checklist —
+  verify each mapped test actually pins its clause and flag unmapped
+  clauses; do not grade coverage by grepping clause ids out of test titles.
   Also flags implemented behavior the contract never asked for.
 - **Architecture reviewer:** receives the diff and the governing skills
   (`architecture` plus the layer skills for the files touched; always
