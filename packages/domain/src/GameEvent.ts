@@ -3,6 +3,7 @@ import { CardSlug, PowerKind, Rank } from "./Card.js"
 import { GameConfig } from "./GameConfig.js"
 import { Hand, SlotRef } from "./GameState.js"
 import { SlotIndex, Timestamp, UserId } from "./Ids.js"
+import { PrngState } from "./Prng.js"
 
 /**
  * The event ADT: every state change the engine performs, as persistable
@@ -17,7 +18,8 @@ import { SlotIndex, Timestamp, UserId } from "./Ids.js"
  * remaining deck order, first discard — so event-log replay never depends on
  * the PRNG staying byte-stable across versions. `seed` is audit-only. `at`
  * is the only event timestamp; later events are stamped by the persistence
- * layer's `at` column (§4.3).
+ * layer's `at` column (§4.3). `prng` records the state **after** the deal
+ * shuffle so the fold transcribes it, never recomputes (ADR-0014).
  */
 export const GameStarted = Schema.TaggedStruct("GameStarted", {
   at: Timestamp,
@@ -27,6 +29,7 @@ export const GameStarted = Schema.TaggedStruct("GameStarted", {
   hands: Schema.Array(Hand),
   deck: Schema.Array(CardSlug),
   firstDiscard: CardSlug,
+  prng: PrngState,
 })
 
 export const CambioCalled = Schema.TaggedStruct("CambioCalled", {
@@ -145,9 +148,14 @@ export const DrawSkipped = Schema.TaggedStruct("DrawSkipped", {
   kind: Schema.Literal("penalty", "give"),
 })
 
-/** Records the **resulting order**; the top discard was retained (§1.7). */
+/**
+ * Records the **resulting order**; the top discard was retained (§1.7).
+ * `prng` is the state after the reshuffle — transcribed by the fold, never
+ * recomputed (ADR-0014).
+ */
 export const DeckReshuffled = Schema.TaggedStruct("DeckReshuffled", {
   deck: Schema.Array(CardSlug),
+  prng: PrngState,
 })
 
 export const SlamWindowClosed = Schema.TaggedStruct("SlamWindowClosed", {})

@@ -70,7 +70,7 @@ const reshuffleIfEmpty = (state: GameState): Step => {
   const [deck, prng] = shuffle(state.discard.slice(1), state.prng)
   return [
     { ...state, deck, discard: [state.discard[0]!], prng },
-    [{ _tag: "DeckReshuffled", deck }],
+    [{ _tag: "DeckReshuffled", deck, prng }],
   ]
 }
 

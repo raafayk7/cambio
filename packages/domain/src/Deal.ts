@@ -55,6 +55,7 @@ export const dealGame = (
     hands,
     deck,
     firstDiscard,
+    prng,
   }
 
   return Either.right([state, [started]] as const)

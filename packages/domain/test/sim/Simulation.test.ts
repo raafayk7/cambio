@@ -131,7 +131,7 @@ describe("counter derivation (C5.1)", () => {
         first: { playerId: uid(0), slotIndex: slot(0) },
         second: { playerId: uid(1), slotIndex: slot(0) },
       },
-      { _tag: "DeckReshuffled", deck: [card("KS")] },
+      { _tag: "DeckReshuffled", deck: [card("KS")], prng: prngStateFromSeed(7) },
     ])
     expect(c.drawSkippedPenalty).toBe(1)
     expect(c.drawSkippedGive).toBe(1)
