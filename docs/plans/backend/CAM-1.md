@@ -642,7 +642,17 @@ the tie game, and the determinism replay.
 
 ## Progress
 
-- [ ] YYYY-MM-DD HH:MM — step
+- [x] 2026-08-31 12:44 — M1 complete: `GameConfig.ts`, `Prng.ts` (incl.
+      `shuffle`, implemented early alongside `prngStateFromSeed` — its tests
+      land in M3 as planned), `GameState.ts`, `Phase.ts` rewritten
+      (PROVISIONAL shapes deleted), `test/fixtures.ts` helper added
+      (uid/slot/ts/card builders, not in plan — reduces fixture noise).
+      25 tests green, typecheck clean.
+- [x] 2026-08-31 12:47 — M2 complete: `GameError.ts` (13 classes),
+      `Command.ts` (10 cases), `GameEvent.ts` (22 cases), all exported.
+      31 tests green, typecheck clean. (One test rework: TS narrows a
+      const's declared union by its initializer, so the `_tag`-switch test
+      routes through a `(err: GameError) => string` function.)
 
 ## Surprises & notes for the root plan
 
