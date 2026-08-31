@@ -206,7 +206,8 @@ describe("DrawFromDeck (C2.4–5)", () => {
       discard: [card("4S"), card("2D"), card("3H")],
     }
     const [after, events] = apply(exhausted, { _tag: "DrawFromDeck", playerId: p0 })
-    expect(events[0]!._tag).toBe("DeckReshuffled")
+    if (events[0]!._tag !== "DeckReshuffled") throw new Error("expected DeckReshuffled")
+    expect(events[0]!.prng).toStrictEqual(after.prng)
     expect(events[1]!._tag).toBe("CardDrawn")
     expect(after.discard).toStrictEqual([card("4S")])
     if (after.phase._tag !== "HoldingCard") throw new Error("expected HoldingCard")

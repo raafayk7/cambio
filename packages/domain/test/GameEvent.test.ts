@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { decodeGameEvent, encodeGameEvent, type GameEvent } from "../src/GameEvent.js"
+import { prngStateFromSeed } from "../src/Prng.js"
 import { card, slot, ts, uid } from "./fixtures.js"
 
 const p0 = uid(0)
@@ -26,6 +27,7 @@ describe("GameEvent (C8.2)", () => {
         ],
         deck: [card("5S"), card("6S")],
         firstDiscard: card("7D"),
+        prng: prngStateFromSeed(42),
       },
       { _tag: "CambioCalled", playerId: p0 },
       {
@@ -89,7 +91,7 @@ describe("GameEvent (C8.2)", () => {
         card: card("JS"),
       },
       { _tag: "DrawSkipped", playerId: p1, kind: "penalty" },
-      { _tag: "DeckReshuffled", deck: [card("2S"), card("9D")] },
+      { _tag: "DeckReshuffled", deck: [card("2S"), card("9D")], prng: prngStateFromSeed(7) },
       { _tag: "SlamWindowClosed" },
       { _tag: "TurnAdvanced", playerId: p1 },
     ]

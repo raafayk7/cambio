@@ -12,7 +12,7 @@ import {
   endViolations,
   handIntegrityViolations,
   stepViolations,
-} from "./invariants.js"
+} from "../../src/testing/invariants.js"
 
 const config = decodeGameConfig({ slamWindowMs: 4000 })
 const players3 = [uid(0), uid(1), uid(2)]

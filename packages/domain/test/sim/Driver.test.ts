@@ -7,9 +7,9 @@ import { decodeGameConfig } from "../../src/GameConfig.js"
 import { type GameState } from "../../src/GameState.js"
 import { prngStateFromSeed } from "../../src/Prng.js"
 import { card, slot, ts, uid } from "../fixtures.js"
-import { legalCandidates } from "./candidates.js"
-import { SimFailure, simulateGame } from "./driver.js"
-import { makeDriverRng } from "./rng.js"
+import { legalCandidates } from "../../src/testing/candidates.js"
+import { SimFailure, simulateGame } from "../../src/testing/driver.js"
+import { makeDriverRng } from "../../src/testing/rng.js"
 
 const config = decodeGameConfig({ slamWindowMs: 4000 })
 const players3 = [uid(0), uid(1), uid(2)]
@@ -278,6 +278,19 @@ describe("game driver (C1)", () => {
     const c = simulateGame({ ...params, driverSeed: 203 })
     expect(c.events[0]).toStrictEqual(a.events[0])
     expect(c.trace).not.toStrictEqual(a.trace)
+  })
+
+  it("onStep reports the running event count, ending at events.length (CAM-3 M3)", () => {
+    const counts: Array<number> = []
+    const run = simulateGame({
+      ...params,
+      onStep: (_state, _now, _step, eventCount) => counts.push(eventCount),
+    })
+    expect(counts.length).toBe(run.steps)
+    for (let i = 1; i < counts.length; i++) {
+      expect(counts[i]!).toBeGreaterThan(counts[i - 1]!)
+    }
+    expect(counts[counts.length - 1]).toBe(run.events.length)
   })
 
   it("the simulated clock is monotone and window actions respect closesAt (C1.3)", () => {

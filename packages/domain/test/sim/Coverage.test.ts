@@ -4,8 +4,8 @@ import { decodeGameConfig } from "../../src/GameConfig.js"
 import { type GameState } from "../../src/GameState.js"
 import { prngStateFromSeed } from "../../src/Prng.js"
 import { card, slot, uid } from "../fixtures.js"
-import { simulateGame } from "./driver.js"
-import { defaultKnobs } from "./policy.js"
+import { simulateGame } from "../../src/testing/driver.js"
+import { defaultKnobs } from "../../src/testing/policy.js"
 
 /**
  * Seeded scenarios for the C5.2 rare-case shapes the tuned default batch

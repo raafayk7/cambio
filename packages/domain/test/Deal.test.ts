@@ -77,6 +77,7 @@ describe("dealGame", () => {
     expect(started.players).toStrictEqual(state.players.map((p) => p.id))
     expect(started.at).toBe(now)
     expect(started.seed).toBe(42)
+    expect(started.prng).toStrictEqual(state.prng)
   })
 
   it("differs across seeds", () => {

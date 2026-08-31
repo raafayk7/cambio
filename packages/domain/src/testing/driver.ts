@@ -1,13 +1,13 @@
 import { Either, Option } from "effect"
-import { ALL_CARD_SLUGS } from "../../src/Card.js"
-import { type Command } from "../../src/Command.js"
-import { dealGame } from "../../src/Deal.js"
-import { applyCommand, type EngineResult } from "../../src/Engine.js"
-import { type GameConfig } from "../../src/GameConfig.js"
-import { type GameEvent } from "../../src/GameEvent.js"
-import { type GameState } from "../../src/GameState.js"
-import { Timestamp, type UserId } from "../../src/Ids.js"
-import { ts, uid } from "../fixtures.js"
+import { ALL_CARD_SLUGS } from "../Card.js"
+import { type Command } from "../Command.js"
+import { dealGame } from "../Deal.js"
+import { applyCommand, type EngineResult } from "../Engine.js"
+import { type GameConfig } from "../GameConfig.js"
+import { type GameEvent } from "../GameEvent.js"
+import { type GameState } from "../GameState.js"
+import { Timestamp, type UserId } from "../Ids.js"
+import { ts, uid } from "./fixtures.js"
 import { legalCandidates } from "./candidates.js"
 import { emptyCounters, recordStep, type SimCounters } from "./counters.js"
 import { stepViolations } from "./invariants.js"
@@ -36,8 +36,13 @@ export interface SimParams {
     readonly state: GameState
     readonly roster: ReadonlyArray<UserId>
   }
-  /** Observation hook (fuzzing rides real states here); must not mutate. */
-  readonly onStep?: (state: GameState, now: Timestamp, step: number) => void
+  /**
+   * Observation hook (fuzzing rides real states here); must not mutate.
+   * `eventCount` is `events.length` after the step's append — the
+   * whole-command-prefix boundary a fold or mid-flight save must cut at
+   * (CAM-3; additive change flagged in the root plan's decision log).
+   */
+  readonly onStep?: (state: GameState, now: Timestamp, step: number, eventCount: number) => void
 }
 
 export interface StepRecord {
@@ -206,7 +211,7 @@ export const simulateGame = (params: SimParams): GameRun => {
     // The §4.5 invariants hold after every accepted command (C2.1, C2.2).
     const violations = stepViolations(state, roster, FULL_DECK_SORTED)
     if (violations.length > 0) return fail(violations.join("; "))
-    params.onStep?.(state, at, steps)
+    params.onStep?.(state, at, steps, events.length)
   }
 
   return {

@@ -6,10 +6,10 @@ import { decodeGameConfig } from "../../src/GameConfig.js"
 import { occupiedSlots } from "../../src/GameState.js"
 import { Timestamp } from "../../src/Ids.js"
 import { checkCommand, legalCommandKinds } from "../../src/Legality.js"
-import { legalCandidates } from "./candidates.js"
-import { playerCountFor, seedPair, simulateGame } from "./driver.js"
-import { randomCommand, sampleFillings } from "./fuzz.js"
-import { makeDriverRng } from "./rng.js"
+import { legalCandidates } from "../../src/testing/candidates.js"
+import { playerCountFor, seedPair, simulateGame } from "../../src/testing/driver.js"
+import { randomCommand, sampleFillings } from "../../src/testing/fuzz.js"
+import { makeDriverRng } from "../../src/testing/rng.js"
 
 /**
  * Illegal-command robustness (C4): probes ride real game states via the

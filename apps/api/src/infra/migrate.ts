@@ -2,11 +2,8 @@ import { readdir, readFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { NodeRuntime } from "@effect/platform-node"
 import { SqlClient } from "@effect/sql"
 import { Effect } from "effect"
-
-import { DatabaseLive } from "./database.js"
 
 /**
  * Plain-SQL migration runner (§9.1: `@effect/sql-pg` for queries, plain SQL
@@ -16,11 +13,15 @@ import { DatabaseLive } from "./database.js"
  * filename order, each in its own transaction, recorded in `_cambio_migrations`
  * so re-running is a no-op. Deliberately dumb: no down-migrations, no
  * checksums. Add them when there is a production database worth protecting.
+ *
+ * Exported as a bare effect requiring `SqlClient` so the CLI
+ * (`migrate-cli.ts`) and the integration-test setup can both run it against
+ * whichever database layer they provide (CAM-3, root plan C6.1).
  */
 
 const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "migrations")
 
-const migrate = Effect.gen(function* () {
+export const migrate = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
 
   yield* sql`
@@ -58,6 +59,4 @@ const migrate = Effect.gen(function* () {
 
     yield* Effect.logInfo(`applied ${name}`)
   }
-}).pipe(Effect.provide(DatabaseLive), Effect.scoped)
-
-NodeRuntime.runMain(migrate)
+})
