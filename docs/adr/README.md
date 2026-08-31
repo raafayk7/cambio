@@ -20,3 +20,7 @@ the point.
 | [0006](0006-typescript-pinned-5-9.md) | TypeScript pinned to 5.9 | accepted | 2026-08-30 | — |
 | [0007](0007-ai-harness-structure.md) | AI harness: AGENTS.md + .agents/ skills, commands, templates | accepted | 2026-08-30 | — |
 | [0008](0008-branching-strategy.md) | Branch hierarchy main → development → release-vN → task | accepted | 2026-08-31 | — |
+| [0009](0009-zero-card-slammer-draws-then-gives.md) | Zero-card slammer draws-then-gives; discard take at zero cards is a keep | proposed | 2026-08-31 | CAM-1 |
+| [0010](0010-jq-swaps-require-occupied-slots-powers-fizzle.md) | J/Q swaps need occupied slots; untargetable powers fizzle | proposed | 2026-08-31 | CAM-1 |
+| [0011](0011-slam-window-fixed-close-config-duration.md) | Slam window: fixed close from GameConfig; impossible draws skipped | proposed | 2026-08-31 | CAM-1 |
+| [0012](0012-empty-discard-skips-slam-window.md) | Empty discard pile skips the slam window; taking from it is illegal | proposed | 2026-08-31 | CAM-1 |

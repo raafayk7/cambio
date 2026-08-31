@@ -1,6 +1,6 @@
 # 0012 — An empty discard pile skips the slam window; taking from it is illegal
 
-- **Status:** accepted
+- **Status:** proposed (accepted at the release-v0 → development merge, upon human approval)
 - **Date:** 2026-08-31
 - **Task:** CAM-1
 

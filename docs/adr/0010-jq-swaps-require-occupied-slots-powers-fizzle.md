@@ -1,6 +1,6 @@
 # 0010 — J/Q swaps must name occupied slots; an obligatory power with no valid target fizzles
 
-- **Status:** accepted
+- **Status:** proposed (accepted at the release-v0 → development merge, upon human approval)
 - **Date:** 2026-08-31
 - **Task:** CAM-1
 
