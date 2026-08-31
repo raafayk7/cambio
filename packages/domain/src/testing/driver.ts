@@ -36,8 +36,13 @@ export interface SimParams {
     readonly state: GameState
     readonly roster: ReadonlyArray<UserId>
   }
-  /** Observation hook (fuzzing rides real states here); must not mutate. */
-  readonly onStep?: (state: GameState, now: Timestamp, step: number) => void
+  /**
+   * Observation hook (fuzzing rides real states here); must not mutate.
+   * `eventCount` is `events.length` after the step's append — the
+   * whole-command-prefix boundary a fold or mid-flight save must cut at
+   * (CAM-3; additive change flagged in the root plan's decision log).
+   */
+  readonly onStep?: (state: GameState, now: Timestamp, step: number, eventCount: number) => void
 }
 
 export interface StepRecord {
@@ -206,7 +211,7 @@ export const simulateGame = (params: SimParams): GameRun => {
     // The §4.5 invariants hold after every accepted command (C2.1, C2.2).
     const violations = stepViolations(state, roster, FULL_DECK_SORTED)
     if (violations.length > 0) return fail(violations.join("; "))
-    params.onStep?.(state, at, steps)
+    params.onStep?.(state, at, steps, events.length)
   }
 
   return {

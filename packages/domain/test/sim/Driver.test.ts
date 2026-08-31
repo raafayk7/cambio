@@ -280,6 +280,19 @@ describe("game driver (C1)", () => {
     expect(c.trace).not.toStrictEqual(a.trace)
   })
 
+  it("onStep reports the running event count, ending at events.length (CAM-3 M3)", () => {
+    const counts: Array<number> = []
+    const run = simulateGame({
+      ...params,
+      onStep: (_state, _now, _step, eventCount) => counts.push(eventCount),
+    })
+    expect(counts.length).toBe(run.steps)
+    for (let i = 1; i < counts.length; i++) {
+      expect(counts[i]!).toBeGreaterThan(counts[i - 1]!)
+    }
+    expect(counts[counts.length - 1]).toBe(run.events.length)
+  })
+
   it("the simulated clock is monotone and window actions respect closesAt (C1.3)", () => {
     const run = simulateGame(params)
     let [state] = Either.getOrThrow(dealGame(players3, params.gameSeed, config, ts(0)))
