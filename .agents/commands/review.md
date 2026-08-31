@@ -57,3 +57,4 @@ $ARGUMENTS with the verdict; if the verdict is ship, move the issue to
 cycle. Then report to the user: overall verdict first
 (ship / fix-then-ship / re-plan), findings with evidence, and what you ran.
 Do not fix findings in this command — the user decides what gets addressed.
+On a ship verdict, suggest `/ship $ARGUMENTS` as the next step.

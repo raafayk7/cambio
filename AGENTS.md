@@ -73,6 +73,8 @@ identifier as their argument:
 - `/plan CAM-xxx` — interview, explore, decide ADRs, produce plan documents
 - `/implement CAM-xxx` — execute the plan, keeping it updated as a living doc
 - `/review CAM-xxx` — review implementation against plan and architecture
+- `/ship CAM-xxx` — final commits, push, PR against the release branch,
+  linked to the Linear issue (the GitHub↔Linear integration is enabled)
 
 Plan documents are named after the issue and live in `docs/plans/`:
 `root/CAM-xxx.md` (the functional contract + milestone plan),
