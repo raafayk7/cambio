@@ -347,5 +347,53 @@ assumptions, upstream bugs, better approaches. Evidence included.)*
 
 ## Outcomes & retrospective
 
-*(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)*
+*(filled by `/review`, 2026-08-31)*
+
+**Verdict: fix-then-ship.** Every contract clause C1.1–C8.2 is SATISFIED
+(contract reviewer, clause-by-clause with file:line evidence); the
+architecture review confirmed the import boundary, purity, no-input-
+mutation, typed errors, single-legality-source, collision-free exports, and
+docstring discipline all clean. Independent gate run: 18/18 turbo tasks
+uncached, 106/106 domain tests, all validation greps empty.
+
+**Findings to fix before ship (small, enumerated):**
+
+1. *Architecture violation — non-exhaustive `if`-chain dispatch over
+   `Phase`* (effect-domain-modeling: unions must be matched exhaustively).
+   `GameState.ts` `allCards` decides "does this phase hold a card" via a
+   three-way `_tag ===` chain — a new card-carrying phase case would
+   compile clean and silently break the 52-partition — and
+   `Legality.ts` `legalCommandKinds` dispatches via sequential `if`s (a
+   new phase yields `[]` with no compiler signal). Fix: exhaustive
+   `switch`/`Match` with a `satisfies never` check.
+2. *Acceptance-criterion shortfall (letter, not behavior):* "every clause
+   has a test naming it" holds for only 17 of 34 numbered statements;
+   behavior is covered but several regressions would not be caught:
+   C7.3's test never deep-compares pre/post state; no test advances the
+   turn onto a zero-card seat (C4.6); no engine-path test slams out a
+   *middle* slot to pin hole-stability (C4.3); C6.2's positive half
+   (Cambio/take remain legal when draws are impossible) is unpinned;
+   `KeepHeld` during `ResolvingPower` (third `MustResolvePower` arm) is
+   untested; `GameError.test.ts` constructs 13 of the 16 error classes.
+
+**Advisory (defer or fold into CAM-2):** C4.1's body text predates
+ADR-0012 and still reads as if a window always opens — amend when next
+touched. `WrongPhase` doubles as the "can't discard a taken discard"
+rejection (deliberate, logged). `Engine.ts` `reshuffleIfEmpty` and
+`Legality.ts` `drawable` are two spellings of one predicate — divergence
+would turn a legality bug into a thrown `getOrThrow` defect. `HoldingCard`
+accepts a power card at the schema level; C2.5 holds only because the draw
+path never constructs that state — a decoded/persisted state violating it
+would be a hole (carry to persistence-task validation). `PlayerScore` is
+an unschema'd interface duplicating `GameEnded`'s inline struct.
+`Deal.ts` re-decodes the 52 slugs per deal. Seven `state.phase as Extract`
+casts in Engine stand in for narrowing the compiler can't carry.
+`DrawSkipped("give")` is unreachable in legal play (documented).
+Randomized property testing over the §4.5 invariants is CAM-2's task, as
+planned. Pre-existing, out of scope: zod 4.4.3 sits in the lockfile as a
+TanStack Router transitive dep from the scaffold commit (separate task
+flagged).
+
+**What should carry to CAM-2:** the two latent risks above (power card in
+`HoldingCard` via decoded state; `drawable` duplication), plus counting
+how often ADR-0011 skips and ADR-0012 empty-pile turns actually occur.
