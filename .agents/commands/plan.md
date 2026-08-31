@@ -55,7 +55,9 @@ If exploration surfaces new ambiguity, ask the user another round.
 
 Apply the `adr` skill's bar to every decision the task forces. For each that
 meets it: propose the decision and alternatives to the user, get their call,
-then write the ADR in `docs/adr/` (next free number, status accepted).
+then write the ADR in `docs/adr/` (next free number, status **proposed** —
+binding for this release, accepted only at the release→development merge;
+update `docs/adr/README.md` in the same commit).
 Task-scoped calls that don't meet the bar go in the plan's Decision Log
 instead. If the task contradicts an existing ADR, surface that now.
 

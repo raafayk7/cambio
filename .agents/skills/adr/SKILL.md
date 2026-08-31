@@ -58,9 +58,13 @@ runner", not "Migrations".
 
 ## Lifecycle
 
-- New ADRs from a planning session start as **accepted** once the user
-  confirms (they were discussed live); use **proposed** only when writing
-  one ahead of a decision.
+- New ADRs written during development (by `/plan`, `/implement`, or any
+  session) start as **proposed**, even when the user confirmed the decision
+  live. A proposed ADR is **binding within its release** — implementation
+  and review treat it as the ruling — but it graduates to **accepted** only
+  by explicit human approval when its release branch merges into
+  `development`. (Pre-development ADRs 0001–0008 were accepted directly;
+  that path is closed.)
 - **Never edit an accepted ADR's Decision section.** To change course, write
   a new ADR that states the new decision and marks the old one
   `superseded by NNNN`. History is the point.
@@ -68,3 +72,12 @@ runner", not "Migrations".
   don't quietly diverge.
 - When a change you're making contradicts an existing ADR, that's a signal
   to stop, not to route around it.
+
+## The index
+
+`docs/adr/README.md` is the one-glance index — a table of number, linked
+title, status, date, and task. Read it FIRST when you need to know what
+decisions exist; only open individual ADRs you actually need. Every ADR
+write, supersession, or status change updates the index **in the same
+commit** — an ADR that isn't in the index doesn't exist as far as future
+sessions are concerned.

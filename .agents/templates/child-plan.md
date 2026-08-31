@@ -26,6 +26,14 @@ The exact commands to run at each checkpoint and what output signals
 success (test names, expected counts). Include the final gate:
 `pnpm turbo build typecheck lint test`.
 
+## Contract coverage
+
+*(maintained by `/implement`, verified by `/review`: one row per root-plan
+contract clause this side owns — the test that pins it, or why none can)*
+
+| Clause | Test (file + name) |
+| --- | --- |
+
 ## Progress
 
 - [ ] YYYY-MM-DD HH:MM — step
