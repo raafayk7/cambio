@@ -5,7 +5,9 @@
 - **Child plans:** [backend](../backend/CAM-1.md)
 - **ADRs:** [0009](../../adr/0009-zero-card-slammer-draws-then-gives.md),
   [0010](../../adr/0010-jq-swaps-require-occupied-slots-powers-fizzle.md),
-  [0011](../../adr/0011-slam-window-fixed-close-config-duration.md)
+  [0011](../../adr/0011-slam-window-fixed-close-config-duration.md),
+  [0012](../../adr/0012-empty-discard-skips-slam-window.md) *(added during
+  implementation — new gap surfaced and resolved with the user)*
 
 > This is a **living document** (ExecPlan-style). The implementer updates
 > Progress, Decision Log, and Surprises as work happens — not at the end.
@@ -198,25 +200,25 @@ numeric seed. Same inputs ⇒ identical outputs, always.
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes.
-- [ ] `applyCommand(state, command, now)` with the
+- [x] `pnpm turbo build typecheck lint test` passes.
+- [x] `applyCommand(state, command, now)` with the
       `Either<GameError, [GameState, GameEvent[]]>` shape is exported from
       `@cambio/domain`, plus `dealGame` and the legality function.
-- [ ] The `PROVISIONAL` `TargetSelection`/`CardRef` shapes in `Phase.ts` are
+- [x] The `PROVISIONAL` `TargetSelection`/`CardRef` shapes in `Phase.ts` are
       gone, replaced per ADR-0010; no `PROVISIONAL` marker remains in
       `packages/domain`.
-- [ ] `grep -rn "Date.now\|new Date\|Math.random" packages/domain/src`
+- [x] `grep -rn "Date.now\|new Date\|Math.random" packages/domain/src`
       returns nothing.
-- [ ] Every contract clause above (C1–C8) has at least one test naming it;
+- [x] Every contract clause above (C1–C8) has at least one test naming it;
       each ADR ruling (draw-then-give, keep-at-zero, illegal empty target,
       fizzle, fixed close, skipped draw) has a dedicated test.
-- [ ] A scripted end-to-end test plays a full game — deal, several turns
+- [x] A scripted end-to-end test plays a full game — deal, several turns
       covering a take, swaps/discards, at least one power, at least one
       slam, a reshuffle, then Cambio — and asserts final scores and the
       52-card partition after every step.
-- [ ] A tie game is constructed and both winners appear in the result.
-- [ ] Determinism test: same seed + same commands ⇒ identical state/events.
-- [ ] The `cambio-rules` skill's "open gaps" section is updated to cite
+- [x] A tie game is constructed and both winners appear in the result.
+- [x] Determinism test: same seed + same commands ⇒ identical state/events.
+- [x] The `cambio-rules` skill's "open gaps" section is updated to cite
       ADRs 0009–0011 instead of "STOP AND ASK", and `Phase.ts` docstrings
       no longer forbid what this task built.
 
@@ -266,7 +268,18 @@ after each. File-level detail: [backend child plan](../backend/CAM-1.md).
 
 *(updated continuously; newest last; timestamp each entry)*
 
-- [ ] 2026-08-31 07:20 — plan written; awaiting sign-off
+- [x] 2026-08-31 07:20 — plan written; signed off; committed d043edd
+- [x] 2026-08-31 12:44 — M1 state model + Phase rewrite (25 tests)
+- [x] 2026-08-31 12:47 — M2 error/command/event vocabulary (31 tests)
+- [x] 2026-08-31 12:55 — M3 seeded deal (40 tests)
+- [x] 2026-08-31 13:00 — M4 legality core + engine skeleton (54 tests)
+- [x] 2026-08-31 13:10 — M5 turn actions + scoring; ADR-0012 written
+      (72 tests)
+- [x] 2026-08-31 13:20 — M6 powers + fizzles (85 tests)
+- [x] 2026-08-31 13:25 — M7 slamming complete, scaffold deleted (100 tests)
+- [x] 2026-08-31 13:35 — M8 end-to-end/tie/determinism tests, docstring +
+      skill updates; full gate `pnpm turbo build typecheck lint test`
+      green (18/18 tasks, 106 domain tests); all acceptance criteria hold
 
 ## Decision log
 
@@ -296,13 +309,104 @@ skill's bar.)*
   `now >= closesAt` (the application layer's timer fires it on the happy
   path, and can fire it lazily before a late command after a sleep, per
   §6). The engine never auto-advances on unrelated commands.
+- 2026-08-31 (implementation) — Added `UnknownPlayer` error: `Slam` accepts
+  any player, so a non-member issuer needs a distinguishable rejection.
+- 2026-08-31 (implementation) — Added `SwapTargetsIdentical` error: §1.4's
+  "blind-swap any two cards" is read as two *distinct* slots; allowing the
+  same slot twice would let a J/Q decline its swap information-free.
+- 2026-08-31 (implementation) — `powerHasValidTarget(power, state,
+  playerId)` gained the third parameter: 7/8 and 9/10 targets are relative
+  to the drawer, which the child plan's two-arg signature couldn't express.
+- 2026-08-31 (implementation) — The end-to-end game is driven by a
+  deterministic state-reading policy rather than a hand-scripted command
+  list: same coverage guarantees (asserted via required-event set), far
+  less brittle than 100+ hardcoded expectations, and the determinism test
+  replays it verbatim.
 
 ## Surprises & discoveries
 
 *(anything found mid-implementation that the plan didn't predict — wrong
 assumptions, upstream bugs, better approaches. Evidence included.)*
 
+- **The discard pile can empty** (zero-card keep of the pile's only card,
+  reachable right after the deal or a reshuffle), which the handoff never
+  contemplates — the slam window would have no rank and TakeDiscard nothing
+  to take. Resolved with the user as ADR-0012: skip the window, advance the
+  turn; taking from an empty pile is `EmptyDiscard`. Pinned by tests in
+  `TurnActions.test.ts`.
+- **`allCards` must count the phase-held card**: while a card is held
+  (`HoldingCard`/`ResolvingPower`/`ResolvingQueenSwap`) it is in the phase,
+  not in deck/discard/hands, so the child plan's deck+discard+hands
+  definition breaks the 52-partition mid-turn. Fixed in `GameState.ts`.
+- **`DrawSkipped("give")` is unreachable in legal play**: a slam window
+  implies a non-empty pile, and a successful slam pushes the slammed card
+  onto it, so the give-draw always finds the old top card via reshuffle
+  (test: "a zero-card give is satisfied by reshuffling the old top under
+  the slammed card"). Only the *penalty* skip is reachable (deck empty +
+  pile at exactly its top card). The give branch is kept for totality.
+
 ## Outcomes & retrospective
 
-*(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)*
+*(filled by `/review`, 2026-08-31)*
+
+**Verdict: fix-then-ship.** Every contract clause C1.1–C8.2 is SATISFIED
+(contract reviewer, clause-by-clause with file:line evidence); the
+architecture review confirmed the import boundary, purity, no-input-
+mutation, typed errors, single-legality-source, collision-free exports, and
+docstring discipline all clean. Independent gate run: 18/18 turbo tasks
+uncached, 106/106 domain tests, all validation greps empty.
+
+**Findings to fix before ship (small, enumerated):**
+
+1. *Architecture violation — non-exhaustive `if`-chain dispatch over
+   `Phase`* (effect-domain-modeling: unions must be matched exhaustively).
+   `GameState.ts` `allCards` decides "does this phase hold a card" via a
+   three-way `_tag ===` chain — a new card-carrying phase case would
+   compile clean and silently break the 52-partition — and
+   `Legality.ts` `legalCommandKinds` dispatches via sequential `if`s (a
+   new phase yields `[]` with no compiler signal). Fix: exhaustive
+   `switch`/`Match` with a `satisfies never` check.
+2. *Acceptance-criterion shortfall (letter, not behavior):* "every clause
+   has a test naming it" holds for only 17 of 34 numbered statements;
+   behavior is covered but several regressions would not be caught:
+   C7.3's test never deep-compares pre/post state; no test advances the
+   turn onto a zero-card seat (C4.6); no engine-path test slams out a
+   *middle* slot to pin hole-stability (C4.3); C6.2's positive half
+   (Cambio/take remain legal when draws are impossible) is unpinned;
+   `KeepHeld` during `ResolvingPower` (third `MustResolvePower` arm) is
+   untested; `GameError.test.ts` constructs 13 of the 16 error classes.
+
+**Advisory (defer or fold into CAM-2):** C4.1's body text predates
+ADR-0012 and still reads as if a window always opens — amend when next
+touched. `WrongPhase` doubles as the "can't discard a taken discard"
+rejection (deliberate, logged). `Engine.ts` `reshuffleIfEmpty` and
+`Legality.ts` `drawable` are two spellings of one predicate — divergence
+would turn a legality bug into a thrown `getOrThrow` defect. `HoldingCard`
+accepts a power card at the schema level; C2.5 holds only because the draw
+path never constructs that state — a decoded/persisted state violating it
+would be a hole (carry to persistence-task validation). `PlayerScore` is
+an unschema'd interface duplicating `GameEnded`'s inline struct.
+`Deal.ts` re-decodes the 52 slugs per deal. Seven `state.phase as Extract`
+casts in Engine stand in for narrowing the compiler can't carry.
+`DrawSkipped("give")` is unreachable in legal play (documented).
+Randomized property testing over the §4.5 invariants is CAM-2's task, as
+planned. Pre-existing, out of scope: zod 4.4.3 sits in the lockfile as a
+TanStack Router transitive dep from the scaffold commit (separate task
+flagged).
+
+**What should carry to CAM-2:** the two latent risks above (power card in
+`HoldingCard` via decoded state; `drawable` duplication), plus counting
+how often ADR-0011 skips and ADR-0012 empty-pile turns actually occur.
+
+**Fix cycle (2026-08-31, post-review):** both blocking findings addressed.
+(1) `allCards` now routes through an exhaustive `phaseHeldCards` switch and
+`legalCommandKinds` dispatches via an exhaustive switch, both with
+`satisfies never` defaults — a new `Phase` case is now a compile error at
+both sites. (2) Tests added: pre/post deep-compare in both C7.3 paths
+(illegal *and* legal), turn advance onto a zero-card seat, middle-slot
+slam pinning hole stability, C6.2's positive half
+(`["CallCambio","TakeDiscard"]` when draws are impossible), `KeepHeld`
+during `ResolvingPower`, a successful slam against a power-rank top
+(C3.6), all 16 error classes constructed, and clause tags added to test
+titles for the previously unnamed clauses. Gate re-run: 18/18 uncached,
+111/111 tests. Advisory items remain deferred as listed.
