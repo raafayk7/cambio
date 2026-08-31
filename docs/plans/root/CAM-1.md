@@ -5,7 +5,9 @@
 - **Child plans:** [backend](../backend/CAM-1.md)
 - **ADRs:** [0009](../../adr/0009-zero-card-slammer-draws-then-gives.md),
   [0010](../../adr/0010-jq-swaps-require-occupied-slots-powers-fizzle.md),
-  [0011](../../adr/0011-slam-window-fixed-close-config-duration.md)
+  [0011](../../adr/0011-slam-window-fixed-close-config-duration.md),
+  [0012](../../adr/0012-empty-discard-skips-slam-window.md) *(added during
+  implementation — new gap surfaced and resolved with the user)*
 
 > This is a **living document** (ExecPlan-style). The implementer updates
 > Progress, Decision Log, and Surprises as work happens — not at the end.
@@ -198,25 +200,25 @@ numeric seed. Same inputs ⇒ identical outputs, always.
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes.
-- [ ] `applyCommand(state, command, now)` with the
+- [x] `pnpm turbo build typecheck lint test` passes.
+- [x] `applyCommand(state, command, now)` with the
       `Either<GameError, [GameState, GameEvent[]]>` shape is exported from
       `@cambio/domain`, plus `dealGame` and the legality function.
-- [ ] The `PROVISIONAL` `TargetSelection`/`CardRef` shapes in `Phase.ts` are
+- [x] The `PROVISIONAL` `TargetSelection`/`CardRef` shapes in `Phase.ts` are
       gone, replaced per ADR-0010; no `PROVISIONAL` marker remains in
       `packages/domain`.
-- [ ] `grep -rn "Date.now\|new Date\|Math.random" packages/domain/src`
+- [x] `grep -rn "Date.now\|new Date\|Math.random" packages/domain/src`
       returns nothing.
-- [ ] Every contract clause above (C1–C8) has at least one test naming it;
+- [x] Every contract clause above (C1–C8) has at least one test naming it;
       each ADR ruling (draw-then-give, keep-at-zero, illegal empty target,
       fizzle, fixed close, skipped draw) has a dedicated test.
-- [ ] A scripted end-to-end test plays a full game — deal, several turns
+- [x] A scripted end-to-end test plays a full game — deal, several turns
       covering a take, swaps/discards, at least one power, at least one
       slam, a reshuffle, then Cambio — and asserts final scores and the
       52-card partition after every step.
-- [ ] A tie game is constructed and both winners appear in the result.
-- [ ] Determinism test: same seed + same commands ⇒ identical state/events.
-- [ ] The `cambio-rules` skill's "open gaps" section is updated to cite
+- [x] A tie game is constructed and both winners appear in the result.
+- [x] Determinism test: same seed + same commands ⇒ identical state/events.
+- [x] The `cambio-rules` skill's "open gaps" section is updated to cite
       ADRs 0009–0011 instead of "STOP AND ASK", and `Phase.ts` docstrings
       no longer forbid what this task built.
 
@@ -266,7 +268,18 @@ after each. File-level detail: [backend child plan](../backend/CAM-1.md).
 
 *(updated continuously; newest last; timestamp each entry)*
 
-- [ ] 2026-08-31 07:20 — plan written; awaiting sign-off
+- [x] 2026-08-31 07:20 — plan written; signed off; committed d043edd
+- [x] 2026-08-31 12:44 — M1 state model + Phase rewrite (25 tests)
+- [x] 2026-08-31 12:47 — M2 error/command/event vocabulary (31 tests)
+- [x] 2026-08-31 12:55 — M3 seeded deal (40 tests)
+- [x] 2026-08-31 13:00 — M4 legality core + engine skeleton (54 tests)
+- [x] 2026-08-31 13:10 — M5 turn actions + scoring; ADR-0012 written
+      (72 tests)
+- [x] 2026-08-31 13:20 — M6 powers + fizzles (85 tests)
+- [x] 2026-08-31 13:25 — M7 slamming complete, scaffold deleted (100 tests)
+- [x] 2026-08-31 13:35 — M8 end-to-end/tie/determinism tests, docstring +
+      skill updates; full gate `pnpm turbo build typecheck lint test`
+      green (18/18 tasks, 106 domain tests); all acceptance criteria hold
 
 ## Decision log
 
@@ -296,11 +309,41 @@ skill's bar.)*
   `now >= closesAt` (the application layer's timer fires it on the happy
   path, and can fire it lazily before a late command after a sleep, per
   §6). The engine never auto-advances on unrelated commands.
+- 2026-08-31 (implementation) — Added `UnknownPlayer` error: `Slam` accepts
+  any player, so a non-member issuer needs a distinguishable rejection.
+- 2026-08-31 (implementation) — Added `SwapTargetsIdentical` error: §1.4's
+  "blind-swap any two cards" is read as two *distinct* slots; allowing the
+  same slot twice would let a J/Q decline its swap information-free.
+- 2026-08-31 (implementation) — `powerHasValidTarget(power, state,
+  playerId)` gained the third parameter: 7/8 and 9/10 targets are relative
+  to the drawer, which the child plan's two-arg signature couldn't express.
+- 2026-08-31 (implementation) — The end-to-end game is driven by a
+  deterministic state-reading policy rather than a hand-scripted command
+  list: same coverage guarantees (asserted via required-event set), far
+  less brittle than 100+ hardcoded expectations, and the determinism test
+  replays it verbatim.
 
 ## Surprises & discoveries
 
 *(anything found mid-implementation that the plan didn't predict — wrong
 assumptions, upstream bugs, better approaches. Evidence included.)*
+
+- **The discard pile can empty** (zero-card keep of the pile's only card,
+  reachable right after the deal or a reshuffle), which the handoff never
+  contemplates — the slam window would have no rank and TakeDiscard nothing
+  to take. Resolved with the user as ADR-0012: skip the window, advance the
+  turn; taking from an empty pile is `EmptyDiscard`. Pinned by tests in
+  `TurnActions.test.ts`.
+- **`allCards` must count the phase-held card**: while a card is held
+  (`HoldingCard`/`ResolvingPower`/`ResolvingQueenSwap`) it is in the phase,
+  not in deck/discard/hands, so the child plan's deck+discard+hands
+  definition breaks the 52-partition mid-turn. Fixed in `GameState.ts`.
+- **`DrawSkipped("give")` is unreachable in legal play**: a slam window
+  implies a non-empty pile, and a successful slam pushes the slammed card
+  onto it, so the give-draw always finds the old top card via reshuffle
+  (test: "a zero-card give is satisfied by reshuffling the old top under
+  the slammed card"). Only the *penalty* skip is reachable (deck empty +
+  pile at exactly its top card). The give branch is kept for totality.
 
 ## Outcomes & retrospective
 

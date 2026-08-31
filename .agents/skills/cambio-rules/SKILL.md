@@ -104,17 +104,31 @@ momentarily — that leak is part of the cost.
   possible and must be representable** — no caller tiebreak, no `winner`
   column.
 
-## Open rule gaps — STOP AND ASK
+## Formerly open gaps — now decided (do NOT re-litigate)
 
-These are deliberately undecided (HANDOFF §9). Never pick an answer, even a
-"reasonable" one — flag the gap to the user instead:
+The HANDOFF §9 rule gaps were resolved with the user during CAM-1 planning
+and implementation. The ADRs are canonical; treat them as rules:
 
-1. **Zero-card slammer** correctly slams an opponent and owes a card — skip
-   the transfer? draw-then-give? undecided.
-2. **J/Q swap targeting a player with zero cards** — no-op or illegal?
-   undecided.
-3. **Slam window duration** — needs playtesting; must be config, not a
-   literal.
+1. **Zero-card slammer** who correctly slams an opponent **draws the deck
+   top and gives it unseen** into the vacated slot; a zero-card player may
+   also take the (non-power) top discard as a **keep** into the lowest free
+   slot — [ADR-0009](../../../docs/adr/0009-zero-card-slammer-draws-then-gives.md).
+2. **J/Q swaps must name two distinct occupied slots** (empty-hand players
+   cannot be targeted); an obligatory power with **no valid target fizzles**
+   to the discard pile as a no-op —
+   [ADR-0010](../../../docs/adr/0010-jq-swaps-require-occupied-slots-powers-fizzle.md).
+3. **Slam window**: `closesAt` is fixed when the window opens (no reset on
+   slams) and the duration comes from `GameConfig.slamWindowMs` — config,
+   never a literal; a penalty/give draw that is impossible even after
+   reshuffle is **skipped** —
+   [ADR-0011](../../../docs/adr/0011-slam-window-fixed-close-config-duration.md).
+4. **Empty discard pile** (a zero-card keep took its last card): no slam
+   window opens — the turn advances directly — and taking from the empty
+   pile is illegal —
+   [ADR-0012](../../../docs/adr/0012-empty-discard-skips-slam-window.md).
+
+Any rule situation NOT covered by §1 or these ADRs is still a stop-and-ask:
+never fill a gap from other Cambio/Cabo variants or from priors.
 
 UI note: the game is **memory-faithful** — a peeked card is shown briefly
 and never again. No persistent markers, tooltips, or "cards you know" panel.

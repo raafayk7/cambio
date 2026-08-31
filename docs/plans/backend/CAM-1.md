@@ -653,6 +653,39 @@ the tie game, and the determinism replay.
       31 tests green, typecheck clean. (One test rework: TS narrows a
       const's declared union by its initializer, so the `_tag`-switch test
       routes through a `(err: GameError) => string` function.)
+- [x] 2026-08-31 12:55 — M3 complete: shuffle tests + `Deal.ts`. 40 green.
+- [x] 2026-08-31 13:00 — M4 complete: `Legality.ts` (checkCommand,
+      legalCommandKinds, powerHasValidTarget), `Engine.ts` skeleton.
+      54 green. Deviations: `powerHasValidTarget` takes a third `playerId`
+      arg (7/8 and 9/10 are relative to the drawer); added `UnknownPlayer`
+      error (Slam accepts any player, so a non-member issuer needs a
+      distinguishable rejection); `isPowerRank` moved to `Card.ts` (shared
+      by Legality and Engine).
+- [x] 2026-08-31 13:10 — M5 complete: `Scoring.ts` + all turn-action
+      handlers. 72 green. **New rule gap surfaced and resolved with the
+      user (ADR-0012):** a zero-card keep can empty the discard pile — the
+      slam window is then skipped (turn advances directly) and taking from
+      an empty pile is a new `EmptyDiscard` error. Also: `allCards` now
+      counts the phase-held card, else the 52-partition breaks mid-turn.
+- [x] 2026-08-31 13:20 — M6 complete: power handlers + fizzles. 85 green.
+      Deviation: added `SwapTargetsIdentical` error — "blind-swap any two
+      cards" (§1.4) read as requiring two *distinct* slots; naming the same
+      slot twice would let a J/Q decline its swap information-free.
+- [x] 2026-08-31 13:25 — M7 complete: slam handler, all outcomes;
+      `TransitionNotReached` scaffold deleted. 100 green. Discovery: the
+      zero-card give's `DrawSkipped("give")` branch is unreachable in legal
+      play — a window implies a non-empty pile, and the successful slam
+      pushes the slammed card, so the give draw always finds the old top
+      via reshuffle (covered by a dedicated test). Branch kept for
+      totality.
+- [x] 2026-08-31 13:35 — M8 complete: `EndToEnd.test.ts` (driver-based
+      scripted game, tie, determinism, enumeration smoke test), docstring
+      pass (`Card.ts`, `Phase.ts` already done in M1), `cambio-rules` gap
+      section rewritten to cite ADRs 0009–0012. All four greps empty. Full
+      gate green: 18/18 turbo tasks, 106 domain tests. Deviation: e2e uses
+      a deterministic state-reading policy driver instead of a hand-coded
+      command list (coverage asserted via required-event set; root plan
+      Decision Log has the rationale).
 
 ## Surprises & notes for the root plan
 
