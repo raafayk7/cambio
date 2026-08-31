@@ -46,6 +46,11 @@ export class EmptySlotTarget extends Data.TaggedError("EmptySlotTarget")<{
   readonly target: SlotRef
 }> {}
 
+/** A blind swap names *two* cards (§1.4) — the same slot twice is not a swap. */
+export class SwapTargetsIdentical extends Data.TaggedError("SwapTargetsIdentical")<{
+  readonly target: SlotRef
+}> {}
+
 /** 7/8 must aim at your own card, 9/10 at another player's (§1.4). */
 export class WrongPeekTarget extends Data.TaggedError("WrongPeekTarget")<{
   readonly power: PowerKind
@@ -100,6 +105,7 @@ export type GameError =
   | PowerDiscardNotTakeable
   | MustResolvePower
   | EmptySlotTarget
+  | SwapTargetsIdentical
   | WrongPeekTarget
   | KeepRequiresEmptyHand
   | InvalidGiveSlot

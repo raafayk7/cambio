@@ -1,5 +1,5 @@
 import { Data, Either, Option } from "effect"
-import { isPowerRank, rank } from "./Card.js"
+import { type CardSlug, isPowerRank, rank } from "./Card.js"
 import { type Command } from "./Command.js"
 import { type GameError } from "./GameError.js"
 import { type GameEvent } from "./GameEvent.js"
@@ -9,6 +9,7 @@ import {
   handOf,
   lowestFreeSlot,
   slotCard,
+  type SlotRef,
 } from "./GameState.js"
 import { Timestamp, type UserId } from "./Ids.js"
 import { shuffle } from "./Prng.js"
@@ -207,6 +208,58 @@ const keepHeld = (state: GameState, playerId: UserId, now: Timestamp): Step => {
   ]
 }
 
+const setSlot = (state: GameState, ref: SlotRef, newCard: CardSlug): GameState =>
+  withHand(state, ref.playerId, (hand) =>
+    hand.map((s) => (s.slotIndex === ref.slotIndex ? { ...s, card: newCard } : s)),
+  )
+
+const powerPeek = (state: GameState, playerId: UserId, target: SlotRef, now: Timestamp): Step => {
+  const phase = state.phase as Extract<GameState["phase"], { _tag: "ResolvingPower" }>
+  const peeked = Option.getOrThrow(slotCard(state, target))
+  const peekEvent: GameEvent = { _tag: "CardPeeked", viewerId: playerId, target, card: peeked }
+
+  if (rank(phase.card) === "Q") {
+    // Step one of two: the swap is still owed (§1.4).
+    return [
+      { ...state, phase: { _tag: "ResolvingQueenSwap", playerId, card: phase.card } },
+      [peekEvent],
+    ]
+  }
+
+  const resolved: GameState = { ...state, discard: [phase.card, ...state.discard] }
+  const [windowState, windowEvents] = openWindowOrAdvance(resolved, playerId, now)
+  return [
+    windowState,
+    [peekEvent, { _tag: "PowerDiscarded", playerId, card: phase.card }, ...windowEvents],
+  ]
+}
+
+const powerSwap = (
+  state: GameState,
+  playerId: UserId,
+  first: SlotRef,
+  second: SlotRef,
+  now: Timestamp,
+): Step => {
+  const phase = state.phase as Extract<
+    GameState["phase"],
+    { _tag: "ResolvingPower" } | { _tag: "ResolvingQueenSwap" }
+  >
+  const cardA = Option.getOrThrow(slotCard(state, first))
+  const cardB = Option.getOrThrow(slotCard(state, second))
+  const swapped = setSlot(setSlot(state, first, cardB), second, cardA)
+  const resolved: GameState = { ...swapped, discard: [phase.card, ...swapped.discard] }
+  const [windowState, windowEvents] = openWindowOrAdvance(resolved, playerId, now)
+  return [
+    windowState,
+    [
+      { _tag: "CardsBlindSwapped", by: playerId, first, second },
+      { _tag: "PowerDiscarded", playerId, card: phase.card },
+      ...windowEvents,
+    ],
+  ]
+}
+
 const closeSlamWindow = (state: GameState): Step => {
   const phase = state.phase as Extract<GameState["phase"], { _tag: "SlamWindow" }>
   const [advanced, events] = advanceTurn(state, phase.turnPlayerId)
@@ -236,9 +289,11 @@ export const applyCommand = (
       case "KeepHeld":
         return Either.right(keepHeld(state, command.playerId, now))
       case "PowerPeek":
-        return todo(command._tag)
+        return Either.right(powerPeek(state, command.playerId, command.target, now))
       case "PowerSwap":
-        return todo(command._tag)
+        return Either.right(
+          powerSwap(state, command.playerId, command.first, command.second, now),
+        )
       case "Slam":
         return todo(command._tag)
       case "CloseSlamWindow":

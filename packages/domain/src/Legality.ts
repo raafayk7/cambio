@@ -13,6 +13,7 @@ import {
   NotYourTurn,
   PowerDiscardNotTakeable,
   SlamTooLate,
+  SwapTargetsIdentical,
   UnknownPlayer,
   WindowStillOpen,
   WrongPeekTarget,
@@ -179,6 +180,12 @@ export const checkCommand = (
       }
       if (!occupied(state, command.second)) {
         return Option.some(new EmptySlotTarget({ target: command.second }))
+      }
+      if (
+        command.first.playerId === command.second.playerId &&
+        command.first.slotIndex === command.second.slotIndex
+      ) {
+        return Option.some(new SwapTargetsIdentical({ target: command.first }))
       }
       return Option.none()
     }
