@@ -58,6 +58,15 @@ title; verify the attachment appeared on the issue (MCP `get_issue`), and if
 it didn't, attach the PR URL explicitly (`save_issue` with `links`). Post a
 Linear comment on $ARGUMENTS with the PR URL and a one-line summary.
 
+**Downstream brief sweep:** fetch the issues $ARGUMENTS blocks or is
+related to (MCP `get_issue` with `includeRelations`) and re-read each
+description against what this task actually decided, built, or resolved. A
+brief whose premises this task consumed — e.g. it promises a decision an
+ADR has since made, or references behavior this task changed — misleads the
+next `/plan`. For each stale brief: post a comment on that issue stating
+what changed and which ADR/plan supersedes it; edit the description itself
+only with the user's confirmation.
+
 Leave the issue in **Development Done**. Report to the user: the PR URL,
 what the PR contains, and that merging it (and afterwards deleting the task
 branch) is their call.

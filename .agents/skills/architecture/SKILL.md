@@ -11,14 +11,14 @@ so getting this right up front is cheaper than discovering it at lint time).
 
 ## The import table (law, not guidance)
 
-| Package | May import | Role |
-| --- | --- | --- |
-| `packages/domain` | `effect` only | Entities, ADTs, rules engine, **repository ports**. Pure — no I/O of any kind. |
-| `packages/contracts` | `effect` only | Wire schemas shared by api + web (commands, events, responses). |
-| `packages/application` | `domain`, `contracts`, `effect` | Use cases, **infrastructure ports**. |
-| `apps/api` | `application`, `domain`, `contracts` | Fastify presentation + all port implementations. |
-| `apps/web` | `contracts`, `ui` — **never** `domain` or `application` | TanStack Start frontend. |
-| `packages/ui` | nothing app-specific | shadcn primitives, shared components. |
+| Package                | May import                                              | Role                                                                           |
+| ---------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `packages/domain`      | `effect` only                                           | Entities, ADTs, rules engine, **repository ports**. Pure — no I/O of any kind. |
+| `packages/contracts`   | `effect` only                                           | Wire schemas shared by api + web (commands, events, responses).                |
+| `packages/application` | `domain`, `contracts`, `effect`                         | Use cases, **infrastructure ports**.                                           |
+| `apps/api`             | `application`, `domain`, `contracts`                    | Fastify presentation + all port implementations.                               |
+| `apps/web`             | `contracts`, `ui` — **never** `domain` or `application` | TanStack Start frontend.                                                       |
+| `packages/ui`          | nothing app-specific                                    | shadcn primitives, shared components.                                          |
 
 Why `web` can never see `domain`: the domain contains full game state,
 including other players' hidden cards. Keeping `contracts` separate makes

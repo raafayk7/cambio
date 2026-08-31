@@ -27,8 +27,15 @@
       "outputs": []
     },
     "lint": {
-      "dependsOn": ["^build"],
+      // Formatting rides the gate via the root prettier task below: the
+      // documented gate string stays `turbo build typecheck lint test`.
+      "dependsOn": ["^build", "//#format:check"],
       "outputs": []
+    },
+    // Root task: one repo-wide `prettier --check .` (honors .prettierignore).
+    // Cheap and uncached so a stale cache can never fake a green format.
+    "//#format:check": {
+      "cache": false
     },
     "test": {
       "dependsOn": ["^build"],

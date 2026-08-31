@@ -34,7 +34,7 @@ feature needs the client to know something new, the change happens in
 `viewFor` (and its output schema in `contracts`), where it can be reviewed as
 an entitlement decision.
 
-Test it adversarially: for each phase, assert what a *non*-entitled player's
+Test it adversarially: for each phase, assert what a _non_-entitled player's
 view does **not** contain.
 
 ## Channel topology
@@ -48,8 +48,8 @@ publisher:
 - **Per-player channel** — private payloads: the value of a card you drew or
   peeked, your own known cards.
 
-The classification question for every new event: *is this payload identical
-for all players?* If yes → room channel. If no → it must go per-player,
+The classification question for every new event: _is this payload identical
+for all players?_ If yes → room channel. If no → it must go per-player,
 through `viewFor`. Never "mostly public with one private field" — split the
 event.
 

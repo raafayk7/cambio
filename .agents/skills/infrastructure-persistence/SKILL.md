@@ -47,7 +47,7 @@ Rows are soft-deleted (`deleted_at`), hard-deleted a week later by `pg_cron`
 on Supabase. Two rules with sharp edges:
 
 1. **Unique constraints must be partial:** `UNIQUE (…) WHERE deleted_at IS
-   NULL`. A plain unique index starts rejecting inserts once soft-deleted
+NULL`. A plain unique index starts rejecting inserts once soft-deleted
    rows accumulate.
 2. **The `deleted_at IS NULL` filter lives in the repository layer, always.**
    The domain must never know soft-delete exists. If a repository method can

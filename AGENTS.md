@@ -37,13 +37,13 @@ Clean Architecture with strictly enforced import boundaries — see the
 `architecture` skill for the full decision procedure. The one-table summary
 (ESLint fails CI on violations):
 
-| Package | May import |
-| --- | --- |
-| `packages/domain` | `effect` only |
-| `packages/application` | `domain`, `contracts`, `effect` |
-| `packages/contracts` | `effect` only |
-| `apps/api` | `application`, `domain`, `contracts` |
-| `apps/web` | `contracts`, `ui` — **never** `domain` or `application` |
+| Package                | May import                                              |
+| ---------------------- | ------------------------------------------------------- |
+| `packages/domain`      | `effect` only                                           |
+| `packages/application` | `domain`, `contracts`, `effect`                         |
+| `packages/contracts`   | `effect` only                                           |
+| `apps/api`             | `application`, `domain`, `contracts`                    |
+| `apps/web`             | `contracts`, `ui` — **never** `domain` or `application` |
 
 Repository ports live in `domain`; infrastructure ports live in
 `packages/application/src/ports/`; implementations of both live in
@@ -107,6 +107,10 @@ pnpm --filter @cambio/api migrate                   # apply SQL migrations
 pnpm dev                                            # api :3001, web :3100
 pnpm turbo build typecheck lint test                # the full gate
 ```
+
+The `lint` task also runs a repo-wide `prettier --check` (a root turbo
+task) — formatting is enforced, not aspirational. `pnpm format` fixes
+violations.
 
 Environment lives in `.env` at the repo root (copy from `.env.example`). Tests
 are vitest + `@effect/vitest`; domain work is test-first (HANDOFF §12).

@@ -82,8 +82,8 @@ export class IllegalMove extends Data.TaggedError("IllegalMove")<{
 ```
 
 Return them in `Either.left` (pure code) or the error channel of `Effect`
-(application code). One error type per *reason a caller could react
-differently*; don't create one error class per call site.
+(application code). One error type per _reason a caller could react
+differently_; don't create one error class per call site.
 
 A field-less error omits the generic entirely —
 `class NoCardToDraw extends Data.TaggedError("NoCardToDraw") {}` — never

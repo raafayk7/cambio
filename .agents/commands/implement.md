@@ -45,7 +45,7 @@ Follow the root plan's milestone order. Rules of engagement:
   entries for every non-obvious choice, record Surprises with evidence.
   Subagents update their child plan; you consolidate anything root-worthy.
 - **Deviations:** small tactical deviations from a child plan are fine if
-  logged. If the *functional contract* or an ADR turns out wrong, stop and
+  logged. If the _functional contract_ or an ADR turns out wrong, stop and
   ask the user — do not silently reshape the task. HANDOFF §9 open rules:
   never resolve them yourself, even under time pressure.
 
@@ -57,6 +57,13 @@ Then walk the root plan's acceptance criteria one by one and check each off
 only if it demonstrably holds.
 
 ## 4. Close out
+
+**Reconcile the plan docs with the as-built code.** Any API sketches,
+signatures, or module-layout tables the plans stated before code existed
+must now either match reality or be replaced with links to the real files —
+a Surprises entry noting a deviation does not excuse a stale table two
+sections above it. `/review` grades against the plans, and stale sketches
+burn review findings on documentation drift.
 
 Update the root plan's Progress to reflect completion, commit the work on
 the task branch (conventional messages, referencing $ARGUMENTS), and push
