@@ -123,26 +123,26 @@ New/changed files in `packages/domain`:
 
 New/changed files in `apps/api` (plus repo-root config):
 
-| File                                      | Exports                                                        | Job                                                                                                                                     |
-| ----------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `migrations/0002_cambio_schema.sql` (new) | —                                                              | The seven §4.3 tables (C1) — DDL sketch in M5.                                                                                          |
-| `src/infra/migrate.ts` (edit)             | `migrate` (Effect requiring `SqlClient.SqlClient`)             | C6.1: module-scope `runMain` removed; the program becomes reusable.                                                                     |
-| `src/infra/migrate-cli.ts` (new)          | — (entry point)                                                | `NodeRuntime.runMain(migrate.pipe(Effect.provide(DatabaseLive), Effect.scoped))`; `package.json`'s `migrate` script points here.        |
-| `src/infra/game-repository.ts` (new)      | `GameRepositoryLive` (Layer), `actorOf`                        | C3: transactional aggregate save + event append, version guard, codec boundary, soft-delete filters, per-tag actor mapping.             |
-| `src/infra/user-repository.ts` (new)      | `UserRepositoryLive` (Layer)                                   | C4.1, same discipline, `clock.ts`-style small adapter.                                                                                  |
-| `src/runtime.ts` (edit)                   | `AppServices` + `GameRepository` + `UserRepository`            | Registers both layers in `AppLayer` (repos consume `SqlClient` from `DatabaseLive`).                                                    |
-| `package.json` (edit)                     | `test` script; devDeps `vitest` 3.2.7, `@effect/vitest` 0.30.0 | C6.2.                                                                                                                                   |
-| `tsconfig.json` (edit)                    | —                                                              | `include` gains `test/**/*.ts` (`tsconfig.build.json` stays `src/`-only).                                                               |
-| `vitest.config.ts` (new)                  | —                                                              | `include: ["test/**/*.test.ts"]`, `testTimeout: 30_000`, `globalSetup: "./test/global-setup.ts"`, `fileParallelism: false` (shared DB). |
-| `test/global-setup.ts` (new)              | default export                                                 | Provision `cambio_test` (CREATE DATABASE if missing via the admin `cambio` DB), run the exported `migrate` effect, truncate tables.     |
-| `test/support/db.ts` (new)                | `TestDatabaseLive`, `RepoLayer`, `ensureRosterUsers`           | `PgClient.layerConfig` on `TEST_DATABASE_URL` (defaulted), repo layers wired for tests, idempotent `uid(0..4)` user seeding.            |
-| `test/Migrations.test.ts` (new)           | —                                                              | C1 schema introspection + idempotence.                                                                                                  |
-| `test/UserRepository.test.ts` (new)       | —                                                              | C4.1.                                                                                                                                   |
-| `test/GameRepository.test.ts` (new)       | —                                                              | C1.6, C3.3–C3.5, C3.7–C3.9 on scripted games.                                                                                           |
-| `test/RoundTrip.test.ts` (new)            | —                                                              | C5.2 harness round-trips + C5.3 §4.5-verbatim row assertions.                                                                           |
-| `test/SharpEdges.test.ts` (new)           | —                                                              | C5.4: version-conflict atomicity, partial-index re-insert, soft-deleted game invisibility.                                              |
-| `turbo.json` (edit, repo root)            | —                                                              | `TEST_DATABASE_URL` → `globalPassThroughEnv`; `RT_GAMES`, `RT_SEED` → test task `env`.                                                  |
-| `.env.example` (edit, repo root)          | —                                                              | `TEST_DATABASE_URL=postgres://cambio:cambio@localhost:5433/cambio_test`.                                                                |
+| File                                      | Exports                                                                                      | Job                                                                                                                                                                     |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `migrations/0002_cambio_schema.sql` (new) | —                                                                                            | The seven §4.3 tables (C1) — DDL sketch in M5.                                                                                                                          |
+| `src/infra/migrate.ts` (edit)             | `migrate` (Effect requiring `SqlClient.SqlClient`)                                           | C6.1: module-scope `runMain` removed; the program becomes reusable.                                                                                                     |
+| `src/infra/migrate-cli.ts` (new)          | — (entry point)                                                                              | `NodeRuntime.runMain(migrate.pipe(Effect.provide(DatabaseLive), Effect.scoped))`; `package.json`'s `migrate` script points here.                                        |
+| `src/infra/game-repository.ts` (new)      | `GameRepositoryLive` (Layer), `actorOf`                                                      | C3: transactional aggregate save + event append, version guard, codec boundary, soft-delete filters, per-tag actor mapping.                                             |
+| `src/infra/user-repository.ts` (new)      | `UserRepositoryLive` (Layer)                                                                 | C4.1, same discipline, `clock.ts`-style small adapter.                                                                                                                  |
+| `src/runtime.ts` (edit)                   | `AppServices` + `GameRepository` + `UserRepository`                                          | Registers both layers in `AppLayer` (repos consume `SqlClient` from `DatabaseLive`).                                                                                    |
+| `package.json` (edit)                     | `test` script; devDeps `vitest` 3.2.7, `@effect/vitest` 0.30.0                               | C6.2.                                                                                                                                                                   |
+| `tsconfig.json` (edit)                    | —                                                                                            | `include` gains `test/**/*.ts` (`tsconfig.build.json` stays `src/`-only).                                                                                               |
+| `vitest.config.ts` (new)                  | —                                                                                            | `include: ["test/**/*.test.ts"]`, `testTimeout: 30_000`, `globalSetup: "./test/global-setup.ts"`, `fileParallelism: false` (shared DB).                                 |
+| `test/global-setup.ts` (new)              | default export                                                                               | Provision `cambio_test` (CREATE DATABASE if missing via the admin `cambio` DB), run the exported `migrate` effect, truncate tables.                                     |
+| `test/support/db.ts` (new)                | `TEST_DATABASE_URL`, `TestDatabaseLive`, `TestLayer`, `makeTestRuntime`, `ensureRosterUsers` | `PgClient.layer` on `TEST_DATABASE_URL` (defaulted); repo layers over the test DB; one `ManagedRuntime` (one pool) per suite file; idempotent `uid(0..4)` user seeding. |
+| `test/Migrations.test.ts` (new)           | —                                                                                            | C1 schema introspection + idempotence.                                                                                                                                  |
+| `test/UserRepository.test.ts` (new)       | —                                                                                            | C4.1.                                                                                                                                                                   |
+| `test/GameRepository.test.ts` (new)       | —                                                                                            | C1.6, C3.3–C3.5, C3.7–C3.9 on scripted games.                                                                                                                           |
+| `test/RoundTrip.test.ts` (new)            | —                                                                                            | C5.2 harness round-trips + C5.3 §4.5-verbatim row assertions.                                                                                                           |
+| `test/SharpEdges.test.ts` (new)           | —                                                                                            | C5.4: version-conflict atomicity, partial-index re-insert, soft-deleted game invisibility.                                                                              |
+| `turbo.json` (edit, repo root)            | —                                                                                            | `TEST_DATABASE_URL` → `globalPassThroughEnv`; `RT_GAMES`, `RT_SEED` → test task `env`.                                                                                  |
+| `.env.example` (edit, repo root)          | —                                                                                            | `TEST_DATABASE_URL=postgres://cambio:cambio@localhost:5433/cambio_test`.                                                                                                |
 
 ## Plan of work
 
@@ -531,7 +531,7 @@ CREATE TABLE game_events (
   seq        int NOT NULL CHECK (seq >= 0),
   type       text NOT NULL,            -- the event _tag
   payload    jsonb NOT NULL,           -- encoded GameEvent, full truth, server-only
-  actor_id   uuid,                     -- null for SlamWindowClosed / DeckReshuffled (C3.8)
+  actor_id   uuid,                     -- null for GameStarted / SlamWindowClosed / DeckReshuffled (C3.8)
   at         bigint NOT NULL,          -- domain Timestamp, epoch ms (root decision)
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
@@ -576,7 +576,8 @@ Apply it: `pnpm --filter @cambio/api migrate` (applies `0002`), then again
    export const TEST_DATABASE_URL =
      process.env.TEST_DATABASE_URL ?? "postgres://cambio:cambio@localhost:5433/cambio_test"
    export const TestDatabaseLive = PgClient.layer({ url: Redacted.make(TEST_DATABASE_URL), ... })
-   export const RepoLayer // GameRepositoryLive + UserRepositoryLive provided with TestDatabaseLive (exists from M6; stub-free until then)
+   export const TestLayer // GameRepositoryLive + UserRepositoryLive over TestDatabaseLive (added in M6)
+   export const makeTestRuntime // ManagedRuntime.make(TestLayer): one pool per suite file, disposed in afterAll
    export const ensureRosterUsers // INSERT uid(0..4) ... ON CONFLICT DO NOTHING (raw SQL, test-only)
    ```
 
@@ -685,7 +686,8 @@ reference for Step 6.2.
 - "actor_id follows the exhaustive per-tag mapping (C3.8)" — unit-test the
   exported `actorOf` over one literal event of **all 22 tags**: `playerId`
   spellings (`playerId`/`calledBy`/`viewerId`/`by`/`slammerId`) map to the
-  right id; `SlamWindowClosed` and `DeckReshuffled` map to null; then
+  right id; `GameStarted` (system-driven deal — see root decision log),
+  `SlamWindowClosed`, and `DeckReshuffled` map to null; then
   assert the persisted `actor_id` column agrees for the scripted game's
   rows.
 - "SQL failures surface as typed StorageError (C3.7)" — save a game whose
@@ -809,7 +811,7 @@ rows):
   jsonb when its `_tag` is `HoldingCard`/`ResolvingPower`/
   `ResolvingQueenSwap`; sorted, `toStrictEqual` sorted `ALL_CARD_SLUGS`
   (the `EndToEnd.test.ts:58` idiom, against rows).
-- "no hand has a negative card count (C5.3, §4.5)" — per (game, player)
+- "no hand has a negative card count and no slot index is negative (§4.5)" —
   live-row counts are ≥ 0 and every `"index"` ≥ 0 (verbatim restatement;
   trivially strong, asserted anyway because the clause names it).
 - "seat_index values are contiguous from 0 (C5.3, §4.5)" — per game,
@@ -825,16 +827,16 @@ rows):
 small scripted game per test:
 
 - "a stale-version save is rejected atomically — no partial aggregate, no
-  orphan events (C5.4, C3.2)" — save v0→1; attempt a second save with
+  orphan events (C3.2)" — save v0→1; attempt a second save with
   `expectedVersion` 0 carrying new events ⇒ `Either.left` `VersionConflict`
   with `expected: 0, actual: 1`; then row counts of `game_events`,
   `user_cards` (live), `card_peeks` and `games.version` all unchanged.
 - "a soft-deleted row does not block re-insert under the partial unique
-  indexes (C5.4, §7 gotcha 1)" — raw SQL: soft-delete one live `user_cards`
+  indexes (§7 gotcha 1)" — raw SQL: soft-delete one live `user_cards`
   row, insert an identical `(game_id, user_id, "index", card)` row —
   succeeds; a duplicate insert against the **live** row still fails
   (unique violation), proving the index is partial, not absent.
-- "a soft-deleted game behaves as not-found (C5.4, C3.6)" — raw
+- "a soft-deleted game behaves as not-found (C3.6)" — raw
   `UPDATE games SET deleted_at = now()`; `load` ⇒ `GameNotFound`,
   `getEvents` ⇒ `GameNotFound`; a subsequent `save` at any version ⇒
   `VersionConflict` with `actual: null` (the live-row filter is in every
@@ -940,13 +942,13 @@ this column exists to catch.)_
 | C2.3   | `packages/domain/test/Ports.test.ts`                                                                                                                 | tag keys are "@cambio/domain/GameRepository"/"…/UserRepository"; error classes carry their fields; domain lint stays effect-only                                                |
 | C2.4   | structural — proven by the gate + apps/api suite importing `@cambio/domain/testing`                                                                  | `dist/testing` builds; api tests compile against the subpath; `src/index.ts` diff shows no testing re-export; domain sim suite green post-move                                  |
 | C3.1   | `GameRepository.test.ts` — "sequence numbers are contiguous…" + `SharpEdges.test.ts` atomicity test                                                  | events land with state in one transaction (a failed save leaves zero event rows); seq contiguous from 0 across the game's lifetime                                              |
-| C3.2   | `apps/api/test/SharpEdges.test.ts` — "a stale-version save is rejected atomically… (C5.4, C3.2)"                                                     | stale save ⇒ `VersionConflict{expected, actual}`; game_events/user_cards/card_peeks counts and games.version unchanged                                                          |
+| C3.2   | `apps/api/test/SharpEdges.test.ts` — "a stale-version save is rejected atomically… (C3.2)"                                                           | stale save ⇒ `VersionConflict{expected, actual}`; game_events/user_cards/card_peeks counts and games.version unchanged                                                          |
 | C3.3   | `GameRepository.test.ts` — "first save inserts, load returns the identical decoded state and version (C3.3)"                                         | `load` result `toStrictEqual`s the in-memory `GameState` (branded, phase codec round-trip); raw row shapes unreachable from the port surface                                    |
 | C3.4   | `GameRepository.test.ts` — "status derives from phase at save (C3.4)"                                                                                | mid-flight row has status `in_progress`; post-`Ended` save has `completed`; no other value ever written by this task                                                            |
 | C3.5   | `GameRepository.test.ts` — "final_score is null mid-game and materialized from GameEnded at completion (C3.5)"                                       | final_score NULL before completion; equals each player's `GameEnded.scores` total after                                                                                         |
-| C3.6   | `SharpEdges.test.ts` — "a soft-deleted game behaves as not-found (C5.4, C3.6)"                                                                       | load/getEvents ⇒ `GameNotFound`; save ⇒ `VersionConflict{actual: null}`; the filter is inside the repository, invisible to domain types                                         |
+| C3.6   | `SharpEdges.test.ts` — "a soft-deleted game behaves as not-found (C3.6)"                                                                             | load/getEvents ⇒ `GameNotFound`; save ⇒ `VersionConflict{actual: null}`; the filter is inside the repository, invisible to domain types                                         |
 | C3.7   | `GameRepository.test.ts` — "SQL failures surface as typed StorageError (C3.7)"                                                                       | an FK-violating save yields `Either.left StorageError` through `Effect.either` — nothing thrown across the boundary                                                             |
-| C3.8   | `GameRepository.test.ts` — "actor_id follows the exhaustive per-tag mapping (C3.8)"                                                                  | `actorOf` over literals of all 22 tags returns the right id per spelling and null for SlamWindowClosed/DeckReshuffled; persisted column agrees                                  |
+| C3.8   | `GameRepository.test.ts` — "actor_id follows the exhaustive per-tag mapping (C3.8)"                                                                  | `actorOf` over literals of all 22 tags returns the right id per spelling and null for GameStarted/SlamWindowClosed/DeckReshuffled; persisted column agrees                      |
 | C3.9   | `GameRepository.test.ts` — "getEvents returns the complete ordered decoded stream (C3.9)"                                                            | returned array deep-equals the saved `GameEvent`s in seq order, decoded (branded) values                                                                                        |
 | C4.1   | `apps/api/test/UserRepository.test.ts` — all three tests                                                                                             | create/findById round-trip decoded `User`; unknown id ⇒ `UserNotFound`; soft-deleted user ⇒ `UserNotFound`                                                                      |
 | C5.1   | `packages/domain/test/Fold.test.ts` — "folding the full event log reproduces the final state…" + "folding a step-boundary prefix…"                   | over the SIM_GAMES batch: `foldEvents(run.events)` `toStrictEqual` `run.finalState` (prng + phase asserted by name); every sampled prefix equal                                 |
@@ -961,6 +963,7 @@ this column exists to catch.)_
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [ ] 2026-08-31 — backend plan written; awaiting `/implement`
+- [x] 2026-08-31 23:31 — M7 done: `RoundTrip.test.ts` (incremental saves at ~every-10th-step boundaries, load-after-save equality, fold ≡ live ≡ load, five §4.5-verbatim row sweeps) + `SharpEdges.test.ts` (conflict atomicity, partial-index re-insert, soft-deleted invisibility); api suite 26 green; full gate `pnpm turbo build typecheck lint test` 20/20 in 51.5s; RT_GAMES=1000 deep run launched (wall time recorded on completion)
 - [x] 2026-08-31 23:27 — M6 done: `user-repository.ts` + `game-repository.ts` adapters, `runtime.ts` + `TestLayer` wiring; 16 api tests green. Surprise logged: driver is node-postgres and `sql.json` mangles JS-array params — see Surprises
 - [x] 2026-08-31 23:20 — M5 done: `0002_cambio_schema.sql` applied + idempotent on the dev DB; `migrate` exported (CLI moved to `migrate-cli.ts`); api vitest scaffolding (global-setup provisions/migrates/truncates `cambio_test`, `support/db.ts` with ManagedRuntime helper); `Migrations.test.ts` 5 tests green; turbo/.env.example wired
 - [x] 2026-08-31 23:16 — M4 done: `GameVersion` brand, `src/GameRepository.ts` + `src/UserRepository.ts` ports (test-first in `test/Ports.test.ts`), barrel exports; 175 green
@@ -971,3 +974,29 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 ## Surprises & notes for the root plan
 
 _(anything the root plan's Decision Log or the reviewer must know)_
+
+- **`@effect/sql-pg` 0.53.0 rides node-postgres (`pg` 8.22), not porsager
+  `postgres`.** Two consequences bitten during M6, both fixed inside
+  `game-repository.ts` with comments:
+  1. `sql.json(value)` passes the raw value through as a parameter, and pg
+     serializes a JS **array** parameter as a PG array literal (`{a,b,…}`) —
+     invalid json for the `PrngState` tuple (`error 22P02: invalid input
+syntax for type json`). Fix: a local `jsonb(value)` helper that
+     pre-stringifies (`${JSON.stringify(value)}::jsonb`), used for phase,
+     prng, config, and event payloads uniformly.
+  2. `${array}` in `@effect/sql` is an `ArrayHelper` that renders an IN-list
+     `(a, b, c)`, never a PG array — `text[]` columns bind through
+     `string_to_array(${items.join(",")}, ',')` (safe: `CardSlug` is a fixed
+     two-character token; `string_to_array('', ',')` is `{}`).
+- **`actorOf(GameStarted) = null`** — the deal is system-driven; the plan's
+  actorless list only named `SlamWindowClosed`/`DeckReshuffled`. Root plan
+  C3.8 and decision log updated.
+- The fold and all 27 contract clauses passed the batch properties on the
+  first green build after the two driver idioms above — no engine or rule
+  gaps surfaced; no HANDOFF §9 question was touched.
+- `test/support/db.ts` exports ended up as `TEST_DATABASE_URL` /
+  `TestDatabaseLive` / `TestLayer` / `makeTestRuntime` / `ensureRosterUsers`
+  (Module layout updated; the planned `RepoLayer` name became `TestLayer`).
+- RoundTrip's §4.5 row sweeps are scoped to the suite's own game-id prefix
+  (`…-4000-c000-…`): the five files share one database and the other suites
+  deliberately persist mid-flight and soft-deleted games.

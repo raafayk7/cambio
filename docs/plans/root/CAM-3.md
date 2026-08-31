@@ -147,7 +147,7 @@ uuid null, at)`; unique `(game_id, seq)`; append-only — no code path in
   channel; the adapter never throws across the layer boundary.
 - **C3.8** `game_events.actor_id` is populated by an exhaustive per-tag
   mapping (compiler-checked `satisfies never` default); events with no
-  actor (`SlamWindowClosed`, `DeckReshuffled`) store null.
+  actor (`GameStarted`, `SlamWindowClosed`, `DeckReshuffled`) store null.
 - **C3.9** `getEvents(gameId)` returns the complete ordered stream decoded
   to `GameEvent` values.
 
@@ -191,15 +191,15 @@ uuid null, at)`; unique `(game_id, seq)`; append-only — no code path in
 
 ### Acceptance criteria
 
-- [ ] Fresh database: migrate applies `0002_…`; second run reports no
+- [x] Fresh database: migrate applies `0002_…`; second run reports no
       pending migrations.
-- [ ] `pnpm turbo build typecheck lint test` passes with Docker Postgres up
+- [x] `pnpm turbo build typecheck lint test` passes with Docker Postgres up
       (the full gate, including the new apps/api suite).
-- [ ] C5.1 fold property passes over the full harness batch; C5.2/C5.3
+- [x] C5.1 fold property passes over the full harness batch; C5.2/C5.3
       round-trip + verbatim §4.5 invariants pass against Postgres.
-- [ ] CAM-1 + CAM-2 domain suites green after the C2.1 payload change and
+- [x] CAM-1 + CAM-2 domain suites green after the C2.1 payload change and
       C2.4 harness move.
-- [ ] No derivable columns exist (grep the migration for
+- [x] No derivable columns exist (grep the migration for
       `turn|face_up|size|winner|score|called_cambio` finds nothing beyond
       `final_score`).
 - [ ] Review confirms: events appended in the same transaction as state,
@@ -255,7 +255,15 @@ File-level detail lives in the [backend child plan](../backend/CAM-3.md).
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-08-31 — plan written; awaiting `/implement`
+- [x] 2026-08-31 — plan written; awaiting `/implement`
+- [x] 2026-08-31 23:08 — M1: `prng` in `GameStarted`/`DeckReshuffled` (test-first); domain suite green
+- [x] 2026-08-31 23:10 — M2: harness → `src/testing/` + `@cambio/domain/testing` export
+- [x] 2026-08-31 23:14 — M3: `foldEvents` + `onStep` eventCount; fold ≡ live over the 250-game batch, final + prefixes, first run
+- [x] 2026-08-31 23:16 — M4: `GameRepository`/`UserRepository` ports + `GameVersion`
+- [x] 2026-08-31 23:20 — M5: `0002_cambio_schema.sql` (applied, idempotent), `migrate` exported, api vitest + `cambio_test` provisioning
+- [x] 2026-08-31 23:27 — M6: both adapters, `runtime.ts` wiring; 16 api tests green
+- [x] 2026-08-31 23:31 — M7: round-trip batch + §4.5-verbatim sweeps + sharp edges; **full gate 20/20 tasks green (51.5s)**
+- [x] 2026-08-31 23:41 — `RT_GAMES=1000` deep run: 1000 games persisted and reconstructed, all 26 api tests green, wall time **8m37s**; `RT_GAMES=4` under `turbo test` proves the strict-env declaration is live; acceptance criteria checked (the review-owned box stays for `/review`)
 
 ## Decision log
 
@@ -320,6 +328,9 @@ _(reconciled from backend child-plan drafting, same day)_
 - Round-trip batch sizing follows the CAM-2 convention: `RT_GAMES`/`RT_SEED`
   knobs, default 25 in the gate, `RT_GAMES=1000` deep run required locally
   before ship.
+- (implementation) `actorOf(GameStarted) = null` — the deal is
+  system-driven like the clock-close and auto-reshuffle; C3.8's actorless
+  list is three events, not two.
 
 ## Surprises & discoveries
 
@@ -330,6 +341,12 @@ _(reconciled from backend child-plan drafting, same day)_
 - Planning: ESLint's boundary rules only deny `@cambio/*` imports, so a
   non-workspace violation (e.g. `@effect/sql-pg` inside domain) would pass
   lint silently. Out of CAM-3 scope; flagged as a separate harness task.
+- Implementation: `@effect/sql-pg` 0.53.0 rides node-postgres, and two of
+  its binding behaviours bit: `sql.json` of a JS array becomes a PG array
+  literal (invalid json — the `PrngState` tuple), and `${array}` is an
+  IN-list helper, never a PG array. The adapter pre-stringifies json params
+  (`::jsonb` cast) and binds `text[]` via `string_to_array`; details in the
+  backend plan's Surprises.
 
 ## Outcomes & retrospective
 
