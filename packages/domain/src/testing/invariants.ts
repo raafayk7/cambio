@@ -1,7 +1,7 @@
-import { type CardSlug, score } from "../../src/Card.js"
-import { type GameEvent } from "../../src/GameEvent.js"
-import { allCards, type GameState } from "../../src/GameState.js"
-import { type UserId } from "../../src/Ids.js"
+import { type CardSlug, score } from "../Card.js"
+import { type GameEvent } from "../GameEvent.js"
+import { allCards, type GameState } from "../GameState.js"
+import { type UserId } from "../Ids.js"
 
 /**
  * Pure invariant checkers (C2): each returns a list of human-readable

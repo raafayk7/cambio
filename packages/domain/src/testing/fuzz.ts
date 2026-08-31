@@ -1,7 +1,7 @@
-import { type Command } from "../../src/Command.js"
-import { type GameState, type SlotRef } from "../../src/GameState.js"
-import { type SlotIndex, type UserId } from "../../src/Ids.js"
-import { slot, uid } from "../fixtures.js"
+import { type Command } from "../Command.js"
+import { type GameState, type SlotRef } from "../GameState.js"
+import { type SlotIndex, type UserId } from "../Ids.js"
+import { slot, uid } from "./fixtures.js"
 import { type DriverRng } from "./rng.js"
 
 /**

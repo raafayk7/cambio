@@ -1,6 +1,6 @@
-import { type Command } from "../../src/Command.js"
-import { type GameEvent } from "../../src/GameEvent.js"
-import { type GameState } from "../../src/GameState.js"
+import { type Command } from "../Command.js"
+import { type GameEvent } from "../GameEvent.js"
+import { type GameState } from "../GameState.js"
 
 /**
  * Rare-case and volume counters aggregated over simulated games (C5.1) —

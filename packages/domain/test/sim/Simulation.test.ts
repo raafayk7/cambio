@@ -8,9 +8,14 @@ import { type GameState } from "../../src/GameState.js"
 import { legalCommandKinds } from "../../src/Legality.js"
 import { prngStateFromSeed } from "../../src/Prng.js"
 import { card, slot, ts, uid } from "../fixtures.js"
-import { emptyCounters, mergeCounters, formatSummary, recordStep } from "./counters.js"
-import { type GameRun, playerCountFor, seedPair, simulateGame } from "./driver.js"
-import { endViolations } from "./invariants.js"
+import {
+  emptyCounters,
+  mergeCounters,
+  formatSummary,
+  recordStep,
+} from "../../src/testing/counters.js"
+import { type GameRun, playerCountFor, seedPair, simulateGame } from "../../src/testing/driver.js"
+import { endViolations } from "../../src/testing/invariants.js"
 
 /**
  * The batch (C2, C3, C5): `SIM_GAMES` seeded random complete games. Per-step

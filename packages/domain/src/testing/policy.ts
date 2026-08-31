@@ -1,7 +1,7 @@
 import { Option } from "effect"
-import { rank } from "../../src/Card.js"
-import { type Command } from "../../src/Command.js"
-import { type GameState, handOf, slotCard } from "../../src/GameState.js"
+import { rank } from "../Card.js"
+import { type Command } from "../Command.js"
+import { type GameState, handOf, slotCard } from "../GameState.js"
 import { type DriverRng } from "./rng.js"
 
 /**
