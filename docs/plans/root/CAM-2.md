@@ -161,16 +161,22 @@ equivalences. The DB-shaped originals become checkable verbatim in CAM-3.
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes.
-- [ ] Default `pnpm --filter @cambio/domain test` plays ≥ 250 random
+- [x] `pnpm turbo build typecheck lint test` passes — 18/18 tasks green
+      (2026-08-31).
+- [x] Default `pnpm --filter @cambio/domain test` plays ≥ 250 random
       complete games with all C2–C5 assertions active and finishes in
-      reasonable time (target: well under a minute for the sim suite).
-- [ ] `SIM_GAMES=5000 pnpm --filter @cambio/domain test` passes locally
-      (the "thousands" deliverable).
-- [ ] The C5.2 coverage counters are all non-zero in the default run.
-- [ ] `test/EndToEnd.test.ts` is unchanged; `src/` is unchanged (any engine
-      change requires the C7.1 stop-and-ask first).
-- [ ] No new npm dependencies (ADR-0013).
+      reasonable time — sim suite ~8 s total, batch ~1 s.
+- [x] `SIM_GAMES=5000 pnpm --filter @cambio/domain test` passes locally
+      (the "thousands" deliverable) — 737,189 steps, zero violations, 17.5 s.
+- [x] The C5.2 coverage counters are all non-zero in the default run —
+      batch-reachable shapes asserted in `Simulation.test.ts`; J/Q fizzles
+      and the ADR-0012 skip asserted from `Coverage.test.ts` seeded
+      scenarios (per the plan's contingency).
+- [x] `test/EndToEnd.test.ts` is unchanged; `src/` is unchanged — the
+      C7.1 stop-and-ask was never triggered; `git diff` against
+      `release-v0` for both paths prints nothing.
+- [x] No new npm dependencies (ADR-0013) — `package.json`/lockfile
+      untouched.
 
 ## Plan of work
 
@@ -220,7 +226,12 @@ parameterize a finished harness.
 
 *(updated continuously; newest last; timestamp each entry)*
 
-- [ ] —
+- [x] 2026-08-31 14:20 — M1 driver core complete: `test/sim/` rng, candidates, policy, driver; 17 new tests green (C1.1–C1.5, C3.1 single-game), typecheck/lint clean.
+- [x] 2026-08-31 14:22 — M2 invariant checkers complete and wired per-step; `Simulation.test.ts` batch plays 250 random games with zero violations on first contact (batch wall time ~0.6 s). Suite 150 tests green.
+- [x] 2026-08-31 14:28 — M3 policy tuning + liveness: three probe rounds; final knobs and two policy design changes recorded in the child plan.
+- [x] 2026-08-31 17:28 — M4 illegal fuzz + legality cross-check green (25 offset-seeded games each; all six named illegal shapes observed; zero throws, zero mutations).
+- [x] 2026-08-31 17:40 — M5 counters + summary line + coverage assertions; `Coverage.test.ts` scenarios pin the J/Q fizzles and ADR-0012 skip the batch can't reach.
+- [x] 2026-08-31 17:50 — M6 wiring: `SIM_GAMES`/`SIM_SEED` knobs live under turbo; deep run 5000 games / 737k steps clean; full gate 18/18; acceptance criteria all check off. No engine gap ever surfaced — C7.1 never triggered.
 
 ## Decision log
 
@@ -249,6 +260,23 @@ parameterize a finished harness.
 - 2026-08-31 — Run summary via a single `console.log` line from the test —
   planning call: smallest thing that satisfies ADR-0011/0012's "count how
   often this occurs" request; revisit if it gets noisy.
+- 2026-08-31 — (implementation) Policy design, found by probing: `CallCambio`
+  is reachable only via the termination ramp, never uniform choice (uniform
+  ended ~⅓ of games on turn one); an informed slam attempt with no true rank
+  match on the table passes instead of slamming blind (blind-slam penalties
+  inflated hands faster than informed slams drained them); informed slams
+  prefer the slammer's own matching card (drains toward the zero-card
+  states every ADR rare path needs).
+- 2026-08-31 — (implementation) C5.2 split per the plan's contingency:
+  batch-reachable shapes asserted against the default batch (guarded with
+  `it.skipIf` when `SIM_GAMES`/`SIM_SEED` differ — a rescaled run proves
+  invariants, not rare-case reachability); J/Q fizzles and the ADR-0012
+  skip pinned by two `Coverage.test.ts` seeded scenarios with slams
+  disabled via knobs.
+- 2026-08-31 — (implementation) The 5000-game deep run found no failing
+  seed, so `Regressions.test.ts` was deliberately not created; `DrawSkipped`
+  stayed 0 across 737k steps, confirming ADR-0011's "near-impossible"
+  prediction.
 
 ## Surprises & discoveries
 
@@ -267,5 +295,72 @@ assumptions, upstream bugs, better approaches. Evidence included.)*
 
 ## Outcomes & retrospective
 
-*(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)*
+*(filled by `/review`, 2026-08-31)*
+
+**Verdict: ship.** Contract review: no clause violated — 17 satisfied,
+2 not-verifiable by artifact (C6.3 vacuous: no failing seed ever existed to
+pin; C7.1 process-only: never triggered, consistent with `src/` byte-
+unchanged). Architecture review: import boundaries, purity/determinism,
+single-source-of-legality, and rule fidelity (anti-prior guard, checked
+line-by-line against `cambio-rules`) all pass; no contracts/realtime
+surface touched. Independent verification: forced full gate 18/18 (161
+tests); `SIM_GAMES=5000` reproduced the implementation run's summary
+byte-identically (737,189 steps, zero violations); knob runs rescale and
+correctly skip the seed-pinned C5.2 assertions; untouched-surface checks
+all empty.
+
+**What shipped:** everything the contract asked for; no scope cut. The
+engine survived the harness — the C7.1 stop-and-ask never fired.
+
+**Findings (verified; none blocking — user decides what gets fixed):**
+
+1. **ADR-0013 rests on a false factual premise**: fast-check is already a
+   direct dependency of `effect` (re-exported as `effect/FastCheck`), so
+   "a new dependency" / "first test-only npm dependency" are wrong. The
+   decision stands on its other rationale (model-based `fc.commands`
+   duplicates `legalCommandKinds`; sequence-shrinking buys little over
+   seed replay), but the ADR is still *proposed* and should be amended.
+2. `counters.ts` `recordStep` switch ends `default: break` — silently
+   ignores nine event tags instead of the repo's explicit-cases +
+   `satisfies never` idiom; risky precisely because counters are the
+   rare-case detection mechanism.
+3. `fuzz.ts` `TAGS` / `Fuzz.test.ts` `PLAYER_TAGS` are hand-maintained
+   lists that typecheck while incomplete — a future `Command` tag silently
+   drops out of fuzz and C4.2 coverage.
+4. `driver.ts` calls `applyCommand` without try/catch — an engine *throw*
+   (vs `Either.left`) would escape without seeds/step/trace, unlike the
+   fuzz path (C1.5 asymmetry).
+5. The test titled for C2.4 in `Simulation.test.ts` only asserts
+   `winners.length > 0`; the real recomputation runs via `endViolations`
+   in the C2.3-titled test — child-plan coverage row mis-mapped.
+6. The two window-boundary fuzz probes (late slam, premature close) skip
+   the mutation snapshot the main C4.1 loop performs.
+7. Advisories: C5.2 batch margins thin (9/T fizzle passes on one
+   occurrence; zero-card give has no Coverage-scenario fallback off the
+   default batch); the C3.2/C2.1 batch `it`s are documentation (real
+   checks throw inside the driver — window closes *are* validated every
+   time through `applyCommand`, so no operational stuck-hole); call-ramp
+   monotonicity never unit-tested; child-plan module table shows the old
+   `chooseTurnCommand` signature; stale `invariants.ts` baseline
+   docstring; no NaN guard on `SIM_GAMES`; `testTimeout: 30_000` applies
+   package-wide rather than sim-only; `beforeAll` imported from `vitest`
+   instead of `@effect/vitest`; prettier drift (8 sim files) sits on an
+   already-dirty repo-wide baseline (19 files) with no format gate —
+   candidate for its own cleanup task.
+
+**Fix pass (2026-08-31, user-directed):** findings 1–5 addressed before
+shipping — ADR-0013 amended (fast-check premise corrected); `counters.ts`
+switch now exhaustive with explicit ignored cases + `satisfies never`;
+fuzz tag lists derived from `Record<Command["_tag"], true>` so a new
+command tag fails to compile; `driver.ts` wraps `applyCommand` in
+try/catch so an engine throw carries seeds/step/trace (with `cause`);
+the C2.4-titled test now runs the local recomputation + min-set winners
+check directly, and its coverage row is corrected. Gate re-run: 18/18,
+161 tests, batch summary byte-identical (behavior-preserving). Findings
+6+ (advisories) deliberately left as-is.
+
+**Carry into next tasks:** CAM-3 re-asserts the §4.5 invariants verbatim
+against the persisted schema; the DB-side "status" consistency invariant
+returns there. CAM-10 holds the two deferred engine-hardening items.
+Repo-wide prettier drift (19 files, mostly pre-existing) is a cleanup-task
+candidate.
