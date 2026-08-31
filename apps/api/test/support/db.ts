@@ -4,6 +4,9 @@ import { Effect, Layer, ManagedRuntime, Redacted } from "effect"
 
 import { uid } from "@cambio/domain/testing"
 
+import { GameRepositoryLive } from "../../src/infra/game-repository.js"
+import { UserRepositoryLive } from "../../src/infra/user-repository.js"
+
 /**
  * Shared plumbing for the apps/api integration suites. The literal default
  * keeps `pnpm --filter @cambio/api test` working with nothing but Docker up
@@ -20,8 +23,10 @@ export const TestDatabaseLive = PgClient.layer({
   applicationName: "cambio-api-tests",
 })
 
-/** The test database layer; M6 layers the repository adapters on top. */
-export const TestLayer = Layer.mergeAll(TestDatabaseLive)
+/** Both repository adapters over the test database, plus the raw SqlClient. */
+export const TestLayer = Layer.mergeAll(GameRepositoryLive, UserRepositoryLive).pipe(
+  Layer.provideMerge(TestDatabaseLive),
+)
 
 /** One runtime (one pool) per suite file; dispose it in afterAll. */
 export const makeTestRuntime = () => ManagedRuntime.make(TestLayer)

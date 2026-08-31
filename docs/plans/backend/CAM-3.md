@@ -961,6 +961,7 @@ this column exists to catch.)_
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [ ] 2026-08-31 — backend plan written; awaiting `/implement`
+- [x] 2026-08-31 23:20 — M5 done: `0002_cambio_schema.sql` applied + idempotent on the dev DB; `migrate` exported (CLI moved to `migrate-cli.ts`); api vitest scaffolding (global-setup provisions/migrates/truncates `cambio_test`, `support/db.ts` with ManagedRuntime helper); `Migrations.test.ts` 5 tests green; turbo/.env.example wired
 - [x] 2026-08-31 23:16 — M4 done: `GameVersion` brand, `src/GameRepository.ts` + `src/UserRepository.ts` ports (test-first in `test/Ports.test.ts`), barrel exports; 175 green
 - [x] 2026-08-31 23:14 — M3 done: `onStep` eventCount param (test in Driver.test.ts) + `src/Fold.ts` with `test/Fold.test.ts` (6 error-channel units, 2 transcription units, batch property final+prefix over 250 games — passed first run); suite at 172 green
 - [x] 2026-08-31 23:10 — M2 done: harness + fixtures moved to `src/testing/` (index barrel, `./testing` export, `test/fixtures.ts` shim); build emits `dist/testing/`; 161 tests, lint, prettier all green; `EndToEnd.test.ts` untouched (commit 68e3093)
