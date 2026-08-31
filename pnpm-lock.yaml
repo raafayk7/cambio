@@ -63,6 +63,9 @@ importers:
       '@cambio/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@effect/vitest':
+        specifier: 0.30.0
+        version: 0.30.0(effect@3.22.1)(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.5))
       '@types/node':
         specifier: 22.20.1
         version: 22.20.1
@@ -78,6 +81,9 @@ importers:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.5)
 
   apps/web:
     dependencies:

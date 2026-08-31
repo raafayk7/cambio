@@ -9,6 +9,7 @@
   // invalidate every build artifact in the repo.
   "globalPassThroughEnv": [
     "DATABASE_URL",
+    "TEST_DATABASE_URL",
     "PORT",
     "HOST",
     "LOG_LEVEL",
@@ -40,10 +41,11 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": [],
-      // CAM-2 simulation knobs (see packages/domain/test/sim/Simulation.test.ts).
+      // CAM-2 simulation knobs (packages/domain/test/sim/Simulation.test.ts)
+      // and CAM-3 round-trip knobs (apps/api/test/RoundTrip.test.ts).
       // Hashed, not passed through: a different game count or seed is a genuinely
       // different test run and must miss the cache.
-      "env": ["SIM_GAMES", "SIM_SEED"]
+      "env": ["SIM_GAMES", "SIM_SEED", "RT_GAMES", "RT_SEED"]
     },
     "dev": {
       "dependsOn": ["^build"],
