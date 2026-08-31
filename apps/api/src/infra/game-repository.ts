@@ -1,4 +1,4 @@
-import { PgClient } from "@effect/sql-pg"
+import { SqlClient } from "@effect/sql"
 import { Effect, Layer, Schema } from "effect"
 
 import {
@@ -80,7 +80,7 @@ const storage =
 export const GameRepositoryLive = Layer.effect(
   GameRepository,
   Effect.gen(function* () {
-    const sql = yield* PgClient.PgClient
+    const sql = yield* SqlClient.SqlClient
 
     // `${array}` in @effect/sql is an IN-list helper, not a PG array, so
     // text[] columns bind through string_to_array. Safe: CardSlug is a fixed

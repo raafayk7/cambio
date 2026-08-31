@@ -91,6 +91,28 @@ describe("0002_cambio_schema (C1)", () => {
     )
   })
 
+  it("game_players has exactly the decided columns (C1.3)", async () => {
+    const cols = await sqlRows<{ column_name: string }>(
+      (sql) => sql`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'game_players'
+      `,
+    )
+    expect(cols.map((c) => c.column_name).sort()).toStrictEqual(
+      [
+        "game_id",
+        "user_id",
+        "seat_index",
+        "final_score",
+        "is_connected",
+        "is_bot",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+      ].sort(),
+    )
+  })
+
   it("game_players/decks keys match the contract (C1.3, C1.4)", async () => {
     const pk = (table: string) =>
       sqlRows<{ column_name: string }>(

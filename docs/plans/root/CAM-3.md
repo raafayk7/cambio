@@ -202,7 +202,7 @@ uuid null, at)`; unique `(game_id, seq)`; append-only — no code path in
 - [x] No derivable columns exist (grep the migration for
       `turn|face_up|size|winner|score|called_cambio` finds nothing beyond
       `final_score`).
-- [ ] Review confirms: events appended in the same transaction as state,
+- [x] Review confirms: events appended in the same transaction as state,
       partial unique indexes, soft-delete filter only in repositories.
 
 ## Plan of work
@@ -332,6 +332,24 @@ _(reconciled from backend child-plan drafting, same day)_
   system-driven like the clock-close and auto-reshuffle; C3.8's actorless
   list is three events, not two.
 
+_(review fix cycle, 2026-08-31)_
+
+- `final_score` is **sticky**: the upsert uses
+  `COALESCE(EXCLUDED.final_score, game_players.final_score)`, so a written
+  score never reverts to null. Corollary edge (documented, unreachable from
+  current callers, unguarded by design): a save whose state is `Ended` but
+  whose batch lacks `GameEnded` would write `completed` with null scores —
+  CAM-5's use cases always persist whole engine batches, which include
+  `GameEnded`.
+- `GameRepositoryLive` requires `SqlClient.SqlClient`, not
+  `PgClient.PgClient` — nothing pg-specific remained after the `jsonb`
+  helper replaced `sql.json`; normalized to match `user-repository.ts`
+  (review F7).
+- The applied migration `0002`'s `actor_id` comment omits `GameStarted`
+  from the actorless list; per the never-edit-applied-migrations rule the
+  file stays as-is — this line and root C3.8 are the correction (review
+  F9).
+
 ## Surprises & discoveries
 
 - Planning: HANDOFF §4.2/§4.3's phase sketch is stale (5 variants vs. the
@@ -434,3 +452,13 @@ has a live decode path to harden (`games.phase` jsonb via `load`).
 
 **Verdict: fix-then-ship** — address findings 1–5, re-run the gate, then
 `/ship CAM-3`.
+
+**Fix cycle (2026-08-31, same day):** findings 1–5 all addressed — rollback
+pinned (the C3.7 test now verifies all six tables empty after a
+mid-transaction FK failure), `game_players` columns set-equality-asserted, a
+hole-uncompacted round-trip test added, a deliberately mid-flight game added
+to the §4.5 partition sweep with a vacuity guard, `GameRepositoryLive`
+normalized to `SqlClient`, and F6/F9 recorded in the Decision log. Coverage
+table corrected to match. Gate re-run uncached: 20/20 green (49.6s), api
+suite 28 tests. The deferred/advisory list stands as the carry-forward.
+**Ship.**

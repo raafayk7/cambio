@@ -281,26 +281,83 @@ describe("GameRepositoryLive (C3)", () => {
     )
   })
 
-  it("SQL failures surface as typed StorageError (C3.7)", async () => {
-    // A roster of users that were never created: the game_players FK trips.
+  it("SQL failures surface as typed StorageError and roll the whole transaction back (C3.7, C3.1, C3.2)", async () => {
+    // A roster of users that were never created: the game_players FK trips
+    // AFTER the games insert succeeded — the perfect mid-transaction probe.
     const stranger = (n: number): UserId =>
       Schema.decodeUnknownSync(UserId)(`00000000-0000-4000-b000-${String(n).padStart(12, "0")}`)
     const dealt = Either.getOrThrow(dealGame([stranger(1), stranger(2)], 7, config, ts(0)))
-    const result = await runtime.runPromise(
+    const gameId = gid(8)
+    const [result, leftovers] = await runtime.runPromise(
       Effect.gen(function* () {
         const games = yield* GameRepository
-        return yield* Effect.either(
+        const sql = yield* SqlClient.SqlClient
+        const saved = yield* Effect.either(
           games.save({
-            gameId: gid(8),
+            gameId,
             state: dealt[0],
             expectedVersion: v(0),
             newEvents: dealt[1],
             at: ts(1),
           }),
         )
+        const rows = yield* sql<{
+          games: string
+          players: string
+          decks: string
+          cards: string
+          events: string
+          peeks: string
+        }>`
+          SELECT
+            (SELECT COUNT(*) FROM games WHERE game_id = ${gameId}) AS games,
+            (SELECT COUNT(*) FROM game_players WHERE game_id = ${gameId}) AS players,
+            (SELECT COUNT(*) FROM decks WHERE game_id = ${gameId}) AS decks,
+            (SELECT COUNT(*) FROM user_cards WHERE game_id = ${gameId}) AS cards,
+            (SELECT COUNT(*) FROM game_events WHERE game_id = ${gameId}) AS events,
+            (SELECT COUNT(*) FROM card_peeks WHERE game_id = ${gameId}) AS peeks
+        `
+        return [saved, rows[0]!] as const
       }),
     )
     if (Either.isRight(result)) throw new Error("expected StorageError")
     expect(result.left._tag).toBe("StorageError")
+    // No partial aggregate, no orphan events: the games row that DID insert
+    // before the FK failure must be gone (soft-deleted rows included).
+    expect(Object.values(leftovers).map(Number)).toStrictEqual([0, 0, 0, 0, 0, 0])
+  })
+
+  it("persists a hand with a hole uncompacted (C1.5)", async () => {
+    // Simulate a slam having removed slot 1: indices 0, 2, 3 must round-trip
+    // exactly, never renumbered to 0, 1, 2.
+    const dealt = Either.getOrThrow(dealGame([uid(0), uid(1)], 11, config, ts(0)))
+    const [state, events] = dealt
+    const victim = state.players[0]!
+    const holed = {
+      ...state,
+      players: state.players.map((p) =>
+        p.id === victim.id ? { ...p, hand: p.hand.filter((s) => s.slotIndex !== 1) } : p,
+      ),
+    }
+    const gameId = gid(9)
+    const indices = await runtime.runPromise(
+      Effect.gen(function* () {
+        const games = yield* GameRepository
+        const sql = yield* SqlClient.SqlClient
+        yield* games.save({
+          gameId,
+          state: holed,
+          expectedVersion: v(0),
+          newEvents: events,
+          at: ts(1),
+        })
+        return yield* sql<{ index: number }>`
+          SELECT "index" FROM user_cards
+          WHERE game_id = ${gameId} AND user_id = ${victim.id} AND deleted_at IS NULL
+          ORDER BY "index"
+        `
+      }),
+    )
+    expect(indices.map((r) => r.index)).toStrictEqual([0, 2, 3])
   })
 })

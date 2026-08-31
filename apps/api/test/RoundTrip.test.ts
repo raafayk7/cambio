@@ -50,8 +50,39 @@ interface Persisted {
 
 const persisted: Array<Persisted> = []
 
+const HOLDING_TAGS = new Set(["HoldingCard", "ResolvingPower", "ResolvingQueenSwap"])
+
 beforeAll(async () => {
   await runtime.runPromise(ensureRosterUsers)
+
+  // One extra game persisted ONLY mid-flight, cut at a point whose phase
+  // holds a card — so the §4.5 partition sweep's "(+ phase-held card)" term
+  // is exercised against rows, not just dead code (review finding F3).
+  {
+    const [gameSeed, driverSeed] = seedPair(RT_SEED, RT_GAMES)
+    const cuts: Array<{ state: GameState; eventCount: number }> = []
+    const run = simulateGame({
+      gameSeed,
+      driverSeed,
+      playerCount: playerCountFor(RT_GAMES),
+      config,
+      onStep: (state, _now, _step, eventCount) => cuts.push({ state, eventCount }),
+    })
+    const holding = cuts.find((c) => HOLDING_TAGS.has(c.state.phase._tag))
+    if (holding === undefined) throw new Error("no holding-phase step in the extra game")
+    await runtime.runPromise(
+      Effect.gen(function* () {
+        const games = yield* GameRepository
+        yield* games.save({
+          gameId: gid(RT_GAMES),
+          state: holding.state,
+          expectedVersion: GameVersion.make(0),
+          newEvents: run.events.slice(0, holding.eventCount),
+          at: ts(500),
+        })
+      }),
+    )
+  }
   for (let i = 0; i < RT_GAMES; i++) {
     const [gameSeed, driverSeed] = seedPair(RT_SEED, i)
     const samples: Array<{ state: GameState; eventCount: number }> = []
@@ -145,11 +176,13 @@ describe("§4.5 invariants, verbatim against persisted rows (C5.3)", () => {
       `,
     )
 
-  const HOLDING_TAGS = new Set(["HoldingCard", "ResolvingPower", "ResolvingQueenSwap"])
-
   it("all 52 slugs partition across decks.cards + user_cards + games.discard_pile (+ the phase-held card) with no duplicates (§4.5)", async () => {
     const sorted52 = [...ALL_CARD_SLUGS].sort()
-    for (const game of await gameRows()) {
+    const games = await gameRows()
+    // Vacuity guard: the deliberately mid-flight game guarantees the
+    // held-card branch below runs at least once.
+    expect(games.some((g) => HOLDING_TAGS.has(g.phase._tag))).toBe(true)
+    for (const game of games) {
       const decks = await rowsOf<{ cards: ReadonlyArray<string> }>(
         (sql) => sql`
           SELECT cards FROM decks WHERE game_id = ${game.game_id} AND deleted_at IS NULL
