@@ -17,7 +17,11 @@ filename order by the ~50-line runner in `src/infra/migrate.ts`
 (`pnpm --filter @cambio/api migrate`). One transaction per file, recorded in
 `_cambio_migrations`. **No down-migrations and no checksums** — deliberately,
 until there is a production database worth protecting; don't add them in
-passing. Never edit an applied migration; add a new one.
+passing. Never edit an applied migration; add a new one. That rule is
+absolute and covers comments too: a stale comment in an applied migration
+(e.g. `0002`'s actor_id list) is corrected in the **next** migration's
+header comment and in the owning plan's decision log, never in the applied
+file.
 
 ## Schema design rules (HANDOFF §4.3)
 

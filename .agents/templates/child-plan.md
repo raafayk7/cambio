@@ -20,6 +20,12 @@ what goes in them, and which existing code is the pattern to follow. Steps
 sized so each leaves the repo compiling and tests green (TDD for domain
 work: test first, then implementation).
 
+Code sketches here (signatures, DDL, export lists) are **advisory** — they
+orient the implementer and are expected to drift; the Contract coverage
+table and any module-layout table are the artifacts that must match
+as-built code at close-out. Prefer constraints, test intents, and
+patterns-to-follow over predicted code.
+
 ## Concrete steps & validation
 
 The exact commands to run at each checkpoint and what output signals
@@ -32,7 +38,11 @@ _(maintained by `/implement`, verified by `/review`: one row per root-plan
 contract clause this side owns — the test that pins it, or why none can.
 Each row must also say **what is asserted**, in one phrase — a test whose
 title cites a clause but whose body doesn't assert it is the failure mode
-this column exists to catch.)_
+this column exists to catch. **At plan time, fill only the Clause column
+plus a planned-approach note**; test file, name, and assertion phrase are
+written by `/implement` when the test actually lands. A plan-time row that
+invents a test title and assertion is an overclaim waiting to become a
+review finding.)_
 
 | Clause | Test (file + name) | What is asserted |
 | ------ | ------------------ | ---------------- |

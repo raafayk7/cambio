@@ -206,6 +206,12 @@ This locks the game to one deck. That's acceptable at a 5-player maximum.
 
 ### 4.2 Turn phase is a discriminated union
 
+> **Amended:** this sketch is superseded by the implemented union in
+> `packages/domain/src/Phase.ts` — ADR-0010 split the Queen's swap into
+> `ResolvingQueenSwap`, ADR-0011 added `SlamWindow.turnPlayerId`, and
+> `ResolvingPower` carries the drawn card, not `power`/`chosen`. The
+> *principles* below (phase carries the turn, one legality function) stand.
+
 A turn is not atomic, and the drawn card must have a home. The game carries a `phase`:
 
 ```ts
@@ -222,6 +228,14 @@ type Phase =
 Legal moves are a function of `(phase, playerId, gameState)`. There should be exactly one place in the codebase that answers "is this move legal right now."
 
 ### 4.3 Persisted schema (sketch, not final DDL)
+
+> **Amended:** the shipped DDL is `apps/api/migrations/0002_cambio_schema.sql`
+> (CAM-3), which deviates deliberately: no `called_cambio_by` (derivable —
+> `CallCambio` ends the game immediately, so it is always `phase.calledBy`),
+> `decks` keyed by `game_id` with no surrogate `deck_id`, and `games` gains
+> `prng` + `config` jsonb columns (ADR-0014 makes the event log
+> self-contained). Where this sketch and the migration disagree, the
+> migration and the CAM-3 plan's decision log win.
 
 All tables additionally carry `created_at`, `updated_at`, `deleted_at`.
 
