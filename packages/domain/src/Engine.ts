@@ -1,4 +1,4 @@
-import { Data, Either, Option } from "effect"
+import { Either, Option } from "effect"
 import { type CardSlug, isPowerRank, rank } from "./Card.js"
 import { type Command } from "./Command.js"
 import { type GameError } from "./GameError.js"
@@ -29,20 +29,6 @@ export type EngineResult = Either.Either<
 >
 
 type Step = readonly [GameState, ReadonlyArray<GameEvent>]
-
-/**
- * Scaffold error for milestone-by-milestone construction. Private on
- * purpose: no test may rely on it, and it is deleted once every handler is
- * real (verified by grep in the plan's validation).
- */
-class TransitionNotReached extends Data.TaggedError("TransitionNotReached")<{
-  readonly commandTag: string
-}> {}
-
-type Handler = Either.Either<Step, GameError | TransitionNotReached>
-
-const todo = (commandTag: string): Handler =>
-  Either.left(new TransitionNotReached({ commandTag }))
 
 // ---------------------------------------------------------------------------
 // Shared state-construction helpers. Legality is already established.
@@ -260,6 +246,83 @@ const powerSwap = (
   ]
 }
 
+/** All four slam outcomes (§1.5), plus ADR-0009's draw-then-give and ADR-0011's skips. */
+const slam = (
+  state: GameState,
+  playerId: UserId,
+  target: SlotRef,
+  giveSlot: Hand[number]["slotIndex"] | null,
+): Step => {
+  const phase = state.phase as Extract<GameState["phase"], { _tag: "SlamWindow" }>
+  const targetCard = Option.getOrThrow(slotCard(state, target))
+
+  if (rank(targetCard) !== phase.rank) {
+    const failed: GameEvent = { _tag: "SlamFailed", slammerId: playerId, target, card: targetCard }
+    const drawn = drawOne(state)
+    if (Option.isNone(drawn)) {
+      // No card exists anywhere, even after reshuffle: penalty skipped (ADR-0011).
+      return [state, [failed, { _tag: "DrawSkipped", playerId, kind: "penalty" }]]
+    }
+    const [drawnState, drawEvents, penalty] = drawn.value
+    const slotIndex = lowestFreeSlot(Option.getOrElse(handOf(drawnState, playerId), () => []))
+    const penalized = withHand(drawnState, playerId, (hand) => [
+      ...hand,
+      { slotIndex, card: penalty },
+    ])
+    return [
+      penalized,
+      [failed, ...drawEvents, { _tag: "PenaltyDrawn", playerId, slotIndex, card: penalty }],
+    ]
+  }
+
+  const removed = withHand(state, target.playerId, (hand) =>
+    hand.filter((s) => s.slotIndex !== target.slotIndex),
+  )
+  const succeeded: GameEvent = {
+    _tag: "SlamSucceeded",
+    slammerId: playerId,
+    target,
+    card: targetCard,
+  }
+  const slammed: GameState = { ...removed, discard: [targetCard, ...removed.discard] }
+
+  if (target.playerId === playerId) return [slammed, [succeeded]]
+
+  if (giveSlot !== null) {
+    const giveCard = Option.getOrThrow(slotCard(slammed, { playerId, slotIndex: giveSlot }))
+    const taken = withHand(slammed, playerId, (hand) =>
+      hand.filter((s) => s.slotIndex !== giveSlot),
+    )
+    const given = withHand(taken, target.playerId, (hand) => [
+      ...hand,
+      { slotIndex: target.slotIndex, card: giveCard },
+    ])
+    return [
+      given,
+      [succeeded, { _tag: "CardGivenFromHand", slammerId: playerId, fromSlot: giveSlot, to: target }],
+    ]
+  }
+
+  // Zero-card slammer: draw-then-give, unseen (ADR-0009).
+  const drawn = drawOne(slammed)
+  if (Option.isNone(drawn)) {
+    return [slammed, [succeeded, { _tag: "DrawSkipped", playerId, kind: "give" }]]
+  }
+  const [drawnState, drawEvents, giveCard] = drawn.value
+  const given = withHand(drawnState, target.playerId, (hand) => [
+    ...hand,
+    { slotIndex: target.slotIndex, card: giveCard },
+  ])
+  return [
+    given,
+    [
+      succeeded,
+      ...drawEvents,
+      { _tag: "CardGivenFromDeck", slammerId: playerId, to: target, card: giveCard },
+    ],
+  ]
+}
+
 const closeSlamWindow = (state: GameState): Step => {
   const phase = state.phase as Extract<GameState["phase"], { _tag: "SlamWindow" }>
   const [advanced, events] = advanceTurn(state, phase.turnPlayerId)
@@ -274,7 +337,7 @@ export const applyCommand = (
   const illegal = checkCommand(state, command, now)
   if (Option.isSome(illegal)) return Either.left(illegal.value)
 
-  const result: Handler = (() => {
+  return (() => {
     switch (command._tag) {
       case "CallCambio":
         return Either.right(callCambio(state, command.playerId))
@@ -295,12 +358,9 @@ export const applyCommand = (
           powerSwap(state, command.playerId, command.first, command.second, now),
         )
       case "Slam":
-        return todo(command._tag)
+        return Either.right(slam(state, command.playerId, command.target, command.giveSlot))
       case "CloseSlamWindow":
         return Either.right(closeSlamWindow(state))
     }
   })()
-
-  // The scaffold error never escapes once all handlers are implemented.
-  return result as EngineResult
 }
