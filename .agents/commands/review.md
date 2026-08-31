@@ -12,8 +12,12 @@ job and can be run separately.
 
 Read `docs/plans/root/$ARGUMENTS.md` (the Functional Contract and Validation
 sections are the review baseline), the child plans, referenced ADRs, and the
-diff of the work (uncommitted changes and/or the commits the plan's Progress
-identifies). If there is no root plan, stop and say so.
+diff of the work: the task branch against the current release branch (per
+the Linear ["Release
+History"](https://linear.app/raafayk7/document/release-history-932e3ba2f8c1)
+document, MCP `get_document` id `release-history-932e3ba2f8c1`), e.g.
+`git diff release-v0...HEAD`,
+plus any uncommitted changes. If there is no root plan, stop and say so.
 
 ## 2. Fan out reviewers
 

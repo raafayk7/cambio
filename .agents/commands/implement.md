@@ -11,9 +11,19 @@ this command executes them, it does not re-plan.
 Read `docs/plans/root/$ARGUMENTS.md` and every child plan that exists for
 $ARGUMENTS, plus any ADRs the root plan lists. Fetch the Linear issue for
 late-breaking comments. If no root plan exists, stop: tell the user to run
-`/plan $ARGUMENTS` first. If Progress shows earlier partial work, verify the
-repo actually matches the checked-off state before continuing (run the
-listed validation commands); trust the repo over the checkboxes.
+`/plan $ARGUMENTS` first.
+
+**Branch setup:** find the current release branch in the Linear **["Release
+History"](https://linear.app/raafayk7/document/release-history-932e3ba2f8c1)**
+document (MCP `get_document` id `release-history-932e3ba2f8c1`), sync it (`git checkout <release-branch>
+&& git pull`), then create or check out the task branch — the issue's
+suggested git branch name from Linear (`gitBranchName`, e.g.
+`raafaykazmi/cam-1-…`) — off the release branch. All implementation commits
+land on the task branch; the release branch is the PR target, never
+committed to directly. If resuming and the task branch already exists,
+continue on it — and if Progress shows earlier partial work, verify the repo
+actually matches the checked-off state before continuing (run the listed
+validation commands); trust the repo over the checkboxes.
 
 Move the Linear issue to In Progress.
 
@@ -48,9 +58,11 @@ only if it demonstrably holds.
 
 ## 4. Close out
 
-Update the root plan's Progress to reflect completion and post a Linear
-comment on $ARGUMENTS (what shipped, deviations, anything for review to
-focus on). The issue stays in **In Progress** — `/review` moves it forward
-on a passing verdict. Report to the user: what was built, gate
-results verbatim if anything is non-obvious, and suggest `/review
-$ARGUMENTS` as the next step. Do not commit unless the user asks.
+Update the root plan's Progress to reflect completion, commit the work on
+the task branch (conventional messages, referencing $ARGUMENTS), and push
+it. Do not merge into the release branch — that happens via PR after
+review. Post a Linear comment on $ARGUMENTS (what shipped, deviations,
+anything for review to focus on). The issue stays in **In Progress** —
+`/review` moves it forward on a passing verdict. Report to the user: what
+was built, gate results verbatim if anything is non-obvious, and suggest
+`/review $ARGUMENTS` as the next step.

@@ -7,7 +7,20 @@ Plan the task **$ARGUMENTS** end to end. The output is a set of plan
 documents the `/implement` command can execute without this session's
 context. Do not write any implementation code.
 
-## 1. Pull the brief
+## 1. Preflight
+
+- **Clean tree required:** run `git status --porcelain`. If there is any
+  output, **abort planning** and show the user what's dirty — do not stash,
+  commit, or discard anything to make it clean. Planning writes and commits
+  files; starting on top of unrelated work would entangle them.
+- **Sync the release branch:** read the Linear document **["Release
+  History"](https://linear.app/raafayk7/document/release-history-932e3ba2f8c1)**
+  (team Cambio, MCP `get_document` id `release-history-932e3ba2f8c1`) for
+  which release is marked current and its branch name (e.g. `release-v0`). Check out that branch and `git pull` so
+  planning starts from the tip. If the document is missing or no release is
+  marked current, stop and ask.
+
+## 2. Pull the brief
 
 Fetch issue $ARGUMENTS from Linear (MCP `get_issue` — team "Cambio").
 Read its description, comments, and linked issues, and move the issue to
@@ -16,7 +29,7 @@ plausibly touches. If plan files for
 $ARGUMENTS already exist in `docs/plans/`, stop and ask whether to revise or
 restart.
 
-## 2. Classify and interview
+## 3. Classify and interview
 
 Decide whether the task is backend, frontend, or fullstack (this determines
 which child plans exist).
@@ -28,7 +41,7 @@ Ask in batches; keep going until you cannot phrase another question whose
 answer would change the plan. Do not pad with questions you can answer from
 the repo or the handoff.
 
-## 3. Explore
+## 4. Explore
 
 Launch one read-only Explore subagent per affected side (backend and/or
 frontend), in parallel, each told: the task brief, what to map (files that
@@ -38,7 +51,7 @@ governing skills for the layers involved.
 
 If exploration surfaces new ambiguity, ask the user another round.
 
-## 4. ADRs
+## 5. ADRs
 
 Apply the `adr` skill's bar to every decision the task forces. For each that
 meets it: propose the decision and alternatives to the user, get their call,
@@ -46,7 +59,7 @@ then write the ADR in `docs/adr/` (next free number, status accepted).
 Task-scoped calls that don't meet the bar go in the plan's Decision Log
 instead. If the task contradicts an existing ADR, surface that now.
 
-## 5. Write the plans
+## 6. Write the plans
 
 - **Root plan** — `docs/plans/root/$ARGUMENTS.md` from
   `.agents/templates/root-plan.md`. You write this one yourself; the
@@ -62,9 +75,12 @@ instead. If the task contradicts an existing ADR, surface that now.
 
 Single-side tasks get root + that one child plan only.
 
-## 6. Close out
+## 7. Close out
 
-Post a Linear comment on $ARGUMENTS summarizing the plan (contract in two
-sentences, milestones, ADRs written); the issue stays in **Planning** until
-`/implement` picks it up. Present the root plan to the user for sign-off; do
-not start implementation.
+Present the root plan to the user for sign-off; do not start
+implementation. **After sign-off**, commit the planning outputs (plan docs +
+any ADRs — nothing else) to the release branch with message
+`docs($ARGUMENTS): plan` and push, so the tree is clean for the next
+command. Then post a Linear comment on $ARGUMENTS summarizing the plan
+(contract in two sentences, milestones, ADRs written); the issue stays in
+**Planning** until `/implement` picks it up.

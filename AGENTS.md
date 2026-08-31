@@ -79,6 +79,19 @@ Plan documents are named after the issue and live in `docs/plans/`:
 `backend/CAM-xxx.md` and `frontend/CAM-xxx.md` (implementation detail, only for
 sides the task touches). Templates: `.agents/templates/`.
 
+### Branching
+
+`main` (stable) → `development` (deployment target once CI/CD exists) →
+**release branches** (`release-vN`) → task branches. The current release
+branch is the base of all work and the PR target; task branches use Linear's
+suggested branch name per issue. Release branches merge into `development`
+when deploying. Which release is current is tracked **outside the repo** in
+the Linear document
+["Release History"](https://linear.app/raafayk7/document/release-history-932e3ba2f8c1)
+(deliberately — an in-repo pointer would differ across branches); the
+workflow commands read it, sync the release branch, and never commit to the
+release branch directly except `/plan`'s docs-only commit. See ADR-0008.
+
 ## Development
 
 Node 22 (nvm) and pnpm 9. Postgres runs in Docker on host port **5433**.
