@@ -295,5 +295,59 @@ assumptions, upstream bugs, better approaches. Evidence included.)*
 
 ## Outcomes & retrospective
 
-*(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)*
+*(filled by `/review`, 2026-08-31)*
+
+**Verdict: ship.** Contract review: no clause violated — 17 satisfied,
+2 not-verifiable by artifact (C6.3 vacuous: no failing seed ever existed to
+pin; C7.1 process-only: never triggered, consistent with `src/` byte-
+unchanged). Architecture review: import boundaries, purity/determinism,
+single-source-of-legality, and rule fidelity (anti-prior guard, checked
+line-by-line against `cambio-rules`) all pass; no contracts/realtime
+surface touched. Independent verification: forced full gate 18/18 (161
+tests); `SIM_GAMES=5000` reproduced the implementation run's summary
+byte-identically (737,189 steps, zero violations); knob runs rescale and
+correctly skip the seed-pinned C5.2 assertions; untouched-surface checks
+all empty.
+
+**What shipped:** everything the contract asked for; no scope cut. The
+engine survived the harness — the C7.1 stop-and-ask never fired.
+
+**Findings (verified; none blocking — user decides what gets fixed):**
+
+1. **ADR-0013 rests on a false factual premise**: fast-check is already a
+   direct dependency of `effect` (re-exported as `effect/FastCheck`), so
+   "a new dependency" / "first test-only npm dependency" are wrong. The
+   decision stands on its other rationale (model-based `fc.commands`
+   duplicates `legalCommandKinds`; sequence-shrinking buys little over
+   seed replay), but the ADR is still *proposed* and should be amended.
+2. `counters.ts` `recordStep` switch ends `default: break` — silently
+   ignores nine event tags instead of the repo's explicit-cases +
+   `satisfies never` idiom; risky precisely because counters are the
+   rare-case detection mechanism.
+3. `fuzz.ts` `TAGS` / `Fuzz.test.ts` `PLAYER_TAGS` are hand-maintained
+   lists that typecheck while incomplete — a future `Command` tag silently
+   drops out of fuzz and C4.2 coverage.
+4. `driver.ts` calls `applyCommand` without try/catch — an engine *throw*
+   (vs `Either.left`) would escape without seeds/step/trace, unlike the
+   fuzz path (C1.5 asymmetry).
+5. The test titled for C2.4 in `Simulation.test.ts` only asserts
+   `winners.length > 0`; the real recomputation runs via `endViolations`
+   in the C2.3-titled test — child-plan coverage row mis-mapped.
+6. The two window-boundary fuzz probes (late slam, premature close) skip
+   the mutation snapshot the main C4.1 loop performs.
+7. Advisories: C5.2 batch margins thin (9/T fizzle passes on one
+   occurrence; zero-card give has no Coverage-scenario fallback off the
+   default batch); the C3.2/C2.1 batch `it`s are documentation (real
+   checks throw inside the driver — window closes *are* validated every
+   time through `applyCommand`, so no operational stuck-hole); call-ramp
+   monotonicity never unit-tested; child-plan module table shows the old
+   `chooseTurnCommand` signature; stale `invariants.ts` baseline
+   docstring; no NaN guard on `SIM_GAMES`; `testTimeout: 30_000` applies
+   package-wide rather than sim-only; `beforeAll` imported from `vitest`
+   instead of `@effect/vitest`; prettier drift (8 sim files) sits on an
+   already-dirty repo-wide baseline (19 files) with no format gate —
+   candidate for its own cleanup task.
+
+**Carry into next tasks:** CAM-3 re-asserts the §4.5 invariants verbatim
+against the persisted schema; the DB-side "status" consistency invariant
+returns there. CAM-10 holds the two deferred engine-hardening items.
