@@ -12,7 +12,11 @@ symlinked from `.agents/`, which is the source of truth for skills and commands.
 
 - **[docs/HANDOFF.md](docs/HANDOFF.md)** — canonical game rules (§1),
   architecture (§3–§6), data model (§4), build order (§12). When anything
-  conflicts with a habit or template you'd normally reach for, the handoff wins.
+  conflicts with a habit or template you'd normally reach for, the handoff
+  wins — **unless a later ADR supersedes the section**: ADRs outrank the
+  handoff, and superseded handoff sections carry an amendment blockquote
+  pointing at the ADR. Never "correct" code back toward a handoff sketch
+  without checking the ADR index first.
 - **[docs/adr/](docs/adr/)** — architecture decision records. Start from the
   index at [docs/adr/README.md](docs/adr/README.md) instead of reading each
   file; check them before re-litigating a decision; supersede, don't

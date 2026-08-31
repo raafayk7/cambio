@@ -34,12 +34,15 @@ restart.
 Decide whether the task is backend, frontend, or fullstack (this determines
 which child plans exist).
 
-Then interview the user with AskUserQuestion — the goal is to surface every
-decision the brief leaves open _before_ exploration: scope boundaries,
-behavior ambiguities, quality bar, anything touching HANDOFF §9 open rules.
-Ask in batches; keep going until you cannot phrase another question whose
-answer would change the plan. Do not pad with questions you can answer from
-the repo or the handoff.
+Then interview the user with AskUserQuestion. Expect **two rounds with
+different jobs**: this pre-exploration round covers scope boundaries,
+behavior ambiguities, quality bar, and anything touching HANDOFF §9 open
+rules — don't force design questions here that exploration hasn't earned
+yet. The design forks (which approach, which mechanism) usually only become
+askable after the explorers report; that second round is step 4's, not a
+failure of this one. In both rounds: ask in batches, keep going until you
+cannot phrase another question whose answer would change the plan, and do
+not pad with questions you can answer from the repo or the handoff.
 
 ## 4. Explore
 
@@ -73,7 +76,13 @@ instead. If the task contradicts an existing ADR, surface that now.
   `.agents/templates/child-plan.md`, one per affected side. Delegate each to
   a subagent that receives the root plan, the relevant explorer report, and
   the instruction to follow the layer skills. Review what comes back against
-  the root plan — you own coherence between the documents.
+  the root plan — you own coherence between the documents. Two rules the
+  subagent must be given verbatim: the **Contract coverage table stays
+  test-nameless at plan time** (rows hold clause → planned approach;
+  `/implement` fills file, test name, and assertion phrase as each test
+  actually lands — invented test titles become review findings), and **code
+  sketches (signatures, DDL, exports) are advisory** — the coverage table
+  and module layout are the artifacts reconciled against as-built code.
 
 Single-side tasks get root + that one child plan only.
 
