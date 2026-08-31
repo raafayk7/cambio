@@ -24,3 +24,4 @@ the point.
 | [0010](0010-jq-swaps-require-occupied-slots-powers-fizzle.md) | J/Q swaps need occupied slots; untargetable powers fizzle | proposed | 2026-08-31 | CAM-1 |
 | [0011](0011-slam-window-fixed-close-config-duration.md) | Slam window: fixed close from GameConfig; impossible draws skipped | proposed | 2026-08-31 | CAM-1 |
 | [0012](0012-empty-discard-skips-slam-window.md) | Empty discard pile skips the slam window; taking from it is illegal | proposed | 2026-08-31 | CAM-1 |
+| [0013](0013-hand-rolled-seeded-simulation-driver.md) | Hand-rolled seeded simulation driver, not a property-testing library | proposed | 2026-08-31 | CAM-2 |
