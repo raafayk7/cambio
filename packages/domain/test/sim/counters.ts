@@ -62,6 +62,76 @@ export const emptyCounters = (): SimCounters => ({
 
 type MutableCounters = { -readonly [K in keyof SimCounters]: SimCounters[K] }
 
+const countEvent = (
+  next: MutableCounters,
+  event: GameEvent,
+  stateBefore: GameState,
+  command: Command,
+): void => {
+  switch (event._tag) {
+    case "SlamSucceeded":
+      next.slamsSucceeded++
+      return
+    case "SlamFailed":
+      next.slamsFailed++
+      return
+    case "PenaltyDrawn":
+      next.penaltiesDrawn++
+      return
+    case "CardPeeked":
+      next.peeks++
+      return
+    case "CardsBlindSwapped":
+      next.blindSwaps++
+      return
+    case "DeckReshuffled":
+      next.reshuffles++
+      return
+    case "PowerFizzled":
+      if (event.power === "7" || event.power === "8") next.fizzlesPeekOwn++
+      else if (event.power === "9" || event.power === "T") next.fizzlesPeekOther++
+      else if (event.power === "J") next.fizzlesJack++
+      else next.fizzlesQueen++
+      return
+    case "DrawSkipped":
+      if (event.kind === "penalty") next.drawSkippedPenalty++
+      else next.drawSkippedGive++
+      return
+    case "HeldKept":
+      next.zeroCardKeeps++
+      if (
+        command._tag === "KeepHeld" &&
+        stateBefore.phase._tag === "HoldingCard" &&
+        stateBefore.phase.source === "discard"
+      ) {
+        next.discardSourceKeeps++
+      }
+      return
+    case "CardGivenFromHand":
+      next.givesFromHand++
+      return
+    case "CardGivenFromDeck":
+      next.givesFromDeck++
+      return
+    // Deliberately uncounted — listed explicitly so a future GameEvent case
+    // fails to compile here instead of going silently uncounted.
+    case "GameStarted":
+    case "CambioCalled":
+    case "GameEnded":
+    case "CardDrawn":
+    case "DiscardTaken":
+    case "HeldSwapped":
+    case "HeldDiscarded":
+    case "PowerDiscarded":
+    case "SlamWindowOpened":
+    case "TurnAdvanced":
+    case "SlamWindowClosed":
+      return
+    default:
+      return event satisfies never
+  }
+}
+
 /** Fold one accepted command's events into the counters. */
 export const recordStep = (
   counters: SimCounters,
@@ -70,67 +140,15 @@ export const recordStep = (
   events: ReadonlyArray<GameEvent>,
 ): SimCounters => {
   const next: MutableCounters = { ...counters }
-  let turnAdvanced = false
-  let windowClosed = false
-  for (const event of events) {
-    switch (event._tag) {
-      case "SlamSucceeded":
-        next.slamsSucceeded++
-        break
-      case "SlamFailed":
-        next.slamsFailed++
-        break
-      case "PenaltyDrawn":
-        next.penaltiesDrawn++
-        break
-      case "CardPeeked":
-        next.peeks++
-        break
-      case "CardsBlindSwapped":
-        next.blindSwaps++
-        break
-      case "DeckReshuffled":
-        next.reshuffles++
-        break
-      case "PowerFizzled":
-        if (event.power === "7" || event.power === "8") next.fizzlesPeekOwn++
-        else if (event.power === "9" || event.power === "T") next.fizzlesPeekOther++
-        else if (event.power === "J") next.fizzlesJack++
-        else next.fizzlesQueen++
-        break
-      case "DrawSkipped":
-        if (event.kind === "penalty") next.drawSkippedPenalty++
-        else next.drawSkippedGive++
-        break
-      case "HeldKept":
-        next.zeroCardKeeps++
-        if (
-          command._tag === "KeepHeld" &&
-          stateBefore.phase._tag === "HoldingCard" &&
-          stateBefore.phase.source === "discard"
-        ) {
-          next.discardSourceKeeps++
-        }
-        break
-      case "CardGivenFromHand":
-        next.givesFromHand++
-        break
-      case "CardGivenFromDeck":
-        next.givesFromDeck++
-        break
-      case "TurnAdvanced":
-        turnAdvanced = true
-        break
-      case "SlamWindowClosed":
-        windowClosed = true
-        break
-      default:
-        break
-    }
-  }
+  for (const event of events) countEvent(next, event, stateBefore, command)
   // ADR-0012: the skip path advances the turn with no window ever closing —
   // the ordinary path emits SlamWindowClosed + TurnAdvanced together.
-  if (turnAdvanced && !windowClosed) next.emptyDiscardSkips++
+  if (
+    events.some((e) => e._tag === "TurnAdvanced") &&
+    !events.some((e) => e._tag === "SlamWindowClosed")
+  ) {
+    next.emptyDiscardSkips++
+  }
   return next
 }
 

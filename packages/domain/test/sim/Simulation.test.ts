@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { beforeAll } from "vitest"
 import { Either } from "effect"
+import { score } from "../../src/Card.js"
 import { applyCommand } from "../../src/Engine.js"
 import { decodeGameConfig } from "../../src/GameConfig.js"
 import { type GameState } from "../../src/GameState.js"
@@ -217,11 +218,20 @@ describe(`the random-game batch (${GAMES} games)`, () => {
   })
 
   it("GameEnded scores match an independent recomputation (C2.4, §1.8)", () => {
-    // Covered by endViolations (C2.3 test above) — this named home re-asserts
-    // the clause directly against each run's final event.
+    // The recomputation is local — per card via score(), min-filtered here —
+    // never via gameScores/winnersOf, which the engine itself uses.
     for (const run of runs) {
       const ended = run.events.at(-1)!
       if (ended._tag !== "GameEnded") throw new Error("last event must be GameEnded")
+      const recomputed = run.finalState.players.map((p) => ({
+        playerId: p.id,
+        total: p.hand.reduce((sum, s) => sum + score(s.card), 0),
+      }))
+      expect([...ended.scores]).toStrictEqual(recomputed)
+      const min = Math.min(...recomputed.map((s) => s.total))
+      expect([...ended.winners]).toStrictEqual(
+        recomputed.filter((s) => s.total === min).map((s) => s.playerId),
+      )
       expect(ended.winners.length).toBeGreaterThan(0)
     }
   })

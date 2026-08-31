@@ -635,7 +635,7 @@ Planned homes below; implement keeps them true.)*
 | C2.1 | `test/sim/Invariants.test.ts` corrupt-state units; live in-driver per step — `Simulation.test.ts` "every accepted command preserves the 52-card partition (C2.1, §4.5)" |
 | C2.2 | `test/sim/Invariants.test.ts` units; `Simulation.test.ts` "hand slots stay unique and sorted; the roster never changes (C2.2, §4.5 restated)" |
 | C2.3 | `Simulation.test.ts` "Ended iff GameEnded, exactly once, as the final event (C2.3)" + "ended games reject every command from every player (C2.3)" |
-| C2.4 | `Simulation.test.ts` "GameEnded scores match an independent recomputation (C2.4, §1.8)" (+ `Invariants.test.ts` doctored-event units) |
+| C2.4 | `Simulation.test.ts` "GameEnded scores match an independent recomputation (C2.4, §1.8)" — runs the local per-card recomputation + min-set winners check directly (post-review fix; previously delegated to the C2.3 `endViolations` test) — plus `Invariants.test.ts` doctored-event units |
 | C3.1 | `Simulation.test.ts` "every game reaches Ended within the step cap (C3.1)" |
 | C3.2 | driver in-loop check (throws `SimFailure`); documented by `Simulation.test.ts` "no reachable state is stuck (C3.2)" |
 | C4.1 | `test/sim/Fuzz.test.ts` "illegal commands return typed GameErrors and never mutate state (C4.1)" |

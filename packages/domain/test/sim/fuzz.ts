@@ -13,18 +13,21 @@ import { type DriverRng } from "./rng.js"
  * unknown-player rejections on every phase.
  */
 
-const TAGS: ReadonlyArray<Command["_tag"]> = [
-  "CallCambio",
-  "TakeDiscard",
-  "DrawFromDeck",
-  "SwapHeld",
-  "DiscardHeld",
-  "KeepHeld",
-  "PowerPeek",
-  "PowerSwap",
-  "Slam",
-  "CloseSlamWindow",
-]
+// A Record keyed by the full tag union: a future Command case fails to
+// compile here instead of silently dropping out of fuzz coverage.
+const TAG_SET: Record<Command["_tag"], true> = {
+  CallCambio: true,
+  TakeDiscard: true,
+  DrawFromDeck: true,
+  SwapHeld: true,
+  DiscardHeld: true,
+  KeepHeld: true,
+  PowerPeek: true,
+  PowerSwap: true,
+  Slam: true,
+  CloseSlamWindow: true,
+}
+const TAGS = Object.keys(TAG_SET) as ReadonlyArray<Command["_tag"]>
 
 /** A fixed non-roster player: the UnknownPlayer path. */
 const OUTSIDER = uid(99)

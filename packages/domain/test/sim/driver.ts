@@ -2,7 +2,7 @@ import { Either, Option } from "effect"
 import { ALL_CARD_SLUGS } from "../../src/Card.js"
 import { type Command } from "../../src/Command.js"
 import { dealGame } from "../../src/Deal.js"
-import { applyCommand } from "../../src/Engine.js"
+import { applyCommand, type EngineResult } from "../../src/Engine.js"
 import { type GameConfig } from "../../src/GameConfig.js"
 import { type GameEvent } from "../../src/GameEvent.js"
 import { type GameState } from "../../src/GameState.js"
@@ -68,6 +68,7 @@ export class SimFailure extends Error {
     readonly driverSeed: number
     readonly step: number
     readonly trace: ReadonlyArray<StepRecord>
+    readonly cause?: unknown
   }) {
     const tail = args.trace
       .slice(-5)
@@ -77,6 +78,7 @@ export class SimFailure extends Error {
       `[sim] ${args.reason} at step ${args.step} ` +
         `(gameSeed=${args.gameSeed}, driverSeed=${args.driverSeed}); ` +
         `last commands: ${tail === "" ? "(none)" : tail}`,
+      args.cause === undefined ? undefined : { cause: args.cause },
     )
     this.name = "SimFailure"
     this.gameSeed = args.gameSeed
@@ -114,13 +116,14 @@ export const simulateGame = (params: SimParams): GameRun => {
   let slamsThisWindow = 0
   let counters = emptyCounters()
 
-  const fail = (reason: string): never => {
+  const fail = (reason: string, cause?: unknown): never => {
     throw new SimFailure({
       reason,
       gameSeed: params.gameSeed,
       driverSeed: params.driverSeed,
       step: steps,
       trace,
+      cause,
     })
   }
 
@@ -173,7 +176,17 @@ export const simulateGame = (params: SimParams): GameRun => {
     if (at < now) return fail(`clock went backwards: ${now} → ${at} (C1.3)`)
     now = at
 
-    const result = applyCommand(state, command, at)
+    // An engine THROW (vs a typed Either.left) is a defect; wrap it so the
+    // failure still carries seeds + step + trace (C1.5).
+    let result: EngineResult
+    try {
+      result = applyCommand(state, command, at)
+    } catch (error) {
+      return fail(
+        `engine threw for ${command._tag}: ${String(error)} — engine defect (C7.1: stop and ask)`,
+        error,
+      )
+    }
     if (Either.isLeft(result)) {
       return fail(
         `chosen candidate ${command._tag} rejected with ${result.left._tag} — ` +

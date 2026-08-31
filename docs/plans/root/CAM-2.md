@@ -348,6 +348,19 @@ engine survived the harness — the C7.1 stop-and-ask never fired.
    already-dirty repo-wide baseline (19 files) with no format gate —
    candidate for its own cleanup task.
 
+**Fix pass (2026-08-31, user-directed):** findings 1–5 addressed before
+shipping — ADR-0013 amended (fast-check premise corrected); `counters.ts`
+switch now exhaustive with explicit ignored cases + `satisfies never`;
+fuzz tag lists derived from `Record<Command["_tag"], true>` so a new
+command tag fails to compile; `driver.ts` wraps `applyCommand` in
+try/catch so an engine throw carries seeds/step/trace (with `cause`);
+the C2.4-titled test now runs the local recomputation + min-set winners
+check directly, and its coverage row is corrected. Gate re-run: 18/18,
+161 tests, batch summary byte-identical (behavior-preserving). Findings
+6+ (advisories) deliberately left as-is.
+
 **Carry into next tasks:** CAM-3 re-asserts the §4.5 invariants verbatim
 against the persisted schema; the DB-side "status" consistency invariant
 returns there. CAM-10 holds the two deferred engine-hardening items.
+Repo-wide prettier drift (19 files, mostly pre-existing) is a cleanup-task
+candidate.

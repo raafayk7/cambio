@@ -102,17 +102,22 @@ describe("illegal-command fuzzing", () => {
 
   it("legalCommandKinds agrees with checkCommand (C4.2)", () => {
     const fuzzRng = makeDriverRng(777)
-    const PLAYER_TAGS = [
-      "CallCambio",
-      "TakeDiscard",
-      "DrawFromDeck",
-      "SwapHeld",
-      "DiscardHeld",
-      "KeepHeld",
-      "PowerPeek",
-      "PowerSwap",
-      "Slam",
-    ] as const satisfies ReadonlyArray<Command["_tag"]>
+    // Record-keyed by every player-issued tag: a future Command case fails to
+    // compile here instead of silently escaping the C4.2 cross-check.
+    const PLAYER_TAG_SET: Record<Exclude<Command["_tag"], "CloseSlamWindow">, true> = {
+      CallCambio: true,
+      TakeDiscard: true,
+      DrawFromDeck: true,
+      SwapHeld: true,
+      DiscardHeld: true,
+      KeepHeld: true,
+      PowerPeek: true,
+      PowerSwap: true,
+      Slam: true,
+    }
+    const PLAYER_TAGS = Object.keys(PLAYER_TAG_SET) as ReadonlyArray<
+      Exclude<Command["_tag"], "CloseSlamWindow">
+    >
 
     for (let i = 0; i < FUZZ_GAMES; i++) {
       const [gameSeed, driverSeed] = seedPair(FUZZ_BASE + 500_000, i)
