@@ -35,14 +35,19 @@ export interface PolicyKnobs {
   readonly zeroCardTakeDen: number
 }
 
+// Tuned in M3 against the batch probe: the first cut (call ramp from turn 8,
+// 1/2 informed) ended games in ~18 turns with hands inflated by ~8 penalty
+// draws per game — zero-card states (the ADR-0009/0010/0012 gateway) were
+// reached once in 250 games. Longer games + mostly-informed slams that
+// prefer the slammer's own matches drain hands instead.
 export const defaultKnobs: PolicyKnobs = {
-  forceCallTurn: 64,
-  callRampStart: 8,
-  callRampDenominator: 64,
-  slamAttemptNum: 2,
+  forceCallTurn: 128,
+  callRampStart: 24,
+  callRampDenominator: 128,
+  slamAttemptNum: 4,
   slamAttemptDen: 5,
-  informedSlamNum: 1,
-  informedSlamDen: 2,
+  informedSlamNum: 3,
+  informedSlamDen: 4,
   maxSlamsPerWindow: 3,
   zeroCardTakeNum: 4,
   zeroCardTakeDen: 5,
@@ -101,7 +106,15 @@ export const chooseSlam = (
           onSome: (target) => rank(target) === windowRank,
         }),
     )
+    // Prefer slamming one's own match: it shrinks the slammer's hand (the
+    // gateway to every ADR-0009/0010/0012 rare path) and is correct play.
+    const own = informed.filter((c) => c._tag === "Slam" && c.target.playerId === c.playerId)
+    if (own.length > 0) return Option.some(rng.pick(own))
     if (informed.length > 0) return Option.some(rng.pick(informed))
+    // An informed player with nothing to slam passes — falling back to a
+    // blind slam here made penalties inflate every hand faster than informed
+    // slams could drain them (M3 probe).
+    return Option.none()
   }
   return Option.some(rng.pick(slams))
 }

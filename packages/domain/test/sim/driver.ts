@@ -9,7 +9,7 @@ import { type GameState } from "../../src/GameState.js"
 import { Timestamp, type UserId } from "../../src/Ids.js"
 import { ts, uid } from "../fixtures.js"
 import { legalCandidates } from "./candidates.js"
-import { emptyCounters, type SimCounters } from "./counters.js"
+import { emptyCounters, recordStep, type SimCounters } from "./counters.js"
 import { stepViolations } from "./invariants.js"
 import { chooseSlam, chooseTurnCommand, defaultKnobs, type PolicyKnobs } from "./policy.js"
 import { makeDriverRng } from "./rng.js"
@@ -112,6 +112,7 @@ export const simulateGame = (params: SimParams): GameRun => {
   let steps = 0
   let turns = 0
   let slamsThisWindow = 0
+  let counters = emptyCounters()
 
   const fail = (reason: string): never => {
     throw new SimFailure({
@@ -181,6 +182,7 @@ export const simulateGame = (params: SimParams): GameRun => {
     }
     const [nextState, stepEvents] = result.right
 
+    counters = recordStep(counters, state, command, stepEvents)
     trace.push({ command, at })
     events.push(...stepEvents)
     for (const event of stepEvents) {
@@ -202,6 +204,6 @@ export const simulateGame = (params: SimParams): GameRun => {
     events,
     steps,
     turns,
-    counters: { ...emptyCounters(), games: 1, steps, turns },
+    counters: { ...counters, games: 1, steps, turns },
   }
 }

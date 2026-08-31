@@ -641,16 +641,20 @@ Planned homes below; implement keeps them true.)*
 | C4.1 | `test/sim/Fuzz.test.ts` "illegal commands return typed GameErrors and never mutate state (C4.1)" |
 | C4.2 | `test/sim/Fuzz.test.ts` "legalCommandKinds agrees with checkCommand (C4.2)" |
 | C5.1 | `Simulation.test.ts` "prints one summary line per run (C5.1)" |
-| C5.2 | `Simulation.test.ts` "the default run reaches every ADR rare case (C5.2)"; any shape tuning can't reach moves to a `Coverage.test.ts` seeded scenario (record final split here) |
+| C5.2 | Split (final): `Simulation.test.ts` "the default run reaches the batch-reachable ADR rare cases (C5.2)" pins discard-keeps, zero-keeps, deck-gives, 7/8 and 9/T fizzles, reshuffles (guarded `skipIf` off the default batch); `Coverage.test.ts` seeded scenarios pin J + Q fizzles (plus 7/8, 9/T again) and the ADR-0012 empty-discard skip |
 | C6.1 | config, not a test: `vitest.config.ts` `testTimeout` + computed batch timeout; verified by the gate |
 | C6.2 | `turbo.json` test `env` + `Simulation.test.ts` header; verified by the M6 command matrix (`SIM_GAMES=5000` under both pnpm and turbo) |
-| C6.3 | `test/sim/Regressions.test.ts` — created on the first failing seed; if none is ever found, record that here instead |
+| C6.3 | **No failing seed was ever found** — default batch, fuzz batches, and the `SIM_GAMES=5000` deep run (737k steps) all passed, so `Regressions.test.ts` was not created (per plan) |
 | C7.1 | process, not a test: any `SimFailure` that classifies as an engine defect or uncovered rule situation halts implementation for a user decision (each resolution ⇒ ADR + engine change in a follow-up, per the standing directive) |
 
 ## Progress
 
 - [x] 2026-08-31 14:20 — M1 complete. `rng.ts`, `candidates.ts`, `policy.ts`, `driver.ts` plus `counters.ts` (interface + `emptyCounters` only; `recordStep` lands in M5). `Driver.test.ts` 17 tests green; typecheck + lint clean.
 - [x] 2026-08-31 14:22 — M2 complete. `invariants.ts` + `Invariants.test.ts` (16 corrupt-state units); per-step checks wired into the driver; `Simulation.test.ts` batch skeleton green — 250 games, zero violations, ~0.6 s. Deviation: the driver validates *every* starting state (dealt or `initial`) against the full 52-card baseline at step 0 — Coverage scenarios must be full-partition states, which the plan already required; this makes the corrupted-initial test fail at step 0 rather than at first accepted command.
+- [x] 2026-08-31 14:28 — M3 complete. Liveness `it`s added; knobs tuned over three probe rounds to `forceCallTurn: 128, callRampStart: 24/128, slamAttempt: 4/5, informedSlam: 3/4, maxSlamsPerWindow: 3, zeroCardTake: 4/5`, plus policy changes (see Surprises): informed-but-no-match slams pass instead of slamming blind; informed slams prefer own-card matches. Batch probe at 250 games: 198 zero-card keeps, 5 deck-gives, 26 fizzles, 149 reshuffles, 0 empty-discard skips (Coverage scenario planned), ~1 s wall.
+- [x] 2026-08-31 17:28 — M4 complete. `fuzz.ts` + `Fuzz.test.ts`: C4.1 (typed errors, no throw, no mutation, all six named illegal shapes observed) and C4.2 (legality agreement incl. CloseSlamWindow clock special-case) green over 25 offset-seeded games each. C4.2 ran 4.8 s — pulled M6's `vitest.config.ts` `testTimeout: 30_000` forward to avoid flaking the 5 s default.
+- [x] 2026-08-31 17:40 — M5 complete. `counters.ts` (`recordStep`, `mergeCounters`, `formatSummary`) unit-tested in `Simulation.test.ts`'s "counter derivation" describe, wired into the driver; summary line printing; batch C5.2 assertions for the batch-reachable shapes; `Coverage.test.ts` with two seeded scenarios (slams disabled via knobs) pinning all four fizzle shapes and the ADR-0012 skip — both hit on the first pinned driver seed.
+- [x] 2026-08-31 17:50 — M6 complete. `SIM_GAMES`/`SIM_SEED` env knobs (guarded C5.2 via `it.skipIf` off the default batch), computed batch timeout, `turbo.json` test-task `env` declaration proven live (`SIM_GAMES=300` under turbo printed `games=300`). Deep run `SIM_GAMES=5000`: 737,189 steps, zero violations, 17.5 s — at that scale the batch reaches J fizzles (7), Q fizzles (6), and empty-discard skips (22) naturally; `drawSkipped` stayed 0, confirming ADR-0011's prediction. Full gate `pnpm turbo build typecheck lint test` 18/18 green; untouched-surface greps print nothing. No failing seed found ⇒ no `Regressions.test.ts`.
 
 ## Surprises & notes for the root plan
 

@@ -1,8 +1,13 @@
+import { type Command } from "../../src/Command.js"
+import { type GameEvent } from "../../src/GameEvent.js"
+import { type GameState } from "../../src/GameState.js"
+
 /**
  * Rare-case and volume counters aggregated over simulated games (C5.1) —
  * the counting hooks ADR-0011 and ADR-0012 explicitly ask CAM-2 for.
- * Event-derived; `recordStep` lands in M5 (until then the driver carries an
- * empty instance and fills the volume fields itself).
+ * Everything is derived from the events of each accepted command (plus the
+ * pre-command phase, for the discard-source keep); `games`/`steps`/`turns`
+ * are filled by the driver.
  */
 export interface SimCounters {
   readonly games: number
@@ -54,3 +59,96 @@ export const emptyCounters = (): SimCounters => ({
   givesFromDeck: 0,
   emptyDiscardSkips: 0,
 })
+
+type MutableCounters = { -readonly [K in keyof SimCounters]: SimCounters[K] }
+
+/** Fold one accepted command's events into the counters. */
+export const recordStep = (
+  counters: SimCounters,
+  stateBefore: GameState,
+  command: Command,
+  events: ReadonlyArray<GameEvent>,
+): SimCounters => {
+  const next: MutableCounters = { ...counters }
+  let turnAdvanced = false
+  let windowClosed = false
+  for (const event of events) {
+    switch (event._tag) {
+      case "SlamSucceeded":
+        next.slamsSucceeded++
+        break
+      case "SlamFailed":
+        next.slamsFailed++
+        break
+      case "PenaltyDrawn":
+        next.penaltiesDrawn++
+        break
+      case "CardPeeked":
+        next.peeks++
+        break
+      case "CardsBlindSwapped":
+        next.blindSwaps++
+        break
+      case "DeckReshuffled":
+        next.reshuffles++
+        break
+      case "PowerFizzled":
+        if (event.power === "7" || event.power === "8") next.fizzlesPeekOwn++
+        else if (event.power === "9" || event.power === "T") next.fizzlesPeekOther++
+        else if (event.power === "J") next.fizzlesJack++
+        else next.fizzlesQueen++
+        break
+      case "DrawSkipped":
+        if (event.kind === "penalty") next.drawSkippedPenalty++
+        else next.drawSkippedGive++
+        break
+      case "HeldKept":
+        next.zeroCardKeeps++
+        if (
+          command._tag === "KeepHeld" &&
+          stateBefore.phase._tag === "HoldingCard" &&
+          stateBefore.phase.source === "discard"
+        ) {
+          next.discardSourceKeeps++
+        }
+        break
+      case "CardGivenFromHand":
+        next.givesFromHand++
+        break
+      case "CardGivenFromDeck":
+        next.givesFromDeck++
+        break
+      case "TurnAdvanced":
+        turnAdvanced = true
+        break
+      case "SlamWindowClosed":
+        windowClosed = true
+        break
+      default:
+        break
+    }
+  }
+  // ADR-0012: the skip path advances the turn with no window ever closing —
+  // the ordinary path emits SlamWindowClosed + TurnAdvanced together.
+  if (turnAdvanced && !windowClosed) next.emptyDiscardSkips++
+  return next
+}
+
+export const mergeCounters = (a: SimCounters, b: SimCounters): SimCounters => {
+  const out: MutableCounters = { ...a }
+  for (const key of Object.keys(out) as Array<keyof SimCounters>) {
+    out[key] = a[key] + b[key]
+  }
+  return out
+}
+
+/** The single C5.1 summary line (root plan decision log: one console.log). */
+export const formatSummary = (c: SimCounters): string =>
+  `[sim] games=${c.games} steps=${c.steps} turns=${c.turns} ` +
+  `slams=${c.slamsSucceeded}ok/${c.slamsFailed}fail penalties=${c.penaltiesDrawn} ` +
+  `peeks=${c.peeks} blindSwaps=${c.blindSwaps} reshuffles=${c.reshuffles} ` +
+  `fizzles={78:${c.fizzlesPeekOwn},9T:${c.fizzlesPeekOther},J:${c.fizzlesJack},Q:${c.fizzlesQueen}} ` +
+  `drawSkipped={penalty:${c.drawSkippedPenalty},give:${c.drawSkippedGive}} ` +
+  `keeps={zero:${c.zeroCardKeeps},discard:${c.discardSourceKeeps}} ` +
+  `gives={hand:${c.givesFromHand},deck:${c.givesFromDeck}} ` +
+  `emptyDiscardSkips=${c.emptyDiscardSkips}`

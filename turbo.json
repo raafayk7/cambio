@@ -32,7 +32,11 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": [],
+      // CAM-2 simulation knobs (see packages/domain/test/sim/Simulation.test.ts).
+      // Hashed, not passed through: a different game count or seed is a genuinely
+      // different test run and must miss the cache.
+      "env": ["SIM_GAMES", "SIM_SEED"]
     },
     "dev": {
       "dependsOn": ["^build"],
