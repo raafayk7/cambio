@@ -102,10 +102,8 @@ export const endViolations = (
   const gameEnded = events.filter((e) => e._tag === "GameEnded")
   const ended = finalState.phase._tag === "Ended"
 
-  if (ended !== (gameEnded.length > 0)) {
-    violations.push(
-      `Ended phase is ${ended} but GameEnded count is ${gameEnded.length} (C2.3)`,
-    )
+  if (ended !== gameEnded.length > 0) {
+    violations.push(`Ended phase is ${ended} but GameEnded count is ${gameEnded.length} (C2.3)`)
   }
   if (gameEnded.length > 1) {
     violations.push(`GameEnded emitted ${gameEnded.length} times (C2.3)`)

@@ -2,8 +2,8 @@
 
 - **Linear:** [CAM-xxx](https://linear.app/raafayk7/issue/CAM-xxx)
 - **Scope:** backend | frontend | fullstack
-- **Child plans:** [backend](../backend/CAM-xxx.md) · [frontend](../frontend/CAM-xxx.md) *(delete lines that don't apply)*
-- **ADRs:** NNNN *(or "none needed", with one line saying why)*
+- **Child plans:** [backend](../backend/CAM-xxx.md) · [frontend](../frontend/CAM-xxx.md) _(delete lines that don't apply)_
+- **ADRs:** NNNN _(or "none needed", with one line saying why)_
 
 > This is a **living document** (ExecPlan-style). The implementer updates
 > Progress, Decision Log, and Surprises as work happens — not at the end.
@@ -46,24 +46,25 @@ and what they prove, what to run, what output to expect.
 
 ## Progress
 
-*(updated continuously; newest last; timestamp each entry)*
+_(updated continuously; append new entries at the BOTTOM — newest last;
+timestamp each entry)_
 
 - [ ] YYYY-MM-DD HH:MM — step description
 
 ## Decision log
 
-*(every non-obvious choice made during planning or implementation: what was
+_(every non-obvious choice made during planning or implementation: what was
 decided, why, what was rejected. Promote to an ADR if it meets the adr
-skill's bar.)*
+skill's bar.)_
 
 - YYYY-MM-DD — decision — rationale
 
 ## Surprises & discoveries
 
-*(anything found mid-implementation that the plan didn't predict — wrong
-assumptions, upstream bugs, better approaches. Evidence included.)*
+_(anything found mid-implementation that the plan didn't predict — wrong
+assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-*(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)*
+_(filled at the end, typically by `/review`: what shipped, what was cut,
+what should carry into the next task.)_

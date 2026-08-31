@@ -149,7 +149,10 @@ describe("powerHasValidTarget (ADR-0010)", () => {
     expect(powerHasValidTarget("J", base, p0)).toBe(true)
     const oneSlot: GameState = {
       ...base,
-      players: [{ id: p0, hand: [{ slotIndex: slot(0), card: card("AS") }] }, { id: p1, hand: [] }],
+      players: [
+        { id: p0, hand: [{ slotIndex: slot(0), card: card("AS") }] },
+        { id: p1, hand: [] },
+      ],
     }
     expect(powerHasValidTarget("Q", oneSlot, p0)).toBe(false)
     expect(powerHasValidTarget("J", oneSlot, p0)).toBe(false)

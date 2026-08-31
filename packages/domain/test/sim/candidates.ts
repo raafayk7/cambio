@@ -21,11 +21,7 @@ export const legalCandidates = (state: GameState, now: Timestamp): ReadonlyArray
     legalCommandKinds(state, p.id, now).flatMap((tag) => fill(state, p.id, tag)),
   )
 
-const fill = (
-  state: GameState,
-  playerId: UserId,
-  tag: Command["_tag"],
-): ReadonlyArray<Command> => {
+const fill = (state: GameState, playerId: UserId, tag: Command["_tag"]): ReadonlyArray<Command> => {
   switch (tag) {
     case "CallCambio":
       return [{ _tag: "CallCambio", playerId }]

@@ -8,7 +8,7 @@
 
 CAM-2 builds the randomized-game harness HANDOFF §12 step 2 calls for:
 thousands of seeded complete games played through the pure engine, with the
-§4.5 invariants asserted after every transition. Generating a random *legal*
+§4.5 invariants asserted after every transition. Generating a random _legal_
 command requires the current `GameState` — the candidate set (which tags,
 which slot arguments, which `SlotRef` targets) is a function of the evolving
 state, and the simulated clock must deliberately sit inside or jump past
@@ -39,8 +39,8 @@ property-testing library is added.
 
 The driver's randomness comes from a **second, independently seeded
 `Utils.PCGRandom` instance from `effect`** — the same primitive the engine's
-`Prng.ts` wraps. This deliberately does *not* reverse CAM-1's rejection of a
-hand-rolled PRNG (root plan CAM-1 decision log): we hand-roll the *driver*,
+`Prng.ts` wraps. This deliberately does _not_ reverse CAM-1's rejection of a
+hand-rolled PRNG (root plan CAM-1 decision log): we hand-roll the _driver_,
 not the random-number generator. The driver's PRNG stream is separate from
 `GameState.prng`, so command-choice randomness never perturbs the game's own
 shuffle stream and a game seed alone reproduces the same deal under any
@@ -61,7 +61,7 @@ rests on the shape argument alone.)
   because engine and driver are both pure and deterministic.
 - We own minimal shrinking (replay + report the command trace up to the
   failing step) instead of getting generic shrinking free. If we later need
-  smarter minimization, adding fast-check *on top of* the driver remains
+  smarter minimization, adding fast-check _on top of_ the driver remains
   possible — that would supersede this ADR. It would even be free of new
   installs (`effect/FastCheck`).
 - No new package.json entry; `packages/domain`'s `effect`-only import rule

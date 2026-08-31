@@ -22,9 +22,9 @@ Both were put to the user with alternatives during planning.
    §1.4). Naming an empty slot — including any slot of a zero-card player —
    is an illegal move, rejected with a typed validation error.
 
-   *Rejected — one-way give into an empty hand:* invents a new card-movement
+   _Rejected — one-way give into an empty hand:_ invents a new card-movement
    mechanic never playtested.
-   *Rejected — no-op allowed:* makes an information-bearing action silently
+   _Rejected — no-op allowed:_ makes an information-bearing action silently
    do nothing; illegal-and-retry is clearer for both UI and bot.
 
 2. **No valid target ⇒ the power fizzles.** The obligation of §1.3(c) is
@@ -33,8 +33,8 @@ Both were put to the user with alternatives during planning.
    the discard pile, an explicit event records the fizzle, and the turn
    proceeds normally (slam window opens as usual).
 
-   *Rejected — best-effort partial resolution (e.g. Queen looks but cannot
-   swap):* more faithful to "obligated" in letter but adds per-power partial
+   _Rejected — best-effort partial resolution (e.g. Queen looks but cannot
+   swap):_ more faithful to "obligated" in letter but adds per-power partial
    states for a case that is already rare. The Queen is all-or-nothing at
    the whole-power level: she needs at least one occupied slot to look at
    and at least two to swap, so with fewer than two occupied slots in the

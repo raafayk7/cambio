@@ -12,7 +12,7 @@ mechanics in CAM-1 forced two adjacent rulings the handoff does not state:
 whether slams inside an open window extend it, and what happens when a
 penalty draw (incorrect slam, §1.5) or a draw-then-give
 ([0009](0009-zero-card-slammer-draws-then-gives.md)) finds the deck empty
-*and* the automatic reshuffle of the discard pile (§1.7, top card retained)
+_and_ the automatic reshuffle of the discard pile (§1.7, top card retained)
 yields nothing — possible only when nearly every card is in players' hands.
 Both were put to the user with alternatives during planning.
 
@@ -24,7 +24,7 @@ Both were put to the user with alternatives during planning.
    "timers are not the authority" reasoning simple: any command is judged
    against one immutable timestamp.
 
-   *Rejected — reset on every slam / on correct slams only:* extends games
+   _Rejected — reset on every slam / on correct slams only:_ extends games
    unpredictably and makes the close time a function of contested history
    rather than a stored fact.
 
@@ -40,7 +40,7 @@ Both were put to the user with alternatives during planning.
    removed) and the draw is skipped, recorded as an explicit event so the
    log shows it happened.
 
-   *Rejected — reject the slam as illegal while no drawable card exists:*
+   _Rejected — reject the slam as illegal while no drawable card exists:_
    couples a player's right to slam to a global card-distribution fact they
    cannot easily see.
 

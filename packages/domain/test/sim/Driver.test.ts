@@ -77,7 +77,8 @@ describe("candidate enumeration (C1.2)", () => {
     const [initial] = Either.getOrThrow(dealGame(players3, 42, config, ts(0)))
     const candidates = legalCandidates(initial, ts(1))
     for (const c of candidates) {
-      if (c._tag === "CloseSlamWindow") throw new Error("close is a clock action, never a candidate")
+      if (c._tag === "CloseSlamWindow")
+        throw new Error("close is a clock action, never a candidate")
       expect(c.playerId).toBe(uid(0))
     }
     const top = initial.discard[0]!

@@ -21,7 +21,7 @@ put to the user with alternatives.
    empty: the turn advances directly to the next seat. With nothing to
    match a rank against, no slam could ever be legal.
 
-   *Rejected — a vacuous full-length window:* keeps the game's rhythm
+   _Rejected — a vacuous full-length window:_ keeps the game's rhythm
    uniform but is pure delay, and requires the window phase to represent
    "no rank".
 

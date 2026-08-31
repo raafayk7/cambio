@@ -210,7 +210,10 @@ describe("Q — look at any one card, then blind-swap (C3.4)", () => {
 
 describe("fizzles — no valid target (C3.5, ADR-0010)", () => {
   const drawInto = (deckTop: string, state: GameState) =>
-    apply({ ...state, deck: [card(deckTop), ...state.deck] }, { _tag: "DrawFromDeck", playerId: p0 })
+    apply(
+      { ...state, deck: [card(deckTop), ...state.deck] },
+      { _tag: "DrawFromDeck", playerId: p0 },
+    )
 
   it("7/8 fizzle when the drawer's hand is empty", () => {
     const zeroSelf: GameState = { ...base, players: [{ id: p0, hand: [] }, base.players[1]!] }
@@ -234,7 +237,10 @@ describe("fizzles — no valid target (C3.5, ADR-0010)", () => {
   it("J and Q fizzle whole with fewer than two occupied slots — no partial Queen", () => {
     const oneSlot: GameState = {
       ...base,
-      players: [{ id: p0, hand: [{ slotIndex: slot(0), card: card("AS") }] }, { id: p1, hand: [] }],
+      players: [
+        { id: p0, hand: [{ slotIndex: slot(0), card: card("AS") }] },
+        { id: p1, hand: [] },
+      ],
     }
     const [, jackEvents] = drawInto("JD", oneSlot)
     expect(jackEvents[1]).toStrictEqual({ _tag: "PowerFizzled", playerId: p0, power: "J" })

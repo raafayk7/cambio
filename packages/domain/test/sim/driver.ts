@@ -107,8 +107,7 @@ export const simulateGame = (params: SimParams): GameRun => {
   const knobs = params.knobs ?? defaultKnobs
   const rng = makeDriverRng(params.driverSeed)
   const roster =
-    params.initial?.roster ??
-    Array.from({ length: params.playerCount }, (_, seat) => uid(seat))
+    params.initial?.roster ?? Array.from({ length: params.playerCount }, (_, seat) => uid(seat))
   const trace: Array<StepRecord> = []
   const events: Array<GameEvent> = []
   let steps = 0

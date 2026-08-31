@@ -6,8 +6,8 @@
 - **ADRs:** [0009](../../adr/0009-zero-card-slammer-draws-then-gives.md),
   [0010](../../adr/0010-jq-swaps-require-occupied-slots-powers-fizzle.md),
   [0011](../../adr/0011-slam-window-fixed-close-config-duration.md),
-  [0012](../../adr/0012-empty-discard-skips-slam-window.md) *(added during
-  implementation — new gap surfaced and resolved with the user)*
+  [0012](../../adr/0012-empty-discard-skips-slam-window.md) _(added during
+  implementation — new gap surfaced and resolved with the user)_
 
 > This is a **living document** (ExecPlan-style). The implementer updates
 > Progress, Decision Log, and Surprises as work happens — not at the end.
@@ -82,7 +82,7 @@ numeric seed. Same inputs ⇒ identical outputs, always.
    from the deck. Any command from a non-active player, or any other
    command, is a typed error naming the reason.
 2. **Call Cambio** ends the game immediately: phase becomes `Ended`, all
-   hands are scored (score is per-card, rank *and* suit, §1.2), and the
+   hands are scored (score is per-card, rank _and_ suit, §1.2), and the
    game-ended event carries per-player totals and the (possibly plural) set
    of lowest-score winners. No final round, no caller bonus/penalty. Ties
    must be representable (§1.8).
@@ -266,7 +266,7 @@ after each. File-level detail: [backend child plan](../backend/CAM-1.md).
 
 ## Progress
 
-*(updated continuously; newest last; timestamp each entry)*
+_(updated continuously; newest last; timestamp each entry)_
 
 - [x] 2026-08-31 07:20 — plan written; signed off; committed d043edd
 - [x] 2026-08-31 12:44 — M1 state model + Phase rewrite (25 tests)
@@ -283,9 +283,9 @@ after each. File-level detail: [backend child plan](../backend/CAM-1.md).
 
 ## Decision log
 
-*(every non-obvious choice made during planning or implementation: what was
+_(every non-obvious choice made during planning or implementation: what was
 decided, why, what was rejected. Promote to an ADR if it meets the adr
-skill's bar.)*
+skill's bar.)_
 
 - 2026-08-31 — §9.2, §9.3, §9.4-adjacent rulings decided with the user →
   promoted to ADRs 0009/0010/0011 (see header).
@@ -312,10 +312,10 @@ skill's bar.)*
 - 2026-08-31 (implementation) — Added `UnknownPlayer` error: `Slam` accepts
   any player, so a non-member issuer needs a distinguishable rejection.
 - 2026-08-31 (implementation) — Added `SwapTargetsIdentical` error: §1.4's
-  "blind-swap any two cards" is read as two *distinct* slots; allowing the
+  "blind-swap any two cards" is read as two _distinct_ slots; allowing the
   same slot twice would let a J/Q decline its swap information-free.
 - 2026-08-31 (implementation) — `powerHasValidTarget(power, state,
-  playerId)` gained the third parameter: 7/8 and 9/10 targets are relative
+playerId)` gained the third parameter: 7/8 and 9/10 targets are relative
   to the drawer, which the child plan's two-arg signature couldn't express.
 - 2026-08-31 (implementation) — The end-to-end game is driven by a
   deterministic state-reading policy rather than a hand-scripted command
@@ -325,8 +325,8 @@ skill's bar.)*
 
 ## Surprises & discoveries
 
-*(anything found mid-implementation that the plan didn't predict — wrong
-assumptions, upstream bugs, better approaches. Evidence included.)*
+_(anything found mid-implementation that the plan didn't predict — wrong
+assumptions, upstream bugs, better approaches. Evidence included.)_
 
 - **The discard pile can empty** (zero-card keep of the pile's only card,
   reachable right after the deal or a reshuffle), which the handoff never
@@ -342,12 +342,12 @@ assumptions, upstream bugs, better approaches. Evidence included.)*
   implies a non-empty pile, and a successful slam pushes the slammed card
   onto it, so the give-draw always finds the old top card via reshuffle
   (test: "a zero-card give is satisfied by reshuffling the old top under
-  the slammed card"). Only the *penalty* skip is reachable (deck empty +
+  the slammed card"). Only the _penalty_ skip is reachable (deck empty +
   pile at exactly its top card). The give branch is kept for totality.
 
 ## Outcomes & retrospective
 
-*(filled by `/review`, 2026-08-31)*
+_(filled by `/review`, 2026-08-31)_
 
 **Verdict: fix-then-ship.** Every contract clause C1.1–C8.2 is SATISFIED
 (contract reviewer, clause-by-clause with file:line evidence); the
@@ -358,20 +358,20 @@ uncached, 106/106 domain tests, all validation greps empty.
 
 **Findings to fix before ship (small, enumerated):**
 
-1. *Architecture violation — non-exhaustive `if`-chain dispatch over
-   `Phase`* (effect-domain-modeling: unions must be matched exhaustively).
+1. _Architecture violation — non-exhaustive `if`-chain dispatch over
+   `Phase`_ (effect-domain-modeling: unions must be matched exhaustively).
    `GameState.ts` `allCards` decides "does this phase hold a card" via a
    three-way `_tag ===` chain — a new card-carrying phase case would
    compile clean and silently break the 52-partition — and
    `Legality.ts` `legalCommandKinds` dispatches via sequential `if`s (a
    new phase yields `[]` with no compiler signal). Fix: exhaustive
    `switch`/`Match` with a `satisfies never` check.
-2. *Acceptance-criterion shortfall (letter, not behavior):* "every clause
+2. _Acceptance-criterion shortfall (letter, not behavior):_ "every clause
    has a test naming it" holds for only 17 of 34 numbered statements;
    behavior is covered but several regressions would not be caught:
    C7.3's test never deep-compares pre/post state; no test advances the
    turn onto a zero-card seat (C4.6); no engine-path test slams out a
-   *middle* slot to pin hole-stability (C4.3); C6.2's positive half
+   _middle_ slot to pin hole-stability (C4.3); C6.2's positive half
    (Cambio/take remain legal when draws are impossible) is unpinned;
    `KeepHeld` during `ResolvingPower` (third `MustResolvePower` arm) is
    untested; `GameError.test.ts` constructs 13 of the 16 error classes.
@@ -403,7 +403,7 @@ how often ADR-0011 skips and ADR-0012 empty-pile turns actually occur.
 `legalCommandKinds` dispatches via an exhaustive switch, both with
 `satisfies never` defaults — a new `Phase` case is now a compile error at
 both sites. (2) Tests added: pre/post deep-compare in both C7.3 paths
-(illegal *and* legal), turn advance onto a zero-card seat, middle-slot
+(illegal _and_ legal), turn advance onto a zero-card seat, middle-slot
 slam pinning hole stability, C6.2's positive half
 (`["CallCambio","TakeDiscard"]` when draws are impossible), `KeepHeld`
 during `ResolvingPower`, a successful slam against a power-rank top

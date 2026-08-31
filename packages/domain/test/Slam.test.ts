@@ -171,10 +171,7 @@ describe("rank-only matching (C4.2)", () => {
       ...base,
       discard: [card("JD")],
       phase: { _tag: "SlamWindow", turnPlayerId: p0, closesAt, rank: "J" },
-      players: [
-        { id: p0, hand: [{ slotIndex: slot(0), card: card("QC") }] },
-        base.players[1]!,
-      ],
+      players: [{ id: p0, hand: [{ slotIndex: slot(0), card: card("QC") }] }, base.players[1]!],
     }
     const [, events] = apply(jackWindow, {
       _tag: "Slam",
@@ -190,10 +187,7 @@ describe("rank-only matching (C4.2)", () => {
       ...base,
       discard: [card("JD")],
       phase: { _tag: "SlamWindow", turnPlayerId: p0, closesAt, rank: "J" },
-      players: [
-        { id: p0, hand: [{ slotIndex: slot(0), card: card("JC") }] },
-        base.players[1]!,
-      ],
+      players: [{ id: p0, hand: [{ slotIndex: slot(0), card: card("JC") }] }, base.players[1]!],
     }
     const [, events] = apply(jackTop, {
       _tag: "Slam",
@@ -209,10 +203,7 @@ describe("rank-only matching (C4.2)", () => {
       ...base,
       discard: [card("KS")],
       phase: { _tag: "SlamWindow", turnPlayerId: p0, closesAt, rank: "K" },
-      players: [
-        { id: p0, hand: [{ slotIndex: slot(0), card: card("KH") }] },
-        base.players[1]!,
-      ],
+      players: [{ id: p0, hand: [{ slotIndex: slot(0), card: card("KH") }] }, base.players[1]!],
     }
     const [, events] = apply(kingWindow, {
       _tag: "Slam",
@@ -291,7 +282,11 @@ describe("exhaustion during slams (C4.5, ADR-0011)", () => {
       target: { playerId: p0, slotIndex: slot(0) },
       giveSlot: null,
     })
-    expect(events.map((e) => e._tag)).toStrictEqual(["SlamFailed", "DeckReshuffled", "PenaltyDrawn"])
+    expect(events.map((e) => e._tag)).toStrictEqual([
+      "SlamFailed",
+      "DeckReshuffled",
+      "PenaltyDrawn",
+    ])
     expect(after.discard).toStrictEqual([card("4S")])
   })
 

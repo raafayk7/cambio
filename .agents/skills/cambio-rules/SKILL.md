@@ -22,16 +22,16 @@ Cambio is a hidden-information, memory-based card game. **Lowest score wins.**
 
 ## Scoring
 
-| Card | Score |
-| --- | --- |
-| Ace | 0 |
-| 2–10 | face value |
-| Jack, Queen | 11 |
-| King ♠ ♣ | −1 |
-| King ♥ ♦ | −2 |
+| Card        | Score      |
+| ----------- | ---------- |
+| Ace         | 0          |
+| 2–10        | face value |
+| Jack, Queen | 11         |
+| King ♠ ♣    | −1         |
+| King ♥ ♦    | −2         |
 
 Score is a property of a **specific card**, not a rank — derive from rank
-*and* suit. Negative totals are normal. A hand of zero cards scores 0, which
+_and_ suit. Negative totals are normal. A hand of zero cards scores 0, which
 is beatable.
 
 ## A turn
@@ -47,6 +47,7 @@ player's own slots; the displaced card goes face up onto the discard pile. It
 cannot be discarded straight back.
 
 **(c) Draw from the deck.** Then:
+
 - **Non-power (A, 2–6, K):** blind-swap into own slot (displaced card to
   discard) **or** discard directly.
 - **Power (7, 8, 9, 10, J, Q):** the player is **obligated to play the
@@ -57,12 +58,12 @@ After the action resolves, the slam window opens.
 
 ## Powers
 
-| Card | Power |
-| --- | --- |
-| 7, 8 | Look at one of your own cards |
-| 9, 10 | Look at one of another player's cards |
-| J | Blind-swap any two player-held cards |
-| Q | Look at any one card, then blind-swap any two player-held cards |
+| Card  | Power                                                           |
+| ----- | --------------------------------------------------------------- |
+| 7, 8  | Look at one of your own cards                                   |
+| 9, 10 | Look at one of another player's cards                           |
+| J     | Blind-swap any two player-held cards                            |
+| Q     | Look at any one card, then blind-swap any two player-held cards |
 
 - Powers trigger **only when drawn from the deck**. A power card on the
   discard pile is inert (and can't be taken — see turn (b)), though it is
@@ -83,12 +84,12 @@ as the current top discard. Matching is **rank, not score** (J ≠ Q despite
 both scoring 11; black K matches red K despite different scores). A player
 may slam their own or another's card, multiple times within the window.
 
-| Slam | Result |
-| --- | --- |
-| Own card, correct | Card removed to discard pile; hand shrinks. |
-| Own card, incorrect | Card stays; slammer draws a penalty card. |
-| Opponent's card, correct | Card removed to discard; slammer gives one of their own cards (blind, slammer's choice of slot) into the vacated slot. |
-| Opponent's card, incorrect | Card stays with owner; slammer draws a penalty card. |
+| Slam                       | Result                                                                                                                 |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Own card, correct          | Card removed to discard pile; hand shrinks.                                                                            |
+| Own card, incorrect        | Card stays; slammer draws a penalty card.                                                                              |
+| Opponent's card, correct   | Card removed to discard; slammer gives one of their own cards (blind, slammer's choice of slot) into the vacated slot. |
+| Opponent's card, incorrect | Card stays with owner; slammer draws a penalty card.                                                                   |
 
 Every slam attempt, correct or not, **publicly reveals** the slammed card
 momentarily — that leak is part of the cost.

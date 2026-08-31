@@ -138,8 +138,8 @@ workhorse, §4.5); `slotCard` returns `Option.none` for a hole. Then create
   the lowest free index) and mirrors the future `user_cards` rows.
 - `GamePlayer = Schema.Struct({ id: UserId, hand: Hand })`.
 - `GameState = Schema.Struct({ players: Schema.Array(GamePlayer), deck:
-  Schema.Array(CardSlug), discard: Schema.Array(CardSlug), prng: PrngState,
-  phase: Phase, config: GameConfig })` — players in seat order (array index
+Schema.Array(CardSlug), discard: Schema.Array(CardSlug), prng: PrngState,
+phase: Phase, config: GameConfig })` — players in seat order (array index
   = seat, §4.3 `game_players`), `deck[0]` = next to draw, `discard[0]` =
   top (§4.3). PRNG state lives here so mid-game reshuffles and penalty
   draws stay deterministic (root plan Decision Log). Plus
@@ -268,8 +268,8 @@ payloads (§4.3): they carry **full truth** (card identities included);
 redaction is `viewFor`'s job in a later task. Cases (past tense):
 
 - `GameStarted { at: Timestamp, seed: Schema.Number, players:
-  Schema.Array(UserId), config: GameConfig, hands: Schema.Array(Hand),
-  deck: Schema.Array(CardSlug), firstDiscard: CardSlug }` — records the
+Schema.Array(UserId), config: GameConfig, hands: Schema.Array(Hand),
+deck: Schema.Array(CardSlug), firstDiscard: CardSlug }` — records the
   **concrete deal** (hands parallel to `players` in seat order, remaining
   deck order, first discard) so replay never depends on PRNG byte-stability
   (root Decision Log); `seed` kept for audit only. `at` is the only event
@@ -277,13 +277,13 @@ redaction is `viewFor`'s job in a later task. Cases (past tense):
   column (§4.3).
 - `CambioCalled { playerId }` — C2.2.
 - `GameEnded { calledBy: UserId, scores: Schema.Array(Schema.Struct({
-  playerId: UserId, total: Schema.Int })), winners: Schema.Array(UserId) }`
+playerId: UserId, total: Schema.Int })), winners: Schema.Array(UserId) }`
   — per-player totals and the possibly-plural lowest-score winner set
   (§1.8, C2.2).
 - `CardDrawn { playerId, card: CardSlug }` — turn draw (C2.4).
 - `DiscardTaken { playerId, card: CardSlug }` — top discard into held state.
 - `HeldSwapped { playerId, slotIndex: SlotIndex, placed: CardSlug,
-  discarded: CardSlug }` — held card into slot, displaced card to pile.
+discarded: CardSlug }` — held card into slot, displaced card to pile.
 - `HeldKept { playerId, slotIndex: SlotIndex, card: CardSlug }` —
   zero-card keep (ADR-0009.2).
 - `HeldDiscarded { playerId, card: CardSlug }` — deck-drawn non-power
@@ -298,7 +298,7 @@ redaction is `viewFor`'s job in a later task. Cases (past tense):
 - `PowerDiscarded { playerId, card: CardSlug }` — the power card reaching
   the discard pile after resolution or fizzle (§1.3c).
 - `SlamWindowOpened { turnPlayerId: UserId, closesAt: Timestamp,
-  rank: Rank }` — C4.1.
+rank: Rank }` — C4.1.
 - `SlamSucceeded { slammerId: UserId, target: SlotRef, card: CardSlug }` —
   the public reveal is part of the cost (§1.5, C4.4).
 - `SlamFailed { slammerId: UserId, target: SlotRef, card: CardSlug }` —
@@ -306,7 +306,7 @@ redaction is `viewFor`'s job in a later task. Cases (past tense):
 - `PenaltyDrawn { playerId, slotIndex: SlotIndex, card: CardSlug }` —
   penalty card into the lowest free slot (§1.5).
 - `CardGivenFromHand { slammerId: UserId, fromSlot: SlotIndex,
-  to: SlotRef }` — the normal give (§1.5); identity derivable from slots.
+to: SlotRef }` — the normal give (§1.5); identity derivable from slots.
 - `CardGivenFromDeck { slammerId: UserId, to: SlotRef, card: CardSlug }` —
   zero-card draw-then-give (ADR-0009.1); the card is unseen at the table
   but the log records truth.
@@ -463,7 +463,7 @@ clause:
   `MustResolvePower`.
 - **Window open/close (C4.1, C4.6):** after each resolving action, phase is
   `SlamWindow { turnPlayerId, closesAt: now + config.slamWindowMs, rank:
-  rank(discard[0]) }` and `SlamWindowOpened` is emitted; `CloseSlamWindow`
+rank(discard[0]) }` and `SlamWindowOpened` is emitted; `CloseSlamWindow`
   with `now < closesAt` ⇒ `WindowStillOpen`; with `now >= closesAt` ⇒
   `[SlamWindowClosed, TurnAdvanced]` and `AwaitingDraw` for seat
   `(seat + 1) % n` — including onto a zero-card player (§1.6, C5).
@@ -501,7 +501,7 @@ Write `packages/domain/test/Powers.test.ts` first:
   empty; 9/10 with every opponent empty; J with fewer than two occupied
   slots in the game; Q likewise (whole-Queen fizzle — no peek happens).
   Each ⇒ draw resolves as `[CardDrawn, PowerFizzled, PowerDiscarded,
-  SlamWindowOpened]`, card straight to discard, never entering
+SlamWindowOpened]`, card straight to discard, never entering
   `ResolvingPower`.
 - A power on top of the discard is inert but slammable-against: window
   `rank` is the power's rank (C3.6).
@@ -669,7 +669,7 @@ the tie game, and the determinism replay.
       counts the phase-held card, else the 52-partition breaks mid-turn.
 - [x] 2026-08-31 13:20 — M6 complete: power handlers + fizzles. 85 green.
       Deviation: added `SwapTargetsIdentical` error — "blind-swap any two
-      cards" (§1.4) read as requiring two *distinct* slots; naming the same
+      cards" (§1.4) read as requiring two _distinct_ slots; naming the same
       slot twice would let a J/Q decline its swap information-free.
 - [x] 2026-08-31 13:25 — M7 complete: slam handler, all outcomes;
       `TransitionNotReached` scaffold deleted. 100 green. Discovery: the
@@ -689,4 +689,4 @@ the tie game, and the determinism replay.
 
 ## Surprises & notes for the root plan
 
-*(anything the root plan's Decision Log or the reviewer must know)*
+_(anything the root plan's Decision Log or the reviewer must know)_

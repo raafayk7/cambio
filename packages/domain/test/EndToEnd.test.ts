@@ -100,7 +100,10 @@ const drive = (seed: number): Trace => {
             {
               _tag: "PowerPeek",
               playerId: phase.playerId,
-              target: { playerId: phase.playerId, slotIndex: lowestOccupied(state, phase.playerId)! },
+              target: {
+                playerId: phase.playerId,
+                slotIndex: lowestOccupied(state, phase.playerId)!,
+              },
             },
             now,
           )

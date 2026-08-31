@@ -11,16 +11,10 @@ import { Schema, Utils } from "effect"
  */
 
 /** Mirrors `Utils.PCGRandomState`. */
-export const PrngState = Schema.Tuple(
-  Schema.Number,
-  Schema.Number,
-  Schema.Number,
-  Schema.Number,
-)
+export const PrngState = Schema.Tuple(Schema.Number, Schema.Number, Schema.Number, Schema.Number)
 export type PrngState = typeof PrngState.Type
 
-export const prngStateFromSeed = (seed: number): PrngState =>
-  new Utils.PCGRandom(seed).getState()
+export const prngStateFromSeed = (seed: number): PrngState => new Utils.PCGRandom(seed).getState()
 
 /**
  * Fisher–Yates shuffle driven by the given PRNG state; returns the permuted

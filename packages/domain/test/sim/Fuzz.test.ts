@@ -50,7 +50,8 @@ describe("illegal-command fuzzing", () => {
               )
             }
             if (Option.isSome(verdict)) {
-              if (!Either.isLeft(result)) throw new Error("checkCommand rejected but engine accepted")
+              if (!Either.isLeft(result))
+                throw new Error("checkCommand rejected but engine accepted")
               expect(result.left._tag).toBe(verdict.value._tag)
               seenErrors.add(result.left._tag)
             } else {
@@ -162,9 +163,9 @@ describe("illegal-command fuzzing", () => {
             expect(Option.isSome(checkCommand(state, { _tag: "CloseSlamWindow" }, now))).toBe(
               now < closesAt,
             )
-            expect(
-              Option.isNone(checkCommand(state, { _tag: "CloseSlamWindow" }, closesAt)),
-            ).toBe(true)
+            expect(Option.isNone(checkCommand(state, { _tag: "CloseSlamWindow" }, closesAt))).toBe(
+              true,
+            )
           } else {
             expect(Option.isSome(checkCommand(state, { _tag: "CloseSlamWindow" }, now))).toBe(true)
           }

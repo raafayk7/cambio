@@ -74,10 +74,7 @@ export const seatOf = (state: GameState, playerId: UserId): Option.Option<number
 }
 
 export const handOf = (state: GameState, playerId: UserId): Option.Option<Hand> =>
-  Option.map(
-    Option.fromNullable(state.players.find((p) => p.id === playerId)),
-    (p) => p.hand,
-  )
+  Option.map(Option.fromNullable(state.players.find((p) => p.id === playerId)), (p) => p.hand)
 
 /** Incoming cards fill the lowest free index (§4.3); hands may grow past 4. */
 export const lowestFreeSlot = (hand: Hand): SlotIndex => {
@@ -94,9 +91,7 @@ export const slotCard = (state: GameState, ref: SlotRef): Option.Option<CardSlug
 
 /** Every occupied `(player, slot)` pair, in seat order then slot order. */
 export const occupiedSlots = (state: GameState): ReadonlyArray<SlotRef> =>
-  state.players.flatMap((p) =>
-    p.hand.map((s) => ({ playerId: p.id, slotIndex: s.slotIndex })),
-  )
+  state.players.flatMap((p) => p.hand.map((s) => ({ playerId: p.id, slotIndex: s.slotIndex })))
 
 /**
  * The card a phase holds outside deck/discard/hands, if any. Exhaustive on

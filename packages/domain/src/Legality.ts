@@ -37,12 +37,10 @@ import { type Timestamp, type UserId } from "./Ids.js"
  * no rule check may exist anywhere else.
  */
 
-const occupied = (state: GameState, ref: SlotRef): boolean =>
-  Option.isSome(slotCard(state, ref))
+const occupied = (state: GameState, ref: SlotRef): boolean => Option.isSome(slotCard(state, ref))
 
 /** Can this player draw at all — deck card, or a reshufflable discard (§1.7)? */
-const drawable = (state: GameState): boolean =>
-  state.deck.length > 0 || state.discard.length > 1
+const drawable = (state: GameState): boolean => state.deck.length > 0 || state.discard.length > 1
 
 /** Does a drawn power have any valid target right now (ADR-0010)? */
 export const powerHasValidTarget = (
@@ -134,9 +132,7 @@ export const checkCommand = (
       if (command._tag === "DiscardHeld") {
         // A card taken from the discard must be swapped in — never discarded
         // straight back (§1.3b). Same phase shape, different legal move set.
-        return phase.source === "deck"
-          ? Option.none()
-          : Option.some(wrongPhase(command, state))
+        return phase.source === "deck" ? Option.none() : Option.some(wrongPhase(command, state))
       }
       return hand.length === 0
         ? Option.none()

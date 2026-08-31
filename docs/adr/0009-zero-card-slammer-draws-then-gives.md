@@ -26,9 +26,9 @@ planning.
    draw even after reshuffle, the give is skipped (see
    [0011](0011-slam-window-fixed-close-config-duration.md)).
 
-   *Rejected — skip the transfer:* pure upside for the slammer and leaves the
+   _Rejected — skip the transfer:_ pure upside for the slammer and leaves the
    opponent a card down with no compensation, distorting the slam economy.
-   *Rejected — disallow the slam:* takes a whole mechanic away from zero-card
+   _Rejected — disallow the slam:_ takes a whole mechanic away from zero-card
    players for no table-tested reason.
 
 2. **Taking the discard at zero cards is a keep.** A zero-card active player
@@ -36,7 +36,7 @@ planning.
    slot index and no displaced card goes to the pile (there is none). This
    mirrors §1.6's "keep" semantics for drawn cards.
 
-   *Rejected — draw-or-Cambio only:* would make the take action's legality
+   _Rejected — draw-or-Cambio only:_ would make the take action's legality
    depend on hand size in a way players at the table did not observe.
 
 ## Consequences

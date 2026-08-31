@@ -49,7 +49,7 @@ Everything lives in `packages/domain`; no other package changes.
 **Invariant restatement (deliberate, not scope creep).** Two §4.5 clauses
 are phrased against the persisted schema and are structurally unfalsifiable
 against the domain's shapes: "no negative hand counts" (a `Hand` is an
-array; length ≥ 0 by construction) and "contiguous seat indices" (seat *is*
+array; length ≥ 0 by construction) and "contiguous seat indices" (seat _is_
 the `players` array index). The contract below restates them as the
 equivalent domain invariants the engine actually maintains (unique sorted
 slot indices; fixed player roster). Likewise "phase/status consistency"
@@ -224,7 +224,7 @@ parameterize a finished harness.
 
 ## Progress
 
-*(updated continuously; newest last; timestamp each entry)*
+_(updated continuously; newest last; timestamp each entry)_
 
 - [x] 2026-08-31 14:20 — M1 driver core complete: `test/sim/` rng, candidates, policy, driver; 17 new tests green (C1.1–C1.5, C3.1 single-game), typecheck/lint clean.
 - [x] 2026-08-31 14:22 — M2 invariant checkers complete and wired per-step; `Simulation.test.ts` batch plays 250 random games with zero violations on first contact (batch wall time ~0.6 s). Suite 150 tests green.
@@ -280,8 +280,8 @@ parameterize a finished harness.
 
 ## Surprises & discoveries
 
-*(anything found mid-implementation that the plan didn't predict — wrong
-assumptions, upstream bugs, better approaches. Evidence included.)*
+_(anything found mid-implementation that the plan didn't predict — wrong
+assumptions, upstream bugs, better approaches. Evidence included.)_
 
 - (from planning exploration, for the implementer) A **legal** command can
   return a byte-identical state: a failed slam whose penalty/give draw is
@@ -295,7 +295,7 @@ assumptions, upstream bugs, better approaches. Evidence included.)*
 
 ## Outcomes & retrospective
 
-*(filled by `/review`, 2026-08-31)*
+_(filled by `/review`, 2026-08-31)_
 
 **Verdict: ship.** Contract review: no clause violated — 17 satisfied,
 2 not-verifiable by artifact (C6.3 vacuous: no failing seed ever existed to
@@ -319,7 +319,7 @@ engine survived the harness — the C7.1 stop-and-ask never fired.
    "a new dependency" / "first test-only npm dependency" are wrong. The
    decision stands on its other rationale (model-based `fc.commands`
    duplicates `legalCommandKinds`; sequence-shrinking buys little over
-   seed replay), but the ADR is still *proposed* and should be amended.
+   seed replay), but the ADR is still _proposed_ and should be amended.
 2. `counters.ts` `recordStep` switch ends `default: break` — silently
    ignores nine event tags instead of the repo's explicit-cases +
    `satisfies never` idiom; risky precisely because counters are the
@@ -327,7 +327,7 @@ engine survived the harness — the C7.1 stop-and-ask never fired.
 3. `fuzz.ts` `TAGS` / `Fuzz.test.ts` `PLAYER_TAGS` are hand-maintained
    lists that typecheck while incomplete — a future `Command` tag silently
    drops out of fuzz and C4.2 coverage.
-4. `driver.ts` calls `applyCommand` without try/catch — an engine *throw*
+4. `driver.ts` calls `applyCommand` without try/catch — an engine _throw_
    (vs `Either.left`) would escape without seeds/step/trace, unlike the
    fuzz path (C1.5 asymmetry).
 5. The test titled for C2.4 in `Simulation.test.ts` only asserts
@@ -338,7 +338,7 @@ engine survived the harness — the C7.1 stop-and-ask never fired.
 7. Advisories: C5.2 batch margins thin (9/T fizzle passes on one
    occurrence; zero-card give has no Coverage-scenario fallback off the
    default batch); the C3.2/C2.1 batch `it`s are documentation (real
-   checks throw inside the driver — window closes *are* validated every
+   checks throw inside the driver — window closes _are_ validated every
    time through `applyCommand`, so no operational stuck-hole); call-ramp
    monotonicity never unit-tested; child-plan module table shows the old
    `chooseTurnCommand` signature; stale `invariants.ts` baseline

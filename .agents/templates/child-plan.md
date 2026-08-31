@@ -28,16 +28,21 @@ success (test names, expected counts). Include the final gate:
 
 ## Contract coverage
 
-*(maintained by `/implement`, verified by `/review`: one row per root-plan
-contract clause this side owns — the test that pins it, or why none can)*
+_(maintained by `/implement`, verified by `/review`: one row per root-plan
+contract clause this side owns — the test that pins it, or why none can.
+Each row must also say **what is asserted**, in one phrase — a test whose
+title cites a clause but whose body doesn't assert it is the failure mode
+this column exists to catch.)_
 
-| Clause | Test (file + name) |
-| --- | --- |
+| Clause | Test (file + name) | What is asserted |
+| ------ | ------------------ | ---------------- |
 
 ## Progress
+
+_(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [ ] YYYY-MM-DD HH:MM — step
 
 ## Surprises & notes for the root plan
 
-*(anything the root plan's Decision Log or the reviewer must know)*
+_(anything the root plan's Decision Log or the reviewer must know)_

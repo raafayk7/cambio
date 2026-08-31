@@ -18,8 +18,7 @@ const config = decodeGameConfig({ slamWindowMs: 4000 })
 const players3 = [uid(0), uid(1), uid(2)]
 const FULL_DECK_SORTED = [...ALL_CARD_SLUGS].sort()
 
-const healthy = (): GameState =>
-  Either.getOrThrow(dealGame(players3, 7, config, ts(0)))[0]
+const healthy = (): GameState => Either.getOrThrow(dealGame(players3, 7, config, ts(0)))[0]
 
 describe("card partition checker (C2.1, §4.5)", () => {
   it("accepts a freshly dealt state against the full deck", () => {
@@ -38,9 +37,7 @@ describe("card partition checker (C2.1, §4.5)", () => {
     const state = healthy()
     const corrupt: GameState = {
       ...state,
-      players: state.players.map((p, seat) =>
-        seat === 0 ? { ...p, hand: p.hand.slice(1) } : p,
-      ),
+      players: state.players.map((p, seat) => (seat === 0 ? { ...p, hand: p.hand.slice(1) } : p)),
     }
     expect(cardPartitionViolations(corrupt, FULL_DECK_SORTED)).not.toStrictEqual([])
   })
@@ -153,7 +150,10 @@ describe("end-state checker (C2.3, C2.4, §1.8)", () => {
   })
 
   it("rejects GameEnded that is not the final event, or emitted twice", () => {
-    const trailing: ReadonlyArray<GameEvent> = [...events, { _tag: "TurnAdvanced", playerId: uid(0) }]
+    const trailing: ReadonlyArray<GameEvent> = [
+      ...events,
+      { _tag: "TurnAdvanced", playerId: uid(0) },
+    ]
     expect(endViolations(finalState, trailing, roster)).not.toStrictEqual([])
     const doubled: ReadonlyArray<GameEvent> = [...events, goodEnd]
     expect(endViolations(finalState, doubled, roster)).not.toStrictEqual([])
@@ -162,7 +162,13 @@ describe("end-state checker (C2.3, C2.4, §1.8)", () => {
   it("rejects doctored scores (independent recomputation, C2.4)", () => {
     const doctored: ReadonlyArray<GameEvent> = [
       events[0]!,
-      { ...goodEnd, scores: [{ playerId: uid(0), total: 1 }, { playerId: uid(1), total: -2 }] },
+      {
+        ...goodEnd,
+        scores: [
+          { playerId: uid(0), total: 1 },
+          { playerId: uid(1), total: -2 },
+        ],
+      },
     ]
     expect(endViolations(finalState, doctored, roster)).not.toStrictEqual([])
   })

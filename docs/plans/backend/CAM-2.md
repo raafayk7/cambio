@@ -5,7 +5,7 @@
   side.
 - **ADRs:** [0013](../../adr/0013-hand-rolled-seeded-simulation-driver.md)
   (hand-rolled seeded driver, second independent `Utils.PCGRandom`, no
-  property-testing library). The harness must *exercise and count* the
+  property-testing library). The harness must _exercise and count_ the
   behaviors decided in [0009](../../adr/0009-zero-card-slammer-draws-then-gives.md),
   [0010](../../adr/0010-jq-swaps-require-occupied-slots-powers-fizzle.md),
   [0011](../../adr/0011-slam-window-fixed-close-config-duration.md), and
@@ -33,7 +33,7 @@ The engine surface the harness drives (all complete, CAM-1):
 
 - `applyCommand(state, command, now)` — `packages/domain/src/Engine.ts:332`,
   returns `Either.Either<readonly [GameState, ReadonlyArray<GameEvent>],
-  GameError>` (success channel **first**, effect 3.x order). Pure; illegal
+GameError>` (success channel **first**, effect 3.x order). Pure; illegal
   commands leave the input untouched.
 - `dealGame(players, seed, config, now)` — `src/Deal.ts:16`, same Either
   shape; deals 4 cards to each of 2–5 seats, one discard, emits
@@ -128,15 +128,15 @@ Toolchain facts the implementer must honor:
 
 Helper modules (imported, never collected as suites):
 
-| File | Exports | Job |
-| --- | --- | --- |
-| `rng.ts` | `DriverRng` (`int(maxExclusive)`, `pick(items)`, `chance(num, den)`), `makeDriverRng(seed)` | The ADR-0013 second PRNG: one `Utils.PCGRandom` behind a tiny interface. All draws integer-based. |
-| `candidates.ts` | `legalCandidates(state, now): ReadonlyArray<Command>` | Fully-instantiated legal commands across **all** seats: tags from `legalCommandKinds`, arguments filled from state helpers. Excludes `CloseSlamWindow` (clock action — documented in the module docstring). |
-| `policy.ts` | `PolicyKnobs`, `defaultKnobs`, `chooseTurnCommand(candidates, rng, turnCount, knobs)`, `chooseSlam(state, slamCandidates, rng, slamsThisWindow, knobs): Option.Option<Command>` | Weighted choice + termination pressure (C1.4). `Option.none()` from `chooseSlam` means "close the window now". |
-| `invariants.ts` | `cardPartitionViolations(state, baselineSorted)`, `handIntegrityViolations(state, roster)`, `stepViolations(state, roster, baselineSorted)`, `endViolations(finalState, events, roster)` | Pure checkers returning `ReadonlyArray<string>` of violation descriptions (empty = healthy), so the driver can wrap them with seed/step repro info. C2.4's recomputation is **local** (`score` from `Card.ts` reduced over hands + a local min-filter) — it must not import `Scoring.ts`. |
-| `counters.ts` | `SimCounters`, `emptyCounters()`, `recordStep(counters, stateBefore, command, events)`, `formatSummary(counters)` | Event-derived rare-case counters (C5.1) — see M5 for the exact derivations. |
-| `driver.ts` | `SimParams`, `StepRecord`, `GameRun`, `SimFailure` (Error subclass carrying `gameSeed`/`driverSeed`/`step`/`trace`), `simulateGame(params): GameRun`, `seedPair(base, i)`, `playerCountFor(i)` | The loop: deal (or `params.initial`), enumerate → choose → apply → check, clock control, step cap, per-step invariants, counters. Throws `SimFailure` on any violation or cap hit (C1.5). |
-| `fuzz.ts` | `randomCommand(state, rng)`, `sampleFillings(state, playerId, tag, rng, n)` | Structurally-valid but mostly-illegal command generation for C4.1, and per-tag argument sampling for the C4.2 cross-check. |
+| File            | Exports                                                                                                                                                                                        | Job                                                                                                                                                                                                                                                                                       |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rng.ts`        | `DriverRng` (`int(maxExclusive)`, `pick(items)`, `chance(num, den)`), `makeDriverRng(seed)`                                                                                                    | The ADR-0013 second PRNG: one `Utils.PCGRandom` behind a tiny interface. All draws integer-based.                                                                                                                                                                                         |
+| `candidates.ts` | `legalCandidates(state, now): ReadonlyArray<Command>`                                                                                                                                          | Fully-instantiated legal commands across **all** seats: tags from `legalCommandKinds`, arguments filled from state helpers. Excludes `CloseSlamWindow` (clock action — documented in the module docstring).                                                                               |
+| `policy.ts`     | `PolicyKnobs`, `defaultKnobs`, `chooseTurnCommand(candidates, rng, turnCount, knobs)`, `chooseSlam(state, slamCandidates, rng, slamsThisWindow, knobs): Option.Option<Command>`                | Weighted choice + termination pressure (C1.4). `Option.none()` from `chooseSlam` means "close the window now".                                                                                                                                                                            |
+| `invariants.ts` | `cardPartitionViolations(state, baselineSorted)`, `handIntegrityViolations(state, roster)`, `stepViolations(state, roster, baselineSorted)`, `endViolations(finalState, events, roster)`       | Pure checkers returning `ReadonlyArray<string>` of violation descriptions (empty = healthy), so the driver can wrap them with seed/step repro info. C2.4's recomputation is **local** (`score` from `Card.ts` reduced over hands + a local min-filter) — it must not import `Scoring.ts`. |
+| `counters.ts`   | `SimCounters`, `emptyCounters()`, `recordStep(counters, stateBefore, command, events)`, `formatSummary(counters)`                                                                              | Event-derived rare-case counters (C5.1) — see M5 for the exact derivations.                                                                                                                                                                                                               |
+| `driver.ts`     | `SimParams`, `StepRecord`, `GameRun`, `SimFailure` (Error subclass carrying `gameSeed`/`driverSeed`/`step`/`trace`), `simulateGame(params): GameRun`, `seedPair(base, i)`, `playerCountFor(i)` | The loop: deal (or `params.initial`), enumerate → choose → apply → check, clock control, step cap, per-step invariants, counters. Throws `SimFailure` on any violation or cap hit (C1.5).                                                                                                 |
+| `fuzz.ts`       | `randomCommand(state, rng)`, `sampleFillings(state, playerId, tag, rng, n)`                                                                                                                    | Structurally-valid but mostly-illegal command generation for C4.1, and per-tag argument sampling for the C4.2 cross-check.                                                                                                                                                                |
 
 Test files (each named for what it pins):
 
@@ -150,9 +150,9 @@ Test files (each named for what it pins):
   `SIM_GAMES`/`SIM_SEED` knobs (C6.2).
 - `Fuzz.test.ts` — C4.1 illegal-command robustness and the C4.2
   legality/engine agreement property.
-- `Coverage.test.ts` — *contingent* (M5): dedicated seeded scenarios for any
+- `Coverage.test.ts` — _contingent_ (M5): dedicated seeded scenarios for any
   C5.2 shape the tuned default batch cannot reach.
-- `Regressions.test.ts` — *contingent* (C6.3): created the first time a
+- `Regressions.test.ts` — _contingent_ (C6.3): created the first time a
   failing seed is found; each entry replays the literal seeds.
 
 ## Plan of work
@@ -322,7 +322,7 @@ and advances `+25` ms per ordinary step. Dispatch on `state.phase._tag`:
   (C1.3), failing as `SimFailure`.
 - `Ended`: exit the loop.
 
-Every `applyCommand` left is a `SimFailure` (a *chosen* candidate was
+Every `applyCommand` left is a `SimFailure` (a _chosen_ candidate was
 rejected — a legality/engine disagreement, i.e. an engine gap: C7.1 says
 stop and ask, so the failure message must say so). Every step: push
 `StepRecord`, append events, `recordStep` counters (from M5; until then a
@@ -365,7 +365,7 @@ full-partition states while the driver asserts dealt games against the full
 deck.
 
 **Step 2.2 — Wire per-step checking into the driver, start the batch.**
-Extend `Driver.test.ts` first: a run over a corrupted *initial* state (via
+Extend `Driver.test.ts` first: a run over a corrupted _initial_ state (via
 `params.initial` with a duplicated card) throws `SimFailure` whose message
 names the violation and both seeds. Then wire `stepViolations` into
 `simulateGame` after every accepted command (baseline = sorted
@@ -512,7 +512,7 @@ Extend `Simulation.test.ts`:
   to check that prediction (root Validation).
 - "the default run reaches every ADR rare case (C5.2)" — `expect(x).toBeGreaterThan(0)`
   for: discard-source keeps (ADR-0009.2), zero-card gives —
-  `givesFromDeck + drawSkippedGive` (ADR-0009.1/0011), each fizzle *shape* —
+  `givesFromDeck + drawSkippedGive` (ADR-0009.1/0011), each fizzle _shape_ —
   7/8 combined, 9/T combined, J, Q (ADR-0010), and empty-discard skips
   (ADR-0012). Stable because the default seeds make the batch
   deterministic.
@@ -548,6 +548,7 @@ All config, no new logic. Edit in this order:
    knobs, their defaults, and the repro recipe ("a failure prints gameSeed +
    driverSeed + step; replay with `simulateGame({...literals})` in a scratch
    test") (C6.2).
+
 2. `packages/domain/vitest.config.ts` — add `testTimeout: 30_000` inside
    `test: {}` (headroom for `Driver`/`Fuzz`/`Coverage` on slow CI; the batch
    carries its own computed timeout) (C6.1).
@@ -558,7 +559,7 @@ All config, no new logic. Edit in this order:
    the acceptance "thousands" deliverable. Any failing seed ⇒ diagnose;
    engine/rule issue ⇒ C7.1 stop-and-ask; once resolved, pin the literal
    seeds in `test/sim/Regressions.test.ts` (C6.3, repo convention). If the
-   deep run surfaces nothing, `Regressions.test.ts` is *not* created — note
+   deep run surfaces nothing, `Regressions.test.ts` is _not_ created — note
    that in the coverage table.
 
 Checkpoint: full gate (below).
@@ -621,36 +622,36 @@ message alone (seeds + step) is enough to reproduce and debug, then revert.
 
 ## Contract coverage
 
-*(maintained by `/implement`, verified by `/review`: one row per root-plan
+_(maintained by `/implement`, verified by `/review`: one row per root-plan
 contract clause this side owns — the test that pins it, or why none can.
-Planned homes below; implement keeps them true.)*
+Planned homes below; implement keeps them true.)_
 
-| Clause | Test (file + name) |
-| --- | --- |
-| C1.1 | `test/sim/Driver.test.ts` — "replaying the same seeds yields the identical game (C1.1)" |
-| C1.2 | `test/sim/Driver.test.ts` — "candidate enumeration (C1.2)" describe; scale proof in `Fuzz.test.ts` C4.2 |
-| C1.3 | `test/sim/Driver.test.ts` — "the simulated clock is monotone and window actions respect closesAt (C1.3)" |
-| C1.4 | `test/sim/Driver.test.ts` — "hitting the step cap fails with full repro info (C1.4, C1.5)"; pressure proven batch-wide by C3.1 |
-| C1.5 | same test — `SimFailure` message + `trace` field assertions |
-| C2.1 | `test/sim/Invariants.test.ts` corrupt-state units; live in-driver per step — `Simulation.test.ts` "every accepted command preserves the 52-card partition (C2.1, §4.5)" |
-| C2.2 | `test/sim/Invariants.test.ts` units; `Simulation.test.ts` "hand slots stay unique and sorted; the roster never changes (C2.2, §4.5 restated)" |
-| C2.3 | `Simulation.test.ts` "Ended iff GameEnded, exactly once, as the final event (C2.3)" + "ended games reject every command from every player (C2.3)" |
-| C2.4 | `Simulation.test.ts` "GameEnded scores match an independent recomputation (C2.4, §1.8)" — runs the local per-card recomputation + min-set winners check directly (post-review fix; previously delegated to the C2.3 `endViolations` test) — plus `Invariants.test.ts` doctored-event units |
-| C3.1 | `Simulation.test.ts` "every game reaches Ended within the step cap (C3.1)" |
-| C3.2 | driver in-loop check (throws `SimFailure`); documented by `Simulation.test.ts` "no reachable state is stuck (C3.2)" |
-| C4.1 | `test/sim/Fuzz.test.ts` "illegal commands return typed GameErrors and never mutate state (C4.1)" |
-| C4.2 | `test/sim/Fuzz.test.ts` "legalCommandKinds agrees with checkCommand (C4.2)" |
-| C5.1 | `Simulation.test.ts` "prints one summary line per run (C5.1)" |
-| C5.2 | Split (final): `Simulation.test.ts` "the default run reaches the batch-reachable ADR rare cases (C5.2)" pins discard-keeps, zero-keeps, deck-gives, 7/8 and 9/T fizzles, reshuffles (guarded `skipIf` off the default batch); `Coverage.test.ts` seeded scenarios pin J + Q fizzles (plus 7/8, 9/T again) and the ADR-0012 empty-discard skip |
-| C6.1 | config, not a test: `vitest.config.ts` `testTimeout` + computed batch timeout; verified by the gate |
-| C6.2 | `turbo.json` test `env` + `Simulation.test.ts` header; verified by the M6 command matrix (`SIM_GAMES=5000` under both pnpm and turbo) |
-| C6.3 | **No failing seed was ever found** — default batch, fuzz batches, and the `SIM_GAMES=5000` deep run (737k steps) all passed, so `Regressions.test.ts` was not created (per plan) |
-| C7.1 | process, not a test: any `SimFailure` that classifies as an engine defect or uncovered rule situation halts implementation for a user decision (each resolution ⇒ ADR + engine change in a follow-up, per the standing directive) |
+| Clause | Test (file + name)                                                                                                                                                                                                                                                                                                                            |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1.1   | `test/sim/Driver.test.ts` — "replaying the same seeds yields the identical game (C1.1)"                                                                                                                                                                                                                                                       |
+| C1.2   | `test/sim/Driver.test.ts` — "candidate enumeration (C1.2)" describe; scale proof in `Fuzz.test.ts` C4.2                                                                                                                                                                                                                                       |
+| C1.3   | `test/sim/Driver.test.ts` — "the simulated clock is monotone and window actions respect closesAt (C1.3)"                                                                                                                                                                                                                                      |
+| C1.4   | `test/sim/Driver.test.ts` — "hitting the step cap fails with full repro info (C1.4, C1.5)"; pressure proven batch-wide by C3.1                                                                                                                                                                                                                |
+| C1.5   | same test — `SimFailure` message + `trace` field assertions                                                                                                                                                                                                                                                                                   |
+| C2.1   | `test/sim/Invariants.test.ts` corrupt-state units; live in-driver per step — `Simulation.test.ts` "every accepted command preserves the 52-card partition (C2.1, §4.5)"                                                                                                                                                                       |
+| C2.2   | `test/sim/Invariants.test.ts` units; `Simulation.test.ts` "hand slots stay unique and sorted; the roster never changes (C2.2, §4.5 restated)"                                                                                                                                                                                                 |
+| C2.3   | `Simulation.test.ts` "Ended iff GameEnded, exactly once, as the final event (C2.3)" + "ended games reject every command from every player (C2.3)"                                                                                                                                                                                             |
+| C2.4   | `Simulation.test.ts` "GameEnded scores match an independent recomputation (C2.4, §1.8)" — runs the local per-card recomputation + min-set winners check directly (post-review fix; previously delegated to the C2.3 `endViolations` test) — plus `Invariants.test.ts` doctored-event units                                                    |
+| C3.1   | `Simulation.test.ts` "every game reaches Ended within the step cap (C3.1)"                                                                                                                                                                                                                                                                    |
+| C3.2   | driver in-loop check (throws `SimFailure`); documented by `Simulation.test.ts` "no reachable state is stuck (C3.2)"                                                                                                                                                                                                                           |
+| C4.1   | `test/sim/Fuzz.test.ts` "illegal commands return typed GameErrors and never mutate state (C4.1)"                                                                                                                                                                                                                                              |
+| C4.2   | `test/sim/Fuzz.test.ts` "legalCommandKinds agrees with checkCommand (C4.2)"                                                                                                                                                                                                                                                                   |
+| C5.1   | `Simulation.test.ts` "prints one summary line per run (C5.1)"                                                                                                                                                                                                                                                                                 |
+| C5.2   | Split (final): `Simulation.test.ts` "the default run reaches the batch-reachable ADR rare cases (C5.2)" pins discard-keeps, zero-keeps, deck-gives, 7/8 and 9/T fizzles, reshuffles (guarded `skipIf` off the default batch); `Coverage.test.ts` seeded scenarios pin J + Q fizzles (plus 7/8, 9/T again) and the ADR-0012 empty-discard skip |
+| C6.1   | config, not a test: `vitest.config.ts` `testTimeout` + computed batch timeout; verified by the gate                                                                                                                                                                                                                                           |
+| C6.2   | `turbo.json` test `env` + `Simulation.test.ts` header; verified by the M6 command matrix (`SIM_GAMES=5000` under both pnpm and turbo)                                                                                                                                                                                                         |
+| C6.3   | **No failing seed was ever found** — default batch, fuzz batches, and the `SIM_GAMES=5000` deep run (737k steps) all passed, so `Regressions.test.ts` was not created (per plan)                                                                                                                                                              |
+| C7.1   | process, not a test: any `SimFailure` that classifies as an engine defect or uncovered rule situation halts implementation for a user decision (each resolution ⇒ ADR + engine change in a follow-up, per the standing directive)                                                                                                             |
 
 ## Progress
 
 - [x] 2026-08-31 14:20 — M1 complete. `rng.ts`, `candidates.ts`, `policy.ts`, `driver.ts` plus `counters.ts` (interface + `emptyCounters` only; `recordStep` lands in M5). `Driver.test.ts` 17 tests green; typecheck + lint clean.
-- [x] 2026-08-31 14:22 — M2 complete. `invariants.ts` + `Invariants.test.ts` (16 corrupt-state units); per-step checks wired into the driver; `Simulation.test.ts` batch skeleton green — 250 games, zero violations, ~0.6 s. Deviation: the driver validates *every* starting state (dealt or `initial`) against the full 52-card baseline at step 0 — Coverage scenarios must be full-partition states, which the plan already required; this makes the corrupted-initial test fail at step 0 rather than at first accepted command.
+- [x] 2026-08-31 14:22 — M2 complete. `invariants.ts` + `Invariants.test.ts` (16 corrupt-state units); per-step checks wired into the driver; `Simulation.test.ts` batch skeleton green — 250 games, zero violations, ~0.6 s. Deviation: the driver validates _every_ starting state (dealt or `initial`) against the full 52-card baseline at step 0 — Coverage scenarios must be full-partition states, which the plan already required; this makes the corrupted-initial test fail at step 0 rather than at first accepted command.
 - [x] 2026-08-31 14:28 — M3 complete. Liveness `it`s added; knobs tuned over three probe rounds to `forceCallTurn: 128, callRampStart: 24/128, slamAttempt: 4/5, informedSlam: 3/4, maxSlamsPerWindow: 3, zeroCardTake: 4/5`, plus policy changes (see Surprises): informed-but-no-match slams pass instead of slamming blind; informed slams prefer own-card matches. Batch probe at 250 games: 198 zero-card keeps, 5 deck-gives, 26 fizzles, 149 reshuffles, 0 empty-discard skips (Coverage scenario planned), ~1 s wall.
 - [x] 2026-08-31 17:28 — M4 complete. `fuzz.ts` + `Fuzz.test.ts`: C4.1 (typed errors, no throw, no mutation, all six named illegal shapes observed) and C4.2 (legality agreement incl. CloseSlamWindow clock special-case) green over 25 offset-seeded games each. C4.2 ran 4.8 s — pulled M6's `vitest.config.ts` `testTimeout: 30_000` forward to avoid flaking the 5 s default.
 - [x] 2026-08-31 17:40 — M5 complete. `counters.ts` (`recordStep`, `mergeCounters`, `formatSummary`) unit-tested in `Simulation.test.ts`'s "counter derivation" describe, wired into the driver; summary line printing; batch C5.2 assertions for the batch-reachable shapes; `Coverage.test.ts` with two seeded scenarios (slams disabled via knobs) pinning all four fizzle shapes and the ADR-0012 skip — both hit on the first pinned driver seed.
@@ -658,6 +659,6 @@ Planned homes below; implement keeps them true.)*
 
 ## Surprises & notes for the root plan
 
-- 2026-08-31 — **Policy fix found by the step-cap test:** `CallCambio` must be excluded from the uniform candidate pool (it is always legal in `AwaitingDraw`, so uniform choice ended ~⅓ of games on turn one, starving every rare path). It is now reachable only via the ramp/backstop — except when it is the *only* candidate, where it is taken directly. `chooseTurnCommand` also takes `state` as a first parameter (the zero-card take bias needs the active player's hand size), a small signature deviation from this plan's sketch.
+- 2026-08-31 — **Policy fix found by the step-cap test:** `CallCambio` must be excluded from the uniform candidate pool (it is always legal in `AwaitingDraw`, so uniform choice ended ~⅓ of games on turn one, starving every rare path). It is now reachable only via the ramp/backstop — except when it is the _only_ candidate, where it is taken directly. `chooseTurnCommand` also takes `state` as a first parameter (the zero-card take bias needs the active player's hand size), a small signature deviation from this plan's sketch.
 
-*(anything the root plan's Decision Log or the reviewer must know)*
+_(anything the root plan's Decision Log or the reviewer must know)_

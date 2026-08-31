@@ -94,13 +94,43 @@ describe("counter derivation (C5.1)", () => {
     c = recordStep(c, before, drawn, [
       { _tag: "DrawSkipped", playerId: uid(0), kind: "penalty" },
       { _tag: "DrawSkipped", playerId: uid(0), kind: "give" },
-      { _tag: "CardGivenFromHand", slammerId: uid(0), fromSlot: slot(0), to: { playerId: uid(1), slotIndex: slot(0) } },
-      { _tag: "CardGivenFromDeck", slammerId: uid(0), to: { playerId: uid(1), slotIndex: slot(0) }, card: card("2S") },
-      { _tag: "SlamSucceeded", slammerId: uid(0), target: { playerId: uid(1), slotIndex: slot(0) }, card: card("2S") },
-      { _tag: "SlamFailed", slammerId: uid(0), target: { playerId: uid(1), slotIndex: slot(0) }, card: card("2S") },
+      {
+        _tag: "CardGivenFromHand",
+        slammerId: uid(0),
+        fromSlot: slot(0),
+        to: { playerId: uid(1), slotIndex: slot(0) },
+      },
+      {
+        _tag: "CardGivenFromDeck",
+        slammerId: uid(0),
+        to: { playerId: uid(1), slotIndex: slot(0) },
+        card: card("2S"),
+      },
+      {
+        _tag: "SlamSucceeded",
+        slammerId: uid(0),
+        target: { playerId: uid(1), slotIndex: slot(0) },
+        card: card("2S"),
+      },
+      {
+        _tag: "SlamFailed",
+        slammerId: uid(0),
+        target: { playerId: uid(1), slotIndex: slot(0) },
+        card: card("2S"),
+      },
       { _tag: "PenaltyDrawn", playerId: uid(0), slotIndex: slot(0), card: card("2S") },
-      { _tag: "CardPeeked", viewerId: uid(0), target: { playerId: uid(1), slotIndex: slot(0) }, card: card("2S") },
-      { _tag: "CardsBlindSwapped", by: uid(0), first: { playerId: uid(0), slotIndex: slot(0) }, second: { playerId: uid(1), slotIndex: slot(0) } },
+      {
+        _tag: "CardPeeked",
+        viewerId: uid(0),
+        target: { playerId: uid(1), slotIndex: slot(0) },
+        card: card("2S"),
+      },
+      {
+        _tag: "CardsBlindSwapped",
+        by: uid(0),
+        first: { playerId: uid(0), slotIndex: slot(0) },
+        second: { playerId: uid(1), slotIndex: slot(0) },
+      },
       { _tag: "DeckReshuffled", deck: [card("KS")] },
     ])
     expect(c.drawSkippedPenalty).toBe(1)
@@ -161,15 +191,16 @@ describe(`the random-game batch (${GAMES} games)`, () => {
       const after = ts(run.trace.at(-1)!.at + 1000)
       for (const player of run.roster) {
         expect(legalCommandKinds(run.finalState, player, after)).toStrictEqual([])
-        const draw = applyCommand(
-          run.finalState,
-          { _tag: "DrawFromDeck", playerId: player },
-          after,
-        )
+        const draw = applyCommand(run.finalState, { _tag: "DrawFromDeck", playerId: player }, after)
         expect(Either.isLeft(draw) && draw.left._tag).toBe("GameAlreadyEnded")
         const slam = applyCommand(
           run.finalState,
-          { _tag: "Slam", playerId: player, target: { playerId: player, slotIndex: slot(0) }, giveSlot: null },
+          {
+            _tag: "Slam",
+            playerId: player,
+            target: { playerId: player, slotIndex: slot(0) },
+            giveSlot: null,
+          },
           after,
         )
         expect(Either.isLeft(slam) && slam.left._tag).toBe("GameAlreadyEnded")
@@ -199,23 +230,26 @@ describe(`the random-game batch (${GAMES} games)`, () => {
     expect(merged.games).toBe(GAMES)
   })
 
-  it.skipIf(!DEFAULT_BATCH)("the default run reaches the batch-reachable ADR rare cases (C5.2)", () => {
-    // Deterministic: fixed default seeds. The J-fizzle, Q-fizzle, and
-    // ADR-0012 empty-discard shapes need states this policy cannot reach in
-    // 250 games — they are asserted from seeded scenarios in Coverage.test.ts.
-    // No assertion on drawSkipped: ADR-0011 predicted it near-impossible; the
-    // counter exists to check that prediction (root plan, Validation).
-    const merged = runs.map((r) => r.counters).reduce(mergeCounters, emptyCounters())
-    expect(merged.discardSourceKeeps, "ADR-0009 zero-card discard keep").toBeGreaterThan(0)
-    expect(merged.zeroCardKeeps, "zero-card keeps").toBeGreaterThan(0)
-    expect(
-      merged.givesFromDeck + merged.drawSkippedGive,
-      "ADR-0009/0011 zero-card slammer give",
-    ).toBeGreaterThan(0)
-    expect(merged.fizzlesPeekOwn, "ADR-0010 7/8 fizzle").toBeGreaterThan(0)
-    expect(merged.fizzlesPeekOther, "ADR-0010 9/T fizzle").toBeGreaterThan(0)
-    expect(merged.reshuffles, "§1.7 reshuffles").toBeGreaterThan(0)
-  })
+  it.skipIf(!DEFAULT_BATCH)(
+    "the default run reaches the batch-reachable ADR rare cases (C5.2)",
+    () => {
+      // Deterministic: fixed default seeds. The J-fizzle, Q-fizzle, and
+      // ADR-0012 empty-discard shapes need states this policy cannot reach in
+      // 250 games — they are asserted from seeded scenarios in Coverage.test.ts.
+      // No assertion on drawSkipped: ADR-0011 predicted it near-impossible; the
+      // counter exists to check that prediction (root plan, Validation).
+      const merged = runs.map((r) => r.counters).reduce(mergeCounters, emptyCounters())
+      expect(merged.discardSourceKeeps, "ADR-0009 zero-card discard keep").toBeGreaterThan(0)
+      expect(merged.zeroCardKeeps, "zero-card keeps").toBeGreaterThan(0)
+      expect(
+        merged.givesFromDeck + merged.drawSkippedGive,
+        "ADR-0009/0011 zero-card slammer give",
+      ).toBeGreaterThan(0)
+      expect(merged.fizzlesPeekOwn, "ADR-0010 7/8 fizzle").toBeGreaterThan(0)
+      expect(merged.fizzlesPeekOther, "ADR-0010 9/T fizzle").toBeGreaterThan(0)
+      expect(merged.reshuffles, "§1.7 reshuffles").toBeGreaterThan(0)
+    },
+  )
 
   it("GameEnded scores match an independent recomputation (C2.4, §1.8)", () => {
     // The recomputation is local — per card via score(), min-filtered here —

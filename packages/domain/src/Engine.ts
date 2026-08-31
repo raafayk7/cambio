@@ -23,10 +23,7 @@ import { gameScores, winnersOf } from "./Scoring.js"
  * (C7.3); all updates are immutable.
  */
 
-export type EngineResult = Either.Either<
-  readonly [GameState, ReadonlyArray<GameEvent>],
-  GameError
->
+export type EngineResult = Either.Either<readonly [GameState, ReadonlyArray<GameEvent>], GameError>
 
 type Step = readonly [GameState, ReadonlyArray<GameEvent>]
 
@@ -38,9 +35,7 @@ const sortHand = (hand: Hand): Hand => [...hand].sort((a, b) => a.slotIndex - b.
 
 const withHand = (state: GameState, playerId: UserId, f: (hand: Hand) => Hand): GameState => ({
   ...state,
-  players: state.players.map((p) =>
-    p.id === playerId ? { ...p, hand: sortHand(f(p.hand)) } : p,
-  ),
+  players: state.players.map((p) => (p.id === playerId ? { ...p, hand: sortHand(f(p.hand)) } : p)),
 })
 
 /** Advance to the next seat, `(seat + 1) % n` — zero-card players included (§1.6). */
@@ -177,10 +172,7 @@ const discardHeld = (state: GameState, playerId: UserId, now: Timestamp): Step =
   const phase = state.phase as Extract<GameState["phase"], { _tag: "HoldingCard" }>
   const resolved: GameState = { ...state, discard: [phase.card, ...state.discard] }
   const [windowState, windowEvents] = openWindowOrAdvance(resolved, playerId, now)
-  return [
-    windowState,
-    [{ _tag: "HeldDiscarded", playerId, card: phase.card }, ...windowEvents],
-  ]
+  return [windowState, [{ _tag: "HeldDiscarded", playerId, card: phase.card }, ...windowEvents]]
 }
 
 const keepHeld = (state: GameState, playerId: UserId, now: Timestamp): Step => {
@@ -299,7 +291,10 @@ const slam = (
     ])
     return [
       given,
-      [succeeded, { _tag: "CardGivenFromHand", slammerId: playerId, fromSlot: giveSlot, to: target }],
+      [
+        succeeded,
+        { _tag: "CardGivenFromHand", slammerId: playerId, fromSlot: giveSlot, to: target },
+      ],
     ]
   }
 
@@ -329,11 +324,7 @@ const closeSlamWindow = (state: GameState): Step => {
   return [advanced, [{ _tag: "SlamWindowClosed" }, ...events]]
 }
 
-export const applyCommand = (
-  state: GameState,
-  command: Command,
-  now: Timestamp,
-): EngineResult => {
+export const applyCommand = (state: GameState, command: Command, now: Timestamp): EngineResult => {
   const illegal = checkCommand(state, command, now)
   if (Option.isSome(illegal)) return Either.left(illegal.value)
 
@@ -354,9 +345,7 @@ export const applyCommand = (
       case "PowerPeek":
         return Either.right(powerPeek(state, command.playerId, command.target, now))
       case "PowerSwap":
-        return Either.right(
-          powerSwap(state, command.playerId, command.first, command.second, now),
-        )
+        return Either.right(powerSwap(state, command.playerId, command.first, command.second, now))
       case "Slam":
         return Either.right(slam(state, command.playerId, command.target, command.giveSlot))
       case "CloseSlamWindow":

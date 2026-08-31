@@ -15,19 +15,19 @@ never a direct import of infrastructure.
 
 A use case is an Effect program that orchestrates: load state via repository
 ports → call pure domain functions to decide → persist results → publish
-events. The *decision* lives in the domain; the use case only sequences.
+events. The _decision_ lives in the domain; the use case only sequences.
 
 ```ts
 export const drawCard = (input: DrawCardInput) =>
   Effect.gen(function* () {
-    const games = yield* GameRepository        // port from domain
-    const clock = yield* ClockPort             // port from application
+    const games = yield* GameRepository // port from domain
+    const clock = yield* ClockPort // port from application
     const state = yield* games.load(input.gameId)
     const now = yield* clock.now
     // pure domain decision — Either lifted into the Effect error channel
     const [next, events] = yield* engine.apply(state, command(input, now))
-    yield* games.save(next, events)            // persist state + append events
-    yield* publishEvents(events)               // realtime, via publisher port
+    yield* games.save(next, events) // persist state + append events
+    yield* publishEvents(events) // realtime, via publisher port
   })
 ```
 
@@ -52,7 +52,7 @@ doc comment stating why the port exists and that implementations live in
 
 Remember the split (it is the most common mistake in this codebase's
 architecture): **repository ports live in `domain`** — persistence of
-aggregates is domain vocabulary. `application/src/ports/` holds *technical*
+aggregates is domain vocabulary. `application/src/ports/` holds _technical_
 capabilities only: clock, id generation, realtime publisher, logger.
 
 ## Contracts
@@ -64,11 +64,11 @@ with `decodeX`/`encodeX` helpers exported alongside (see `Health.ts`).
 The gate for adding a field to contracts: **may every client who receives
 this legally see it?** Contracts exist so the frontend never touches the
 domain (which contains all hidden cards). If a client needs a redacted view
-of domain state, the redacted shape is designed *in contracts* and produced
+of domain state, the redacted shape is designed _in contracts_ and produced
 by the server's `viewFor` projection — see the `hidden-information` skill
 before adding any game-state-carrying schema.
 
-Contracts vs application: contracts are *shapes only* — no logic, no ports,
+Contracts vs application: contracts are _shapes only_ — no logic, no ports,
 no use cases. If a schema needs behavior, the behavior goes in application
 (or domain) and operates on the contract type.
 

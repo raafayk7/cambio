@@ -35,7 +35,7 @@ Decide whether the task is backend, frontend, or fullstack (this determines
 which child plans exist).
 
 Then interview the user with AskUserQuestion — the goal is to surface every
-decision the brief leaves open *before* exploration: scope boundaries,
+decision the brief leaves open _before_ exploration: scope boundaries,
 behavior ambiguities, quality bar, anything touching HANDOFF §9 open rules.
 Ask in batches; keep going until you cannot phrase another question whose
 answer would change the plan. Do not pad with questions you can answer from

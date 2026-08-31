@@ -10,7 +10,12 @@ const config = decodeGameConfig({ slamWindowMs: 4000 })
 const now = ts(1_700_000_000_000)
 
 const dealt = (n: number, seed = 42) => {
-  const result = dealGame(Array.from({ length: n }, (_, i) => uid(i)), seed, config, now)
+  const result = dealGame(
+    Array.from({ length: n }, (_, i) => uid(i)),
+    seed,
+    config,
+    now,
+  )
   if (Either.isLeft(result)) throw new Error(`deal failed: ${result.left._tag}`)
   return result.right
 }
@@ -18,7 +23,12 @@ const dealt = (n: number, seed = 42) => {
 describe("dealGame", () => {
   it("rejects player counts outside 2–5 (C1.1, §1.1)", () => {
     for (const n of [0, 1, 6]) {
-      const result = dealGame(Array.from({ length: n }, (_, i) => uid(i)), 1, config, now)
+      const result = dealGame(
+        Array.from({ length: n }, (_, i) => uid(i)),
+        1,
+        config,
+        now,
+      )
       expect(Either.isLeft(result)).toBe(true)
       if (Either.isLeft(result)) {
         expect(result.left._tag).toBe("BadPlayerCount")

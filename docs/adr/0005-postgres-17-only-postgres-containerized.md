@@ -21,7 +21,7 @@ Dockerfiles.
 ## Consequences
 
 `docker compose up -d` is the only container step in dev. Native dev avoids
-Docker Desktop's VM file-watch limits on Linux (which are typically *lower*
+Docker Desktop's VM file-watch limits on Linux (which are typically _lower_
 than the host's — raise host inotify limits instead, see README). Revisit
 build/containerization only when Render deployment forces a choice. Redis is
 added only if the API ever scales horizontally.

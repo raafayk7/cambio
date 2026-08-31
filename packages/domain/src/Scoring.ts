@@ -8,8 +8,7 @@ import { type UserId } from "./Ids.js"
  * returns every player sharing the minimum; there is no caller tiebreak.
  */
 
-export const handTotal = (hand: Hand): number =>
-  hand.reduce((total, s) => total + score(s.card), 0)
+export const handTotal = (hand: Hand): number => hand.reduce((total, s) => total + score(s.card), 0)
 
 export interface PlayerScore {
   readonly playerId: UserId

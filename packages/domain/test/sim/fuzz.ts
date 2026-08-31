@@ -42,8 +42,7 @@ const randRef = (state: GameState, rng: DriverRng): SlotRef => ({
   slotIndex: randSlot(rng),
 })
 
-const randGiveSlot = (rng: DriverRng): SlotIndex | null =>
-  rng.chance(1, 2) ? null : randSlot(rng)
+const randGiveSlot = (rng: DriverRng): SlotIndex | null => (rng.chance(1, 2) ? null : randSlot(rng))
 
 const fillTag = (
   state: GameState,
