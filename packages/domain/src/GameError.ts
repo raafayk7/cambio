@@ -82,7 +82,17 @@ export class WindowStillOpen extends Data.TaggedError("WindowStillOpen")<{
 /** Turn draw with the deck and reshufflable discard both exhausted (C6.2). */
 export class NoCardToDraw extends Data.TaggedError("NoCardToDraw")<{}> {}
 
+/** Taking from an empty discard pile — nothing to take (ADR-0012). */
+export class EmptyDiscard extends Data.TaggedError("EmptyDiscard")<{}> {}
+
+/** The command's issuer is not a player in this game. */
+export class UnknownPlayer extends Data.TaggedError("UnknownPlayer")<{
+  readonly playerId: UserId
+}> {}
+
 export type GameError =
+  | UnknownPlayer
+  | EmptyDiscard
   | BadPlayerCount
   | GameAlreadyEnded
   | NotYourTurn

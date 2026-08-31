@@ -51,6 +51,10 @@ export type PowerKindLiteral = (typeof POWER_RANKS)[number]
 export const PowerKind = Schema.Literal(...POWER_RANKS)
 export type PowerKind = typeof PowerKind.Type
 
+/** Whether a rank carries a power (§1.4) — a set-membership fact, not game logic. */
+export const isPowerRank = (r: Rank): r is PowerKind =>
+  (POWER_RANKS as ReadonlyArray<Rank>).includes(r)
+
 // ---------------------------------------------------------------------------
 // Pure derivations (§4.1). Score is never stored.
 // ---------------------------------------------------------------------------
