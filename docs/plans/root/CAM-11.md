@@ -307,4 +307,34 @@ assertions passed on the first run; no rework was needed.
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+**Verdict: ship.** `/review` ran a contract reviewer and an architecture
+reviewer in parallel against `git diff release-v0...HEAD`, plus an
+independent gate run. No findings from either reviewer; no fixes required.
+
+- **Independent gate:** `pnpm turbo build typecheck lint test` — 21/21
+  tasks green, re-run fresh during review (not just trusted from
+  implementation).
+- **Contract review:** all 6 Functional Contract clauses and all 5
+  Acceptance Criteria verdicted **satisfied**, each against actual code and
+  a live re-run of `pnpm --filter @cambio/config test` (8/8 passed), not
+  against the plan's own prose. No scope creep — diff touches exactly
+  `packages/config/eslint.base.js`, `packages/config/package.json`, and the
+  new test file. One non-issue noted: the effect-only `allow` policy has no
+  `message` field, which is correct since `allow` policies never produce
+  lint errors.
+- **Architecture review:** confirmed the shipped mechanism matches
+  ADR-0017's three decision points exactly (`boundaries/dependencies` only,
+  mutually-exclusive `src/`/`test/` blocks, disallow-then-allow policy
+  order) and hand-traced all four boundary-correctness cases (effect
+  allowed, arbitrary npm denied, existing workspace-deny unaffected,
+  application's legitimate `@cambio/domain` import unaffected by the new
+  check) — all conform, no regressions. `hidden-information` and the other
+  layer skills confirmed not applicable (no client-facing payload,
+  contracts, or realtime code touched).
+- **What shipped:** exactly what ADR-0017 and the plan specified, with one
+  implementer's-call (reusing `LAYER_RATIONALE` messages rather than adding
+  new ones) already logged in the Decision Log. Nothing deferred.
+- **Carries into future tasks:** ADR-0017's src/test mutual-exclusivity
+  constraint on `cambioConfig` is now load-bearing — any future edit to the
+  `domain`/`contracts`/`application` boundary rules must preserve the split
+  rather than reintroducing an overlapping `boundaries/dependencies` block.
