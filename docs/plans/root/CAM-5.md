@@ -357,6 +357,25 @@ RoomRegistry.ts`): a defect inside `closeIfDue` (which runs before the
    (ADR-0014 makes the state row a materialized fold; the actor loads it —
    sanctioned by ADR-0020's "loads or folds").
 
+**Fix cycle + re-review (2026-09-01, commit `abb53ba`): findings 1–5 all
+CLOSED — verdict upgraded to ship.** The re-review verified the finding-1
+sweep independently (widened grep; the old phrasing survives only inside
+corrective quotations), the race test's pure sequential expectation and
+cross-player assertion, the actor supervision code and defect no-hang
+test, the `roomCount`/timer-path observations, the `saveLobby`
+guard/comment/precondition and its dealt-row-defect integration test, and
+every plan-reconciliation item — with no regressions or scope creep.
+Gate after fixes: 22/22 tasks, 298 tests, application suite stable across
+repeated bare runs.
+
+Residual advisories from the re-review, deferred with finding 6's (all
+non-blocking): a caller racing a _dying_ actor gets a bare interrupt
+rather than a typed error or rerouting to the fresh actor (CAM-6's HTTP
+edge may want to map it); the outer per-envelope defect guard and the
+`ensuring` cleanup paths are correct by inspection but have no dedicated
+test (the finding-2 test exercises the inner guard); the defect no-hang
+test has no clause-indexed coverage-table row.
+
 Deferred (unchanged from planning): wire contracts, viewFor, live
 seed/publisher adapters, SLAM_WINDOW_MS plumbing, `setNotFoundHandler` —
 all CAM-6.
