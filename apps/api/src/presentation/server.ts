@@ -1,3 +1,4 @@
+import cookie from "@fastify/cookie"
 import cors from "@fastify/cors"
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from "fastify"
 import type { Runtime } from "effect"
@@ -6,6 +7,7 @@ import type { Logger } from "pino"
 import type { AppConfig } from "../config.js"
 import type { AppServices } from "../runtime.js"
 import { healthRoutes } from "./health.js"
+import { usersRoutes } from "./users.js"
 
 /**
  * Builds the Fastify instance.
@@ -31,7 +33,12 @@ export const buildServer = async (options: {
     credentials: true,
   })
 
+  // Parse/serialize only — no `secret` option: token authenticity is the
+  // session signer's job, not the cookie plugin's (ADR-0018 §2).
+  await app.register(cookie)
+
   await app.register(healthRoutes(options.runtime))
+  await app.register(usersRoutes(options.runtime, options.config))
 
   return app
 }
