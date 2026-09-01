@@ -287,4 +287,47 @@ not a logic issue, just a formatting pass this repo enforces in CI.
 
 ## Outcomes & retrospective
 
-_(filled at the end, by `/review`)_
+**Verdict: ship.** `/review` ran a contract reviewer and an architecture
+reviewer in parallel against `git diff release-v0...HEAD`, plus an
+independent gate run. No findings from either reviewer; no fixes required.
+
+- **Independent gate:** `pnpm turbo build typecheck lint test` — 22/22
+  tasks green, re-run fresh during review (21 cached, `@cambio/config:test`
+  and format:check re-verified). `pnpm --filter @cambio/config test` — 13/13
+  passed, independently re-run.
+- **Contract review:** all 6 Functional Contract clauses and all 5
+  Acceptance Criteria verdicted **satisfied**, checked against actual code
+  (not plan prose) — including an independent read of the installed
+  `@boundaries/elements@3.1.0` source to confirm the source-less-selector
+  "matches everything" claim and the no-normalization-of-`node:`-prefix
+  claim both hold as documented. No scope creep — diff limited to
+  `packages/config/eslint.base.js`, `packages/config/test/eslint.base.test.ts`,
+  the pre-planned ADR-0017 amendment, and mechanical prettier-driven
+  reformatting in `docs/adr/README.md`. All of the plan's own file:line
+  citations checked and found accurate (no stale references). One
+  documented, reasoned coverage narrowing noted as a non-issue: the
+  bare-specifier form is tested only in `domain`, not `contracts`/
+  `application` — accepted because the matching mechanism is
+  layer-parameterized identically (only the rationale message differs).
+- **Architecture review:** no violations. Confirmed the new policy is
+  appended to the *same* `effectOnlyExternalPolicies` array rather than a
+  second overlapping `boundaries/dependencies` block (avoiding the exact
+  silent-discard footgun ADR-0017 itself warns about); confirmed the
+  src/test mutual-exclusivity split is still intact (the core-origin policy
+  only reaches the `src/**` block); confirmed ADR-0017's status is still
+  `proposed`, making the in-place amendment legitimate per the `adr`
+  skill's lifecycle rule; confirmed `docs/adr/README.md`'s index was updated
+  in the same commit as the ADR body. Confirmed the architecture skill's
+  own "enforcement claims must be probe-verified" rule was honored: the
+  manual verify-then-revert is logged in Progress, and the claim is now
+  backed by a permanent regression test, not left as unverified prose.
+- **What shipped:** exactly what the plan and the ADR amendment specified,
+  with the one implementer's-call item (partial bare-form test coverage)
+  already logged and independently judged reasonable by the contract
+  reviewer.
+- **Carries into future tasks:** the effect-only-external policy set per
+  layer is now a policy *triple* (external disallow, external `effect`
+  allow, core disallow) rather than a pair — any future edit to these
+  `src/**` blocks must account for all three, not just the external pair,
+  or risks reopening a fourth silent gap of the same shape. This is already
+  recorded in ADR-0017's Consequences section.
