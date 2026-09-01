@@ -3,7 +3,7 @@ import {
   GameNotFound,
   GameRepository,
   GameVersion,
-  Timestamp,
+  type Timestamp,
   UserNotFound,
   UserRepository,
   VersionConflict,
