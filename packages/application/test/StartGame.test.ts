@@ -29,7 +29,10 @@ const seedLobby = (lobby: Lobby, expectedVersion = GameVersion.make(0)) =>
     Effect.flatMap((games) => games.saveLobby({ gameId: lobby.id, lobby, expectedVersion })),
   )
 
-const layers = (journal: ReturnType<typeof makeJournal>, repo: ReturnType<typeof makeGameRepoStub>) =>
+const layers = (
+  journal: ReturnType<typeof makeJournal>,
+  repo: ReturnType<typeof makeGameRepoStub>,
+) =>
   Layer.mergeAll(
     repo.layer,
     makePublisherStub(journal).layer,
@@ -38,35 +41,33 @@ const layers = (journal: ReturnType<typeof makeJournal>, repo: ReturnType<typeof
   )
 
 describe("startGame (clause 4)", () => {
-  it.effect("any member starts: seats = join order, whole GameStarted batch in ONE save, then publish", () => {
-    const journal = makeJournal()
-    const repo = makeGameRepoStub(journal)
-    const members = [uid(0), uid(1), uid(2)]
-    return seedLobby({ id: gid(1), members, status: "open" }).pipe(
-      Effect.map(() => journal.splice(0)),
-      // uid(1), not the creator — no host concept.
-      Effect.andThen(startGame({ gameId: gid(1), starterId: uid(1), config })),
-      Effect.map((result) => {
-        expect(result.state.players.map((p) => p.id)).toEqual(members)
-        expect(result.state.config).toEqual(config)
-        expect(result.version).toBe(2) // the lobby's v1 consumed by the deal save
-        expect(result.events.map((e) => e._tag)).toEqual(["GameStarted"])
-        expect(opsOf(journal)).toEqual(["loadLobby", "save", "publishGame"])
-        // Deterministic deal: stubbed seed + clock reproduce it exactly.
-        const dealt = dealGame(members, SEED, config, NOW)
-        expect(dealt._tag).toBe("Right")
-        if (dealt._tag === "Right") expect(result.state).toEqual(dealt.right[0])
-      }),
-      Effect.provide(layers(journal, repo)),
-    )
-  })
+  it.effect(
+    "any member starts: seats = join order, whole GameStarted batch in ONE save, then publish",
+    () => {
+      const journal = makeJournal()
+      const repo = makeGameRepoStub(journal)
+      const members = [uid(0), uid(1), uid(2)]
+      return seedLobby({ id: gid(1), members, status: "open" }).pipe(
+        Effect.map(() => journal.splice(0)),
+        // uid(1), not the creator — no host concept.
+        Effect.andThen(startGame({ gameId: gid(1), starterId: uid(1), config })),
+        Effect.map((result) => {
+          expect(result.state.players.map((p) => p.id)).toEqual(members)
+          expect(result.state.config).toEqual(config)
+          expect(result.version).toBe(2) // the lobby's v1 consumed by the deal save
+          expect(result.events.map((e) => e._tag)).toEqual(["GameStarted"])
+          expect(opsOf(journal)).toEqual(["loadLobby", "save", "publishGame"])
+          // Deterministic deal: stubbed seed + clock reproduce it exactly.
+          const dealt = dealGame(members, SEED, config, NOW)
+          expect(dealt._tag).toBe("Right")
+          if (dealt._tag === "Right") expect(result.state).toEqual(dealt.right[0])
+        }),
+        Effect.provide(layers(journal, repo)),
+      )
+    },
+  )
 
-  const refusal = (
-    name: string,
-    lobby: Lobby,
-    starter: UserId,
-    expectedTag: string,
-  ) =>
+  const refusal = (name: string, lobby: Lobby, starter: UserId, expectedTag: string) =>
     it.effect(`${name} ⇒ ${expectedTag}, nothing saved, nothing published`, () => {
       const journal = makeJournal()
       const repo = makeGameRepoStub(journal)
@@ -122,5 +123,4 @@ describe("startGame (clause 4)", () => {
       Effect.provide(layers(journal, repo)),
     )
   })
-
 })

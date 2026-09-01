@@ -310,7 +310,7 @@ independent gate run. No findings from either reviewer; no fixes required.
   `application` — accepted because the matching mechanism is
   layer-parameterized identically (only the rationale message differs).
 - **Architecture review:** no violations. Confirmed the new policy is
-  appended to the *same* `effectOnlyExternalPolicies` array rather than a
+  appended to the _same_ `effectOnlyExternalPolicies` array rather than a
   second overlapping `boundaries/dependencies` block (avoiding the exact
   silent-discard footgun ADR-0017 itself warns about); confirmed the
   src/test mutual-exclusivity split is still intact (the core-origin policy
@@ -326,7 +326,7 @@ independent gate run. No findings from either reviewer; no fixes required.
   already logged and independently judged reasonable by the contract
   reviewer.
 - **Carries into future tasks:** the effect-only-external policy set per
-  layer is now a policy *triple* (external disallow, external `effect`
+  layer is now a policy _triple_ (external disallow, external `effect`
   allow, core disallow) rather than a pair — any future edit to these
   `src/**` blocks must account for all three, not just the external pair,
   or risks reopening a fourth silent gap of the same shape. This is already

@@ -89,7 +89,11 @@ export const leaveLobby = (
     yield* requireOpen(lobby)
     if (!lobby.members.includes(userId)) return yield* Either.left(new NotInLobby({ userId }))
     const members = lobby.members.filter((m) => m !== userId)
-    return { ...lobby, members, status: members.length === 0 ? ("abandoned" as const) : lobby.status }
+    return {
+      ...lobby,
+      members,
+      status: members.length === 0 ? ("abandoned" as const) : lobby.status,
+    }
   })
 
 /**
@@ -104,6 +108,7 @@ export const startSeats = (
 ): Either.Either<ReadonlyArray<UserId>, NotInLobby | LobbyNotJoinable> =>
   Either.gen(function* () {
     yield* requireOpen(lobby)
-    if (!lobby.members.includes(starter)) return yield* Either.left(new NotInLobby({ userId: starter }))
+    if (!lobby.members.includes(starter))
+      return yield* Either.left(new NotInLobby({ userId: starter }))
     return lobby.members
   })

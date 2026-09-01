@@ -65,7 +65,10 @@ interface GameRow {
 export const makeGameRepoStub = (journal: Array<JournalEntry>) => {
   const rows = new Map<string, GameRow>()
 
-  const guard = (gameId: GameId, expected: GameVersion): Effect.Effect<GameRow, VersionConflict> => {
+  const guard = (
+    gameId: GameId,
+    expected: GameVersion,
+  ): Effect.Effect<GameRow, VersionConflict> => {
     const row = rows.get(gameId)
     if (expected === 0) {
       if (row !== undefined) {

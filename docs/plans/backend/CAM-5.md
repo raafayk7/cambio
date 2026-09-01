@@ -28,8 +28,8 @@ queue discipline, stub-layer testing), **infrastructure-persistence** (M3 —
 never edit an applied migration, partial unique indexes, `deleted_at IS
 NULL` filtering only in the repository layer, codec boundary, typed
 `StorageError` never throws), **architecture** (throughout — the lobby
-repository methods belong on the *domain* port, seed/publisher are
-*technical* ports in `application/src/ports/`; enforcement claims must be
+repository methods belong on the _domain_ port, seed/publisher are
+_technical_ ports in `application/src/ports/`; enforcement claims must be
 probe-verified), **cambio-rules** (the slam-race and slam-window tests must
 assert what the engine actually returns, never a prior about how other
 Cambio variants resolve races), **hidden-information** (nothing in CAM-5
@@ -86,14 +86,14 @@ The surfaces this task touches, as they exist today:
   `Context.Tag` classes with tag string `"@cambio/application/XxxPort"`,
   regression-tested via `Tag.key` in `packages/application/test/Ports.test.ts:9`.
   Use cases are exported arrows `(input) => Effect<Result, ErrorUnion,
-  PortUnion>` with the return type written out, `Effect.gen` bodies, ports
+PortUnion>` with the return type written out, `Effect.gen` bodies, ports
   `yield*`'d at the top, use-case-local errors declared in the use-case
   file, everything re-exported from `src/index.ts` —
   `src/use-cases/CreateTemporaryUser.ts` is the reference. Tests are
   `@effect/vitest` `it.effect` suites on stub layers: `Layer.succeed` with
   unused members as `Effect.die("… unused in this suite")`, recording stubs
   returning `{ collected, layer }`, failure assertions via `Effect.either`
-  + `_tag` (`test/CreateTemporaryUser.test.ts` is the model).
+  - `_tag` (`test/CreateTemporaryUser.test.ts` is the model).
 - **Concurrency precedent: none.** No `Queue`/`Deferred`/`Fiber`/`Ref`
   usage exists anywhere in the repo (the single `acquireRelease` in
   `apps/api/src/index.ts:26-38` is it). Whatever M5 writes becomes the
@@ -138,7 +138,7 @@ Decision Log are flagged in Surprises as they're confirmed.
 1. **Domain `Lobby` shape.** A `Schema.Struct`:
    `{ id: GameId, members: ReadonlyArray<UserId>, status: LobbyStatus }`
    with `LobbyStatus = Schema.Literal("open", "abandoned", "started")`.
-   `members` is join order and *is* the eventual seat order (§4.5
+   `members` is join order and _is_ the eventual seat order (§4.5
    contiguous-from-0 holds by construction, ADR-0019). `"started"` is a
    read-only projection — `loadLobby` maps an
    `in_progress`/`completed` row to it so join/leave/start refusals stay
@@ -233,8 +233,8 @@ Decision Log are flagged in Surprises as they're confirmed.
 14. **Test clock approach (the root-plan open point):** two clocks,
     deliberately. `Effect.sleep` in the timer fiber is governed by the test
     runtime's `TestClock` (`it.effect` provides it; no vitest config
-    change) — *timers suppressed* = never advance the `TestClock`, *timer
-    path* = `TestClock.adjust` past the sleep. Authority time (what the
+    change) — _timers suppressed_ = never advance the `TestClock`, _timer
+    path_ = `TestClock.adjust` past the sleep. Authority time (what the
     engine sees as `now`) comes from a `Ref`-backed settable `ClockPort`
     stub in `test/support/stubs.ts` — the lazy-close test sets the `Ref`
     past `closesAt` without touching the `TestClock`. This mirrors
@@ -254,40 +254,40 @@ Decision Log are flagged in Surprises as they're confirmed.
 
 New/changed files in `packages/domain`:
 
-| File                       | Exports                                                                                                        | Job                                                                                                                                              |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/Lobby.ts` (new)       | `Lobby`, `LobbyStatus` (+ types), `MAX_LOBBY_MEMBERS`, `createLobby`, `joinLobby`, `leaveLobby`, `startSeats`, `LobbyFull`, `AlreadyInLobby`, `NotInLobby`, `LobbyNotJoinable` | ADR-0019's pure model: ordered members + status, pure transitions returning `Either`, typed errors. Engine/Phase/Fold untouched. |
-| `src/GameRepository.ts` (edit) | port gains `saveLobby`, `loadLobby`; new `SaveLobbyInput`                                                  | The ADR-0015-anticipated growth path: finer-grained access = new methods on the port, not a new repository. Errors reused (decision 3).           |
-| `src/index.ts` (edit)      | re-exports `./Lobby.js`                                                                                        | Barrel.                                                                                                                                          |
-| `test/Lobby.test.ts` (new) | —                                                                                                              | M1's test-first suite: transitions + typed failures (clauses 1–4's pure halves).                                                                 |
-| `test/Ports.test.ts` (edit)| —                                                                                                              | Lobby error tag/field rows beside the existing repository-error rows.                                                                            |
+| File                           | Exports                                                                                                                                                                        | Job                                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/Lobby.ts` (new)           | `Lobby`, `LobbyStatus` (+ types), `MAX_LOBBY_MEMBERS`, `createLobby`, `joinLobby`, `leaveLobby`, `startSeats`, `LobbyFull`, `AlreadyInLobby`, `NotInLobby`, `LobbyNotJoinable` | ADR-0019's pure model: ordered members + status, pure transitions returning `Either`, typed errors. Engine/Phase/Fold untouched.        |
+| `src/GameRepository.ts` (edit) | port gains `saveLobby`, `loadLobby`; new `SaveLobbyInput`                                                                                                                      | The ADR-0015-anticipated growth path: finer-grained access = new methods on the port, not a new repository. Errors reused (decision 3). |
+| `src/index.ts` (edit)          | re-exports `./Lobby.js`                                                                                                                                                        | Barrel.                                                                                                                                 |
+| `test/Lobby.test.ts` (new)     | —                                                                                                                                                                              | M1's test-first suite: transitions + typed failures (clauses 1–4's pure halves).                                                        |
+| `test/Ports.test.ts` (edit)    | —                                                                                                                                                                              | Lobby error tag/field rows beside the existing repository-error rows.                                                                   |
 
 New/changed files in `packages/application`:
 
-| File                                  | Exports                                                     | Job                                                                                                                                              |
-| ------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/ports/Seed.ts` (new)             | `SeedPort`                                                  | Decision 7. `Clock.ts` is the pattern verbatim.                                                                                                  |
-| `src/ports/RealtimePublisher.ts` (new)| `RealtimePublisherPort`                                     | Decision 8; doc comment carries the hidden-information warning (full truth in, `viewFor` before anything leaves the server — CAM-6).             |
-| `src/use-cases/CreateLobby.ts` (new)  | `createLobby` use case (+ input/result types)               | mint `GameId` → domain `createLobby` → `saveLobby` v0 → `publishLobby` (clause 1).                                                               |
-| `src/use-cases/JoinLobby.ts` (new)    | `joinLobby` use case                                        | `loadLobby` → `findById` (decision 9) → domain `joinLobby` → `saveLobby` at loaded version → `publishLobby` (clause 2).                          |
-| `src/use-cases/LeaveLobby.ts` (new)   | `leaveLobby` use case                                       | `loadLobby` → domain `leaveLobby` (last member out ⇒ `status: "abandoned"`) → `saveLobby` → `publishLobby` (clause 3).                           |
-| `src/use-cases/StartGame.ts` (new)    | `startGame` use case                                        | `loadLobby` → domain `startSeats` → `SeedPort` + `ClockPort` → `dealGame` → **one** `save` of the full `GameStarted` batch at the lobby's version → `publishGame` (clause 4). |
-| `src/use-cases/ExecuteGameCommand.ts` (new) | `executeGameCommand` (+ input, `CommandAccepted`)     | Clause 5–7's core: (cached or loaded) → `applyCommand` lifted from `Either` → whole-batch `save` → `publishGame`; illegal ⇒ typed `GameError`, nothing persisted, nothing published. |
-| `src/room/RoomRegistry.ts` (new)      | `RoomRegistry` (Context.Tag), `RoomRegistryLive` (Layer), outcome types | ADR-0020: lazy per-room actors — envelope queue, `Deferred` replies, cached `{state, version}`, lazy close, timer fiber, eviction (decisions 10–13). |
-| `src/index.ts` (edit)                 | re-exports the seven new modules                            | Barrel; the "realtime publisher port arrives with the event types it publishes" doc paragraph updated.                                           |
-| `test/Ports.test.ts` (edit)           | —                                                           | Two new tag-key rows: `"@cambio/application/SeedPort"`, `"@cambio/application/RealtimePublisherPort"`.                                           |
-| `test/support/stubs.ts` (new)         | in-memory `GameRepository` stub (real version guards, lobby store, shared ordered call journal), settable `Ref` clock layer + setter, recording publisher, fixed `SeedPort`/`IdGeneratorPort` stubs | One home for the CAM-4-style stubs the six suites share; the journal is what pins publish-after-persist ordering. Test-only — `@cambio/domain/testing` fixtures welcome. |
-| `test/CreateLobby.test.ts`, `test/JoinLobby.test.ts`, `test/LeaveLobby.test.ts`, `test/StartGame.test.ts`, `test/ExecuteGameCommand.test.ts` (new) | — | M4's stub-layer suites (clauses 1–7, 12).                                                                                                        |
-| `test/RoomRegistry.test.ts` (new)     | —                                                           | M5's actor suites: slam-race determinism, restart reconstruction, eviction, timer-vs-lazy equivalence (clauses 8–11).                            |
+| File                                                                                                                                               | Exports                                                                                                                                                                                             | Job                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/ports/Seed.ts` (new)                                                                                                                          | `SeedPort`                                                                                                                                                                                          | Decision 7. `Clock.ts` is the pattern verbatim.                                                                                                                                      |
+| `src/ports/RealtimePublisher.ts` (new)                                                                                                             | `RealtimePublisherPort`                                                                                                                                                                             | Decision 8; doc comment carries the hidden-information warning (full truth in, `viewFor` before anything leaves the server — CAM-6).                                                 |
+| `src/use-cases/CreateLobby.ts` (new)                                                                                                               | `createLobby` use case (+ input/result types)                                                                                                                                                       | mint `GameId` → domain `createLobby` → `saveLobby` v0 → `publishLobby` (clause 1).                                                                                                   |
+| `src/use-cases/JoinLobby.ts` (new)                                                                                                                 | `joinLobby` use case                                                                                                                                                                                | `loadLobby` → `findById` (decision 9) → domain `joinLobby` → `saveLobby` at loaded version → `publishLobby` (clause 2).                                                              |
+| `src/use-cases/LeaveLobby.ts` (new)                                                                                                                | `leaveLobby` use case                                                                                                                                                                               | `loadLobby` → domain `leaveLobby` (last member out ⇒ `status: "abandoned"`) → `saveLobby` → `publishLobby` (clause 3).                                                               |
+| `src/use-cases/StartGame.ts` (new)                                                                                                                 | `startGame` use case                                                                                                                                                                                | `loadLobby` → domain `startSeats` → `SeedPort` + `ClockPort` → `dealGame` → **one** `save` of the full `GameStarted` batch at the lobby's version → `publishGame` (clause 4).        |
+| `src/use-cases/ExecuteGameCommand.ts` (new)                                                                                                        | `executeGameCommand` (+ input, `CommandAccepted`)                                                                                                                                                   | Clause 5–7's core: (cached or loaded) → `applyCommand` lifted from `Either` → whole-batch `save` → `publishGame`; illegal ⇒ typed `GameError`, nothing persisted, nothing published. |
+| `src/room/RoomRegistry.ts` (new)                                                                                                                   | `RoomRegistry` (Context.Tag), `RoomRegistryLive` (Layer), outcome types                                                                                                                             | ADR-0020: lazy per-room actors — envelope queue, `Deferred` replies, cached `{state, version}`, lazy close, timer fiber, eviction (decisions 10–13).                                 |
+| `src/index.ts` (edit)                                                                                                                              | re-exports the seven new modules                                                                                                                                                                    | Barrel; the "realtime publisher port arrives with the event types it publishes" doc paragraph updated.                                                                               |
+| `test/Ports.test.ts` (edit)                                                                                                                        | —                                                                                                                                                                                                   | Two new tag-key rows: `"@cambio/application/SeedPort"`, `"@cambio/application/RealtimePublisherPort"`.                                                                               |
+| `test/support/stubs.ts` (new)                                                                                                                      | in-memory `GameRepository` stub (real version guards, lobby store, shared ordered call journal), settable `Ref` clock layer + setter, recording publisher, fixed `SeedPort`/`IdGeneratorPort` stubs | One home for the CAM-4-style stubs the six suites share; the journal is what pins publish-after-persist ordering. Test-only — `@cambio/domain/testing` fixtures welcome.             |
+| `test/CreateLobby.test.ts`, `test/JoinLobby.test.ts`, `test/LeaveLobby.test.ts`, `test/StartGame.test.ts`, `test/ExecuteGameCommand.test.ts` (new) | —                                                                                                                                                                                                   | M4's stub-layer suites (clauses 1–7, 12).                                                                                                                                            |
+| `test/RoomRegistry.test.ts` (new)                                                                                                                  | —                                                                                                                                                                                                   | M5's actor suites: slam-race determinism, restart reconstruction, eviction, timer-vs-lazy equivalence (clauses 8–11).                                                                |
 
 New/changed files in `apps/api`:
 
-| File                                   | Exports | Job                                                                                                                                              |
-| -------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `migrations/0003_lobby_rows.sql` (new) | —       | Decision 5: status-conditional nullability; header also corrects `0002`'s stale `actor_id` comment.                                              |
-| `src/infra/game-repository.ts` (edit)  | layer additionally implements `saveLobby`, `loadLobby` | Decision 4's membership diff, `'lobby'`/`'abandoned'` status writes, decision 6's undealt-row guard on `load`/`getEvents`.                        |
-| `test/LobbyRepository.test.ts` (new)   | —       | Clause 13's integration trio: lifecycle round-trip, stale-version conflict, start-then-reconstruct.                                              |
-| `test/Migrations.test.ts` (edit)       | —       | Applied-list assertion (`:63`) gains `0003_lobby_rows.sql`; a new introspection test pins the conditional-nullability CHECK.                      |
+| File                                   | Exports                                                | Job                                                                                                                          |
+| -------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `migrations/0003_lobby_rows.sql` (new) | —                                                      | Decision 5: status-conditional nullability; header also corrects `0002`'s stale `actor_id` comment.                          |
+| `src/infra/game-repository.ts` (edit)  | layer additionally implements `saveLobby`, `loadLobby` | Decision 4's membership diff, `'lobby'`/`'abandoned'` status writes, decision 6's undealt-row guard on `load`/`getEvents`.   |
+| `test/LobbyRepository.test.ts` (new)   | —                                                      | Clause 13's integration trio: lifecycle round-trip, stale-version conflict, start-then-reconstruct.                          |
+| `test/Migrations.test.ts` (edit)       | —                                                      | Applied-list assertion (`:63`) gains `0003_lobby_rows.sql`; a new introspection test pins the conditional-nullability CHECK. |
 
 No changes to `packages/contracts`, `apps/web`, `apps/api/src/presentation`,
 `apps/api/src/runtime.ts`, any `package.json`, `turbo.json`, or
@@ -367,7 +367,7 @@ every untouched CAM-1/2/3 suite (proving the engine didn't move).
 commit.** These are compile-coupled: adding members to the port interface
 breaks `apps/api/src/infra/game-repository.ts`'s typecheck until the
 adapter implements them, so port and adapter land together; the adapter's
-new *runtime* paths stay dormant (nothing calls them) until `0003` exists
+new _runtime_ paths stay dormant (nothing calls them) until `0003` exists
 and M3's tests exercise them — the repo compiles and stays green
 throughout.
 
@@ -431,9 +431,7 @@ export class SeedPort extends Context.Tag("@cambio/application/SeedPort")<
   { readonly nextSeed: Effect.Effect<number> }
 >() {}
 
-export class RealtimePublisherPort extends Context.Tag(
-  "@cambio/application/RealtimePublisherPort",
-)<
+export class RealtimePublisherPort extends Context.Tag("@cambio/application/RealtimePublisherPort")<
   RealtimePublisherPort,
   {
     readonly publishGame: (
@@ -614,7 +612,7 @@ watch them fail, then implement `src/room/RoomRegistry.ts`:
   `start(gameId, input)` — each enqueues an envelope and awaits its
   `Deferred` (decision 12; CreateLobby stays a plain use case).
 - `RoomRegistryLive: Layer<RoomRegistry, never, GameRepository | ClockPort
-  | RealtimePublisherPort | UserRepository>` — built with a
+| RealtimePublisherPort | UserRepository>` — built with a
   `Ref<Map<GameId, Room>>`; a room is created lazily on first message:
   bounded `Queue` of envelopes (a tagged union, each variant carrying its
   own typed `Deferred` — no type erasure), one forked consumer fiber, a
@@ -658,7 +656,7 @@ Remaining intents, added one at a time:
   crash. Same for a lobby abandoned by its last leave — a later `join`
   gets `LobbyNotJoinable`.
 - **Restart reconstruction (clause 9):** run commands through registry A;
-  build registry B over the *same* stub repository (fresh `Ref` map — the
+  build registry B over the _same_ stub repository (fresh `Ref` map — the
   simulated restart); the same next command against B and against a
   never-restarted control produces identical replies and identical
   post-command persisted state. Once for an in-game room, once for a
@@ -671,7 +669,7 @@ the identical `SlamWindow` state (same seed, same commands):
   the `Ref` clock past `closesAt`; submit the next turn's command — the
   actor first closes the window (persisted + published `CloseSlamWindow`
   batch), then runs the command.
-- **Timer path:** set the `Ref` clock past `closesAt` *and*
+- **Timer path:** set the `Ref` clock past `closesAt` _and_
   `TestClock.adjust` past the sleep so the timer fiber enqueues the close;
   then submit the same command.
 - Assert both rooms' final persisted states and event logs are identical
@@ -753,27 +751,30 @@ time** (rows hold clause → planned approach; `/implement` fills file, test
 name, and assertion phrase as each test actually lands — invented test
 titles become review findings).)_
 
-| Clause | Test (file + name)                                                                                                                                          | What is asserted            |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| 1      | _planned:_ domain create transition (M1) + CreateLobby stub suite (M4.1) + the integration lifecycle's insert half (M3.2)                                    | _(filled by `/implement`)_  |
-| 2      | _planned:_ domain join transitions/failures (M1) + JoinLobby stub suite incl. all four typed refusals and no-save-on-refusal (M4.1)                          | _(filled by `/implement`)_  |
-| 3      | _planned:_ domain leave/abandon transitions (M1) + LeaveLobby stub suite (M4.1) + the integration lifecycle's abandon half (M3.2)                            | _(filled by `/implement`)_  |
-| 4      | _planned:_ StartGame stub suite (M4.2): any-member start, join-order seats, whole `GameStarted` batch in one save, `BadPlayerCount`/non-member/restart refusals | _(filled by `/implement`)_  |
-| 5      | _planned:_ ExecuteGameCommand stub suite (M4.3): whole batch in one save then publish; illegal ⇒ typed `GameError`, nothing persisted, nothing published     | _(filled by `/implement`)_  |
-| 6      | _planned:_ conflict passthrough in the ExecuteGameCommand suite (M4.3) + actor cache-invalidation-and-reload in the registry suite (M5.2)                    | _(filled by `/implement`)_  |
-| 7      | _planned:_ the shared stub journal (M2.3) pins save-before-publish across every M4 suite; lobby mutations publish via `publishLobby`                         | _(filled by `/implement`)_  |
-| 8      | _planned:_ registry slam-race test with in-test repetition over fresh rooms (M5.2); second slam's reply asserted from observed engine behavior               | _(filled by `/implement`)_  |
-| 9      | _planned:_ restart-reconstruction test (fresh registry, same stub repo) for one in-game and one lobby room vs a never-restarted control (M5.2)               | _(filled by `/implement`)_  |
-| 10     | _planned:_ eviction tests — game to `Ended` and lobby to abandoned; later command gets a fresh actor and a typed error, not a crash (M5.2)                   | _(filled by `/implement`)_  |
-| 11     | _planned:_ timer-vs-lazy equivalence (M5.3): suppressed-timer lazy close ≡ timer-driven close, byte-identical states/logs; late timer close is a silent no-op | _(filled by `/implement`)_  |
-| 12     | _planned:_ structural — every M4/M5 suite runs on stubs only, plus the `Date.now`/`Math.random`/`setTimeout`/builtin grep sweeps in the validation section   | _(filled by `/implement`)_  |
-| 13     | _planned:_ migration ledger + CHECK introspection (M3.1) and the LobbyRepository integration trio: lifecycle round-trip, stale-version conflict, start-then-reconstruct via `load` and `getEvents`+`foldEvents` (M3.2) | _(filled by `/implement`)_  |
+| Clause | Test (file + name)                                                                                                                                                                                                     | What is asserted           |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| 1      | _planned:_ domain create transition (M1) + CreateLobby stub suite (M4.1) + the integration lifecycle's insert half (M3.2)                                                                                              | _(filled by `/implement`)_ |
+| 2      | _planned:_ domain join transitions/failures (M1) + JoinLobby stub suite incl. all four typed refusals and no-save-on-refusal (M4.1)                                                                                    | _(filled by `/implement`)_ |
+| 3      | _planned:_ domain leave/abandon transitions (M1) + LeaveLobby stub suite (M4.1) + the integration lifecycle's abandon half (M3.2)                                                                                      | _(filled by `/implement`)_ |
+| 4      | _planned:_ StartGame stub suite (M4.2): any-member start, join-order seats, whole `GameStarted` batch in one save, `BadPlayerCount`/non-member/restart refusals                                                        | _(filled by `/implement`)_ |
+| 5      | _planned:_ ExecuteGameCommand stub suite (M4.3): whole batch in one save then publish; illegal ⇒ typed `GameError`, nothing persisted, nothing published                                                               | _(filled by `/implement`)_ |
+| 6      | _planned:_ conflict passthrough in the ExecuteGameCommand suite (M4.3) + actor cache-invalidation-and-reload in the registry suite (M5.2)                                                                              | _(filled by `/implement`)_ |
+| 7      | _planned:_ the shared stub journal (M2.3) pins save-before-publish across every M4 suite; lobby mutations publish via `publishLobby`                                                                                   | _(filled by `/implement`)_ |
+| 8      | _planned:_ registry slam-race test with in-test repetition over fresh rooms (M5.2); second slam's reply asserted from observed engine behavior                                                                         | _(filled by `/implement`)_ |
+| 9      | _planned:_ restart-reconstruction test (fresh registry, same stub repo) for one in-game and one lobby room vs a never-restarted control (M5.2)                                                                         | _(filled by `/implement`)_ |
+| 10     | _planned:_ eviction tests — game to `Ended` and lobby to abandoned; later command gets a fresh actor and a typed error, not a crash (M5.2)                                                                             | _(filled by `/implement`)_ |
+| 11     | _planned:_ timer-vs-lazy equivalence (M5.3): suppressed-timer lazy close ≡ timer-driven close, byte-identical states/logs; late timer close is a silent no-op                                                          | _(filled by `/implement`)_ |
+| 12     | _planned:_ structural — every M4/M5 suite runs on stubs only, plus the `Date.now`/`Math.random`/`setTimeout`/builtin grep sweeps in the validation section                                                             | _(filled by `/implement`)_ |
+| 13     | _planned:_ migration ledger + CHECK introspection (M3.1) and the LobbyRepository integration trio: lifecycle round-trip, stale-version conflict, start-then-reconstruct via `load` and `getEvents`+`foldEvents` (M3.2) | _(filled by `/implement`)_ |
 
 ## Progress
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
-- [ ] 2026-09-01 — backend plan written; awaiting `/implement`
+- [x] 2026-09-01 — backend plan written; awaiting `/implement`
+- [x] 2026-09-01 13:16 — M1 done (`e91da8e`): `src/Lobby.ts` + `test/Lobby.test.ts` (15 tests), `gid` fixture added to `src/testing/fixtures.ts`, barrel updated. Domain suite 190 green, lint clean. Deviation: lobby error-shape assertions live in `Lobby.test.ts` rather than `test/Ports.test.ts` — they are model errors, not port errors; coverage identical.
+- [x] 2026-09-01 13:20 — M2 done (`9bdba56`): `saveLobby`/`loadLobby` + `SaveLobbyInput` on the domain port; adapter implements both (ascending-order membership diff, rejoin resurrects the soft-deleted row via PK-conflict `deleted_at = NULL`, undealt-row guard on `load`/`getEvents`); `ports/Seed.ts`, `ports/RealtimePublisher.ts`, tag rows in `test/Ports.test.ts`, stub kit `test/support/stubs.ts`. Domain/application/api all compile, tests green.
+- [x] 2026-09-01 13:21 — M3 done (`55409ba`): `0003_lobby_rows.sql` applied + idempotent re-run verified; `Migrations.test.ts` ledger + CHECK-with-teeth introspection; `LobbyRepository.test.ts` four integration tests. api suite 9 files / 52 tests green.
 
 ## Surprises & notes for the root plan
 

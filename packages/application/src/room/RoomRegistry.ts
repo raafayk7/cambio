@@ -82,7 +82,10 @@ type Envelope =
 export class RoomRegistry extends Context.Tag("@cambio/application/RoomRegistry")<
   RoomRegistry,
   {
-    readonly execute: (gameId: GameId, command: Command) => Effect.Effect<GameAdvanced, ExecuteError>
+    readonly execute: (
+      gameId: GameId,
+      command: Command,
+    ) => Effect.Effect<GameAdvanced, ExecuteError>
     readonly join: (gameId: GameId, userId: UserId) => Effect.Effect<LobbyChanged, JoinError>
     readonly leave: (gameId: GameId, userId: UserId) => Effect.Effect<LobbyChanged, LeaveError>
     readonly start: (gameId: GameId, input: StartInput) => Effect.Effect<GameAdvanced, StartError>

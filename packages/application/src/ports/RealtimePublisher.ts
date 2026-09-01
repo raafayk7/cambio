@@ -1,10 +1,5 @@
 import { Context, type Effect } from "effect"
-import {
-  type GameEvent,
-  type GameId,
-  type GameState,
-  type Lobby,
-} from "@cambio/domain"
+import { type GameEvent, type GameId, type GameState, type Lobby } from "@cambio/domain"
 
 /**
  * Realtime publisher port.
@@ -24,9 +19,7 @@ import {
  *
  * Implementations live in `apps/api/src/infra` (arriving with CAM-6).
  */
-export class RealtimePublisherPort extends Context.Tag(
-  "@cambio/application/RealtimePublisherPort",
-)<
+export class RealtimePublisherPort extends Context.Tag("@cambio/application/RealtimePublisherPort")<
   RealtimePublisherPort,
   {
     readonly publishGame: (

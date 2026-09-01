@@ -23,8 +23,10 @@ const config = decodeGameConfig({ slamWindowMs: 4000 })
 const KNOWN_USERS = [uid(0), uid(1), uid(2), uid(3), uid(4), uid(5)]
 
 /** Seed the stub repo, then wipe the journal so assertions see only the use case. */
-const seeded = (journal: ReturnType<typeof makeJournal>, seed: Effect.Effect<void, unknown, GameRepository>) =>
-  seed.pipe(Effect.map(() => journal.splice(0)))
+const seeded = (
+  journal: ReturnType<typeof makeJournal>,
+  seed: Effect.Effect<void, unknown, GameRepository>,
+) => seed.pipe(Effect.map(() => journal.splice(0)))
 
 const seedLobby = (lobby: Lobby) =>
   GameRepository.pipe(
@@ -33,8 +35,10 @@ const seedLobby = (lobby: Lobby) =>
     ),
   )
 
-const layers = (journal: ReturnType<typeof makeJournal>, repo: ReturnType<typeof makeGameRepoStub>) =>
-  Layer.mergeAll(repo.layer, makePublisherStub(journal).layer, usersStub(KNOWN_USERS))
+const layers = (
+  journal: ReturnType<typeof makeJournal>,
+  repo: ReturnType<typeof makeGameRepoStub>,
+) => Layer.mergeAll(repo.layer, makePublisherStub(journal).layer, usersStub(KNOWN_USERS))
 
 describe("joinLobby (clause 2)", () => {
   it.effect("appends in join order, saves at the loaded version, publishes after persist", () => {
@@ -66,7 +70,9 @@ describe("joinLobby (clause 2)", () => {
         Effect.map((result) => {
           expect(result._tag).toBe("Left")
           if (result._tag === "Left") expect(result.left._tag).toBe(expectedTag)
-          expect(opsOf(journal).filter((op) => op === "saveLobby" || op === "publishLobby")).toEqual([])
+          expect(
+            opsOf(journal).filter((op) => op === "saveLobby" || op === "publishLobby"),
+          ).toEqual([])
         }),
         Effect.provide(layers(journal, repo)),
       )
