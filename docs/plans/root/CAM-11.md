@@ -64,7 +64,7 @@ Observe it working: temporarily add either illegal import, run
   wires a single `boundaries/dependencies` rule with one policy
   (`disallow: {to: {module: {origin: "external", source: denied}}}`) inside
   one combined config block covering `files: ["src/**/*.{ts,tsx}",
-  "test/**/*.{ts,tsx}"]`. "External" here means "not resolved as this
+"test/**/*.{ts,tsx}"]`. "External" here means "not resolved as this
   package itself" — workspace packages resolve through node_modules symlinks
   so they show up with `origin: "external"` too (`checkAllOrigins: true` is
   already set for this reason — see `eslint.base.js:129-136`).
@@ -112,17 +112,17 @@ Observe it working: temporarily add either illegal import, run
    Gap 1 and affects every layer's existing workspace-deny policy.
 5. `packages/config` gains a permanent automated regression test (new
    `packages/config/test/` directory, `vitest` devDependency, `"test":
-   "vitest run"` script) that:
+"vitest run"` script) that:
    - asserts an `@effect/sql-pg` (or similar non-`effect` external) import
      in a simulated `packages/domain/src/*.ts` file produces a
      `boundaries/dependencies` lint error under `cambioConfig({layer:
-     "domain"})`;
+"domain"})`;
    - asserts the same import in a simulated `packages/domain/test/*.ts`
      file produces **no** such error (proving the src/test split didn't
      over-restrict);
    - asserts a `@cambio/domain/testing` subpath import produces a
      `boundaries/dependencies` lint error under `cambioConfig({layer:
-     "web"})` (Gap 2);
+"web"})` (Gap 2);
    - covers `contracts` and `application` for the effect-only check too
      (at minimum one positive case each), not just `domain`.
 6. `pnpm turbo build typecheck lint test` passes repo-wide with no other
@@ -133,23 +133,24 @@ Observe it working: temporarily add either illegal import, run
 
 ### Acceptance criteria
 
-- [ ] `packages/config/eslint.base.js` implements both fixes per ADR-0017's
+- [x] `packages/config/eslint.base.js` implements both fixes per ADR-0017's
       mechanism (ordered `disallow`-then-`allow` policies, split into
       mutually-exclusive `src/**` / `test/**` file blocks for `domain`,
       `contracts`, `application`; `[pkg, \`${pkg}/**\`]` deny patterns for
       every layer).
-- [ ] Manual verification performed and reverted: an `@effect/platform`
+- [x] Manual verification performed and reverted: an `@effect/platform`
       import added to `packages/domain/src` makes `pnpm turbo lint` fail;
       an `import ... from "@cambio/domain/testing"` added to `apps/web/src`
       makes `pnpm turbo lint` fail; both reverted before commit (`git diff`
       clean on those files at close-out).
-- [ ] `packages/config` has a new automated test suite covering the six
+- [x] `packages/config` has a new automated test suite covering the six
       cases in Functional Contract clause 5, passing under
       `pnpm --filter @cambio/config test`.
-- [ ] `pnpm turbo build typecheck lint test` passes clean repo-wide.
-- [ ] ADR-0017 accurately reflects the as-shipped mechanism (update it if
+- [x] `pnpm turbo build typecheck lint test` passes clean repo-wide.
+- [x] ADR-0017 accurately reflects the as-shipped mechanism (update it if
       implementation deviates — see the `adr` skill: never let an ADR drift
-      from the code it documents without updating it).
+      from the code it documents without updating it). No deviation: the
+      mechanism shipped exactly as proposed.
 
 ## Plan of work
 
@@ -161,11 +162,10 @@ parallelizable lanes and no contracts/schema dependency.
      (`domain`, `contracts`, `application`) and what their external
      allow-list is (`["effect"]` for all three, per the current import
      table — `application`'s workspace allow-list, `["@cambio/domain",
-     "@cambio/contracts"]`, is unaffected by this; it's a separate,
+"@cambio/contracts"]`, is unaffected by this; it's a separate,
      existing mechanism).
    - Change the workspace deny-pattern derivation so every denied package
-     name `pkg` becomes the pair `[pkg, \`${pkg}/**\`]` (flattened into the
-     `source` array), for **every** layer — this is Gap 2 and applies
+     name `pkg` becomes the pair `[pkg, \`${pkg}/**\`]`(flattened into the`source` array), for **every** layer — this is Gap 2 and applies
      regardless of whether a layer also gets the effect-only-external
      check.
    - For the three effect-only layers, replace the single combined
@@ -173,8 +173,8 @@ parallelizable lanes and no contracts/schema dependency.
      two blocks:
      - `files: ["src/**/*.{ts,tsx}"]`: existing workspace-deny policy, plus
        two new policies in this order — (a) `disallow` `{module: {origin:
-       "external", source: ["!@cambio/**"]}}`, (b) `allow` `{module:
-       {origin: "external", source: ["effect"]}}`. Order matters
+"external", source: ["!@cambio/**"]}}`, (b) `allow` `{module:
+{origin: "external", source: ["effect"]}}`. Order matters
        (last-write-wins per ADR-0017) — (b) must come after (a).
      - `files: ["test/**/*.{ts,tsx}"]`: the existing workspace-deny policy
        only, unchanged from today.
@@ -184,7 +184,7 @@ parallelizable lanes and no contracts/schema dependency.
    - `ui`, `api`, `web` keep their current single combined block — no
      restructuring needed for those three.
    - Update `LAYER_RATIONALE` (or add a parallel rationale for the new
-     policies) so lint failures explain *why*, matching the existing
+     policies) so lint failures explain _why_, matching the existing
      per-layer message style.
 2. **Manual verification (per the issue and the architecture skill).**
    Temporarily add the two illegal imports described in the issue, confirm
@@ -198,7 +198,7 @@ parallelizable lanes and no contracts/schema dependency.
      `packages/config/package.json`.
    - New `packages/config/test/` directory. Use `eslint`'s programmatic
      `ESLint` class (`new ESLint({overrideConfig: cambioConfig({layer:
-     ...}), ...})` and `.lintText(source, {filePath})`) to feed small
+...}), ...})` and `.lintText(source, {filePath})`) to feed small
      inline fixture strings through the real composed config, setting
      `filePath` to a path under the relevant package's `src/` or `test/`
      (e.g. `packages/domain/src/probe.ts`) so the `boundaries/elements`
@@ -239,7 +239,23 @@ parallelizable lanes and no contracts/schema dependency.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-01 — plan written and signed off
+- [x] 2026-09-01 — plan written and signed off
+- [x] 2026-09-01 — `packages/config/eslint.base.js` restructured: `EFFECT_ONLY_EXTERNAL_LAYERS`
+      constant added, workspace deny patterns changed to `[pkg, pkg/**]`,
+      `domain`/`contracts`/`application` split into mutually-exclusive
+      `src/**` and `test/**` config blocks per ADR-0017
+- [x] 2026-09-01 — manual verify-then-revert performed: `@effect/platform`
+      import in `packages/domain/src` and `@cambio/domain/testing` import
+      in `apps/web/src` both failed `pnpm --filter <pkg> lint` with a
+      `boundaries/dependencies` error as expected; both probes removed,
+      `git status --porcelain` confirmed clean before continuing
+- [x] 2026-09-01 — regression suite added at `packages/config/test/eslint.base.test.ts`
+      (8 tests via `eslint`'s programmatic `ESLint#lintText`), `vitest`
+      devDependency + `"test": "vitest run"` script added to
+      `packages/config/package.json`; `pnpm --filter @cambio/config test`
+      green on first run
+- [x] 2026-09-01 — full gate green: `pnpm turbo build typecheck lint test`
+      — 21/21 tasks passed repo-wide, no fallout in any other package
 
 ## Decision log
 
@@ -272,11 +288,53 @@ timestamp each entry)_
   went unnoticed silently; a manual-only check doesn't prevent a future
   edit from reopening either gap. Confirmed with the user during the
   interview round.
+- 2026-09-01 — **Reused the existing per-layer `LAYER_RATIONALE` message for
+  the new effect-only-external `disallow` policy, rather than writing a new
+  rationale entry** — the existing text for `domain` ("may import `effect`
+  only"), `contracts` (same), and `application` ("may import `domain`,
+  `contracts` and `effect` only") already states the external-import rule
+  precisely; a second, near-duplicate message would drift from the first
+  over time. Functional contract clause 1 left this as the implementer's
+  call.
 
 ## Surprises & discoveries
 
-_(none yet — filled in during implementation)_
+None — the exploration's findings (last-write-wins `boundaries/dependencies`
+semantics, the `!@cambio/**` / `effect` policy ordering, `ESLint#lintText`
+resolving `boundaries/elements` correctly via `cwd`) all held exactly as
+predicted. Both manual verification probes and all 8 regression-test
+assertions passed on the first run; no rework was needed.
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+**Verdict: ship.** `/review` ran a contract reviewer and an architecture
+reviewer in parallel against `git diff release-v0...HEAD`, plus an
+independent gate run. No findings from either reviewer; no fixes required.
+
+- **Independent gate:** `pnpm turbo build typecheck lint test` — 21/21
+  tasks green, re-run fresh during review (not just trusted from
+  implementation).
+- **Contract review:** all 6 Functional Contract clauses and all 5
+  Acceptance Criteria verdicted **satisfied**, each against actual code and
+  a live re-run of `pnpm --filter @cambio/config test` (8/8 passed), not
+  against the plan's own prose. No scope creep — diff touches exactly
+  `packages/config/eslint.base.js`, `packages/config/package.json`, and the
+  new test file. One non-issue noted: the effect-only `allow` policy has no
+  `message` field, which is correct since `allow` policies never produce
+  lint errors.
+- **Architecture review:** confirmed the shipped mechanism matches
+  ADR-0017's three decision points exactly (`boundaries/dependencies` only,
+  mutually-exclusive `src/`/`test/` blocks, disallow-then-allow policy
+  order) and hand-traced all four boundary-correctness cases (effect
+  allowed, arbitrary npm denied, existing workspace-deny unaffected,
+  application's legitimate `@cambio/domain` import unaffected by the new
+  check) — all conform, no regressions. `hidden-information` and the other
+  layer skills confirmed not applicable (no client-facing payload,
+  contracts, or realtime code touched).
+- **What shipped:** exactly what ADR-0017 and the plan specified, with one
+  implementer's-call (reusing `LAYER_RATIONALE` messages rather than adding
+  new ones) already logged in the Decision Log. Nothing deferred.
+- **Carries into future tasks:** ADR-0017's src/test mutual-exclusivity
+  constraint on `cambioConfig` is now load-bearing — any future edit to the
+  `domain`/`contracts`/`application` boundary rules must preserve the split
+  rather than reintroducing an overlapping `boundaries/dependencies` block.
