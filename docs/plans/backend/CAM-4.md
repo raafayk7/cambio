@@ -570,6 +570,12 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       test-first (red observed) — 12 tests green in 3 files; build,
       typecheck, lint clean; `pnpm turbo test --filter=@cambio/application`
       picks the script up.
+- [x] 2026-09-01 11:45 — M3: `AppConfig` session entries
+      (`Config.literal` for SameSite), `.env.example` + `turbo.json` +
+      local `.env` in lockstep; `Config.test.ts` (4 tests, `fromMap`);
+      signer adapter test-first (red observed) — `session-signer.ts`
+      (`makeSessionSigner` + `SessionSignerLive`), registered in
+      `runtime.ts`. Api suite 36 green (was 28), build + lint clean.
 
 ## Surprises & notes for the root plan
 
