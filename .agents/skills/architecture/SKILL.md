@@ -82,3 +82,15 @@ are not obvious from the code:
 To confirm a violation is caught (or after changing lint config):
 temporarily add an illegal import (e.g. `import { Phase } from
 "@cambio/domain"` in `apps/web`), check `pnpm turbo lint` fails, revert.
+
+**Enforcement claims must be probe-verified when written.** Any sentence of
+the form "lint/CI enforces X" in a plan, ADR, or skill is a claim about
+tooling, not a fact about the rule — and it has been wrong three times in
+this repo's history (CAM-3 found two lint gaps, CAM-4 a third: the
+boundaries plugin treats Node builtins as origin `"core"`, so "may import
+`effect` only" was never lint-enforced for builtins). Before writing such a
+sentence, run the probe above for that exact claim: add the illegal thing,
+watch the gate fail, revert. If the gate does not fail, write what is
+actually enforced and file the gap. Durable claims belong in
+`packages/config/test/eslint.base.test.ts` as regression tests — a claim
+with a test needs no re-probing; a claim without one is unverified prose.
