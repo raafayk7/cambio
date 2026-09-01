@@ -755,6 +755,20 @@ column below is plan-time orientation only.)_
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [x] 2026-09-01 — backend plan written; awaiting `/implement`
+- [x] 2026-09-01 15:20 — M1 complete (c31f815): seven contracts files landed
+      (`GamePrimitives`, `GameCommand`, `GameView`, `GameEvents`, `Channel`,
+      `Error`, `Responses`) + barrel; contracts build/typecheck/lint green.
+      Private events got distinct tags (`PrivateCardDrawn`,
+      `PrivateCardPeeked`) so the two streams can never be confused — see
+      Surprises.
+- [x] 2026-09-01 15:45 — M2 complete: `src/projection/{ViewFor,
+      EventProjection,CommandMapping}.ts` + four test suites + `leaks.ts`
+      helper, TDD (suites written first, red on missing modules, then green).
+      Application suite 80 tests green; raised-knob sweep `VIEW_GAMES=25`
+      green (thousands of per-step views checked). `VIEW_GAMES`/`VIEW_SEED`
+      added to `turbo.json` test env. Deviation: `projectEvents(events)` —
+      the advisory `(state, events)` first parameter proved unnecessary
+      (deck counts come from the events themselves).
 
 ## Surprises & notes for the root plan
 

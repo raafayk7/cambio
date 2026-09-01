@@ -20,6 +20,9 @@ import { TestDatabaseLive } from "./db.js"
  */
 export const TEST_SESSION_SECRET = "cam-4-test-session-secret"
 
+/** Topic-derivation secret for route suites (ADR-0023) — literal, like the above. */
+export const TEST_TOPIC_SECRET = "cam-6-test-topic-secret"
+
 export const testSigner = makeSessionSigner(Redacted.make(TEST_SESSION_SECRET))
 
 /** Everything `AppServices` needs, over the test database. */
@@ -42,6 +45,12 @@ const baseConfig: AppConfig = {
   sessionTtlSeconds: 3600,
   sessionCookieSecure: false,
   sessionCookieSameSite: "lax",
+  slamWindowMs: 5000,
+  // Route-layer tests never touch the realtime wire (the publisher is a
+  // recording stub); literals keep the config total.
+  realtimeUrl: "http://realtime-dev.localhost:4000",
+  realtimeJwtSecret: Redacted.make("cam-6-test-realtime-jwt-secret-padding-to-32"),
+  topicSecret: Redacted.make(TEST_TOPIC_SECRET),
 }
 
 /**

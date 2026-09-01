@@ -29,6 +29,7 @@
   "devDependencies": {
     "@cambio/config": "workspace:*",
     "@effect/vitest": "0.30.0",
+    "@supabase/realtime-js": "^2.112.4",
     "@types/node": "22.20.1",
     "eslint": "10.8.0",
     "pino-pretty": "13.1.3",

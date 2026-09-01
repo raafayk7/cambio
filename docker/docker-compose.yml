@@ -1,9 +1,18 @@
 name: cambio
 
-# Postgres only. No Redis — in-memory room state plus Postgres is sufficient
-# for a single instance, and Redis becomes necessary only if the API scales
-# horizontally and needs pub/sub to route room events between instances (§6).
-# Do not add it pre-emptively.
+# Postgres + Supabase Realtime. No Redis — in-memory room state plus Postgres
+# is sufficient for a single instance, and Redis becomes necessary only if the
+# API scales horizontally and needs pub/sub to route room events between
+# instances (§6). Do not add it pre-emptively.
+#
+# Realtime (ADR-0024) exists solely as a Broadcast relay the API posts into —
+# Broadcast mode only (§5): no Postgres Changes replication to clients, ever.
+# It runs fully offline: no Supabase account or cloud key; the only credential
+# is the self-chosen API_JWT_SECRET below, and the "apikey" clients present is
+# a JWT we sign with it (see apps/api/src/infra/realtime-jwt.ts). All secrets
+# in this file are dev-only values, hardcoded in the existing cambio/cambio
+# style. API_JWT_SECRET must equal REALTIME_JWT_SECRET in .env — the API signs
+# its publish token with that value.
 
 services:
   postgres:
@@ -26,6 +35,83 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # One-shot: pre-create the _realtime schema before Realtime's first boot.
+  # Without it (plus the search_path below), Realtime's Ecto bookkeeping —
+  # including a schema_migrations table — lands in public and collides with
+  # our _cambio_migrations. A postgres-image init script cannot do this: those
+  # only run on first volume initialization, and cambio-pgdata already exists.
+  realtime-init:
+    image: postgres:17-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint:
+      - psql
+      - postgres://cambio:cambio@postgres:5432/cambio
+      - -c
+      - CREATE SCHEMA IF NOT EXISTS _realtime
+    restart: "no"
+
+  realtime:
+    # Pinned to what supabase/supabase's self-host docker-compose pins
+    # (verified 2026-09-01). Realtime tags move fast; follow their pin, not
+    # upstream latest.
+    image: supabase/realtime:v2.102.3
+    container_name: cambio-realtime
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      realtime-init:
+        condition: service_completed_successfully
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: 4000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      # Runs Ecto + tenant migrations, so needs a superuser — the container's
+      # POSTGRES_USER is one.
+      DB_USER: cambio
+      DB_PASSWORD: cambio
+      DB_NAME: cambio
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      # Exactly 16 chars (AES-128). Changing it after first seed breaks
+      # decryption of the tenant row — wipe the _realtime schema if you must.
+      DB_ENC_KEY: cambiorealtime16
+      # ≥32 chars; becomes the seeded tenant's jwt_secret. Must equal
+      # REALTIME_JWT_SECRET in .env (see header note).
+      API_JWT_SECRET: cambio-dev-realtime-jwt-secret-0123456789
+      # Required at boot; the supabase self-host compose sets it to the same
+      # JWT secret. We publish no metrics.
+      METRICS_JWT_SECRET: cambio-dev-realtime-jwt-secret-0123456789
+      # 64 chars.
+      SECRET_KEY_BASE: cambio-dev-secret-key-base-0123456789abcdef0123456789abcdef0123
+      ERL_AFLAGS: "-proto_dist inet_tcp"
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      # Seeds the single self-host tenant (external_id "realtime-dev").
+      # Tenant resolution is by Host subdomain: clients and the API must use
+      # realtime-dev.localhost:4000 — bare localhost gets tenant-not-found.
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+      DISABLE_HEALTHCHECK_LOGGING: "true"
+    healthcheck:
+      # The health endpoint requires a Bearer JWT signed with API_JWT_SECRET.
+      # This one is {role: "anon", exp: 2100-01-01}, signed with the dev
+      # secret above — regenerate if you change the secret
+      # (node apps/api: see infra/realtime-jwt.ts).
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sSfL --head -o /dev/null -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImV4cCI6NDEwMjQ0NDgwMH0.4TCXQWrlKgdYaE4yBRibes-l8MNF-zkznJ8WFqp25k0' http://localhost:4000/api/tenants/realtime-dev/health",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
 volumes:
   cambio-pgdata:

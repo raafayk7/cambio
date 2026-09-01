@@ -34,6 +34,31 @@ export const AppConfig = Config.all({
     "strict",
     "none",
   )("SESSION_COOKIE_SAMESITE").pipe(Config.withDefault("lax" as const)),
+  /**
+   * Slam window duration fed into `GameConfig` at start (ADR-0011: config,
+   * never a literal). The 5000 default is a placeholder pending playtesting.
+   */
+  slamWindowMs: Config.integer("SLAM_WINDOW_MS").pipe(Config.withDefault(5000)),
+  /**
+   * Supabase Realtime base URL (ADR-0024). The tenant is resolved from the
+   * Host's first label, so locally this must be realtime-dev.localhost, not
+   * bare localhost.
+   */
+  realtimeUrl: Config.string("REALTIME_URL").pipe(
+    Config.withDefault("http://realtime-dev.localhost:4000"),
+  ),
+  /**
+   * HS256 secret the publish/subscribe JWTs are signed with (ADR-0024). Must
+   * equal the realtime container's API_JWT_SECRET. No default: like
+   * SESSION_SECRET, a missing value fails boot.
+   */
+  realtimeJwtSecret: Config.redacted("REALTIME_JWT_SECRET"),
+  /**
+   * HMAC secret channel-topic capabilities are derived from (ADR-0023).
+   * Deterministic derivation keeps topics stable across restarts without
+   * persistence; rotating this severs every live subscription.
+   */
+  topicSecret: Config.redacted("TOPIC_SECRET"),
 })
 
 export type AppConfig = typeof AppConfig extends Config.Config<infer A> ? A : never
