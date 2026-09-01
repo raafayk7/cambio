@@ -14,8 +14,17 @@
  *     must not exist in the payload at all — not hidden, not present-but-
  *     unrendered, not sent-then-filtered client-side (§5).
  *
- * Contracts so far: the health check (Task 1) and the temporary-user auth
- * shapes (CAM-4). Commands and events arrive with the rules engine.
+ * Contracts so far: the health check (Task 1), the temporary-user auth
+ * shapes (CAM-4), and the game wire language (CAM-6) — commands, the
+ * room/per-player event split, the viewFor snapshot, channel grants,
+ * reply envelopes, and the error body.
  */
+export * from "./Channel.js"
+export * from "./Error.js"
+export * from "./GameCommand.js"
+export * from "./GameEvents.js"
+export * from "./GamePrimitives.js"
+export * from "./GameView.js"
 export * from "./Health.js"
+export * from "./Responses.js"
 export * from "./User.js"
