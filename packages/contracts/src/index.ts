@@ -14,7 +14,8 @@
  *     must not exist in the payload at all — not hidden, not present-but-
  *     unrendered, not sent-then-filtered client-side (§5).
  *
- * Task 1 is scaffolding only, so the only contract here is the health check.
- * Commands and events arrive with the rules engine.
+ * Contracts so far: the health check (Task 1) and the temporary-user auth
+ * shapes (CAM-4). Commands and events arrive with the rules engine.
  */
 export * from "./Health.js"
+export * from "./User.js"
