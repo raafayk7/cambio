@@ -235,3 +235,55 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 _(filled at the end, typically by `/review`: what shipped, what was cut,
 what should carry into the next task.)_
+
+**Review verdict (2026-09-01): fix-then-ship.** Every behavioral clause
+(C1.1–C4.2) is satisfied and genuinely pinned — the contract reviewer opened
+every mapped test body and confirmed each "What is asserted" phrase matches
+real assertions (including the two easiest to fake: C2.4's
+repository-untouched flag and C1.3's row-count check). Architecture review:
+boundaries, port placement, untrusted-input decoding, typed errors,
+soft-delete containment, runtime singularity, and secret handling all clean;
+implementation matches ADR-0017 and ADR-0018. Independent verification:
+uncached full gate green (22 tasks), all four sweeps print nothing, 58
+tests green (application 12, api 46).
+
+**Findings (ranked):**
+
+1. **C5.1 enforcement overclaim (must fix before ship — docs + follow-up).**
+   The clause claims "enforced by the existing lint boundaries; the gate
+   passing is the check" — **false**. `eslint-plugin-boundaries` classifies
+   Node builtins as origin `"core"`, not `"external"`, so the
+   `packages/config/eslint.base.js` effect-only policy never matches them:
+   a probe `import { randomUUID } from "node:crypto"` in
+   `packages/application/src/` lints clean (verified twice, independently).
+   The _code_ satisfies C5.1; the enforcement does not exist — only the
+   child plan's manual greps, which are not CI. This is a latent CAM-11 gap
+   (ADR-0017 presumed builtins count as external), surfaced by this review.
+   Fix: reword C5.1 + the coverage row honestly; close the lint gap in a
+   follow-up task against `packages/config` (an `origin: "core"` policy or
+   `no-restricted-imports`), not in CAM-4.
+2. **No `setErrorHandler` (medium).** Defects that escape the typed channel
+   (`Effect.either` catches typed errors only — e.g. an `encodeSync`
+   ParseError) fall through to Fastify's default handler, whose
+   `{statusCode, error, message}` body is unreviewed output. No plausible
+   secret in those messages today; the invariant, not a live leak.
+3. **`POST /users` hardcodes 500 (medium, convention).**
+   `users.ts` bypasses `errors.ts`; honest today (channel is
+   `StorageError`-only) but loses the exhaustiveness guarantee the moment
+   CAM-5 widens the union.
+4. **Advisories:** C4.2's wording is self-contradictory (unconditional
+   attributes are necessarily literals in the cookie helper — graded
+   satisfied under the only coherent reading; tighten wording); C3.1's
+   "every authenticated request" is structural with one protected route
+   (becomes load-bearing in CAM-5); `SessionPayload` is signed-not-encrypted
+   and should say so; consider redacting `res.headers["set-cookie"]` in
+   pino before any response-header serializer lands; `SessionResult` lives
+   in `CreateTemporaryUser.ts` (relocate when a third session use case
+   lands); three contract decode/encode helpers are unexercised;
+   `SameSite=none` without `Secure=true` is configurable but
+   browser-rejected (guard later); the dead defensive 401 branch in `/me`
+   is deliberate (child-plan decision 5).
+
+**Carry into next tasks:** the lint-gap follow-up (finding 1); findings 2–3
+are small presentation hardening items suitable for the CAM-4 fix cycle or
+CAM-5's route work.
