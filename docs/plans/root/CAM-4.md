@@ -227,7 +227,10 @@ skill's bar.)_
   now owns everything that escapes the typed channel — client-fault status
   codes (4xx) from the framework are preserved, bodies are curated via
   `unhandledErrorResponse`, the error is logged server-side, and Fastify's
-  default `{ message: err.message }` body can no longer reach a client.
+  default `{ message: err.message }` body no longer reaches clients on any
+  matched route. (Unmatched routes still get Fastify's default 404 body,
+  which echoes only the caller's own method/URL — `setNotFoundHandler` is
+  CAM-5 material.)
   `POST /users` routes its failure through `sessionErrorStatus` instead of
   a literal 500, restoring the compile-time exhaustiveness guarantee.
 
@@ -302,3 +305,18 @@ tests green (application 12, api 46).
 **Carry into next tasks:** the lint-gap follow-up (finding 1); findings 2–3
 are small presentation hardening items suitable for the CAM-4 fix cycle or
 CAM-5's route work.
+
+**Re-review (2026-09-01, after the fix cycle): ship.** Findings 2 and 3
+verified resolved (`setErrorHandler` registered on the root instance before
+all plugins/routes, `unknown`-safe narrowing with no throw path, curated
+constant bodies, malformed-JSON test pins the path; `POST /users` routes
+through `sessionErrorStatus` with the compile-time guarantee real via both
+the exhaustive switch and call-site assignability). Finding 1's doc rewrites
+verified accurate — the re-reviewer independently confirmed no
+`origin: "core"` policy exists in `eslint.base.js` — and caught one stale
+M2-checkpoint sentence still claiming lint-as-teeth, now corrected, along
+with softened wording for the 404 path (unmatched routes keep Fastify's
+default not-found body, which echoes only the caller's own method/URL;
+`setNotFoundHandler` deferred to CAM-5). Final state: uncached gate green
+(22 tasks), 59 tests (application 12, api 47). The lint-gap follow-up task
+remains open by design and is the only deferred item.
