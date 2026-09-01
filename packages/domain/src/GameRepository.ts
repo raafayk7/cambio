@@ -2,6 +2,7 @@ import { Context, Data, type Effect } from "effect"
 import { type GameEvent } from "./GameEvent.js"
 import { type GameState } from "./GameState.js"
 import { type GameId, type GameVersion, type Timestamp } from "./Ids.js"
+import { type Lobby } from "./Lobby.js"
 
 /**
  * The aggregate repository port (ADR-0015): the game — `games`,
@@ -29,6 +30,18 @@ export class StorageError extends Data.TaggedError("StorageError")<{
   readonly operation: string
   readonly cause: unknown
 }> {}
+
+export interface SaveLobbyInput {
+  readonly gameId: GameId
+  /**
+   * The lobby to persist. `status: "started"` is never a valid input here —
+   * that transition is `save` with the `GameStarted` batch (ADR-0019); the
+   * adapter treats it as a defect, not a typed outcome.
+   */
+  readonly lobby: Lobby
+  /** The version the caller loaded; `GameVersion 0` means first save (insert). */
+  readonly expectedVersion: GameVersion
+}
 
 export interface SaveGameInput {
   readonly gameId: GameId
@@ -58,5 +71,27 @@ export class GameRepository extends Context.Tag("@cambio/domain/GameRepository")
     readonly getEvents: (
       gameId: GameId,
     ) => Effect.Effect<ReadonlyArray<GameEvent>, GameNotFound | StorageError>
+    /**
+     * Persist a lobby (ADR-0019): rows are the lobby's authority — the event
+     * log never contains lobby history, so this writes `games`
+     * (`status 'lobby'`/`'abandoned'`) + `game_players` only, under the same
+     * `games.version` guard as `save`. Membership rows mirror `lobby.members`
+     * (join order = `seat_index`, compacted; absentees soft-deleted).
+     */
+    readonly saveLobby: (
+      input: SaveLobbyInput,
+    ) => Effect.Effect<GameVersion, VersionConflict | StorageError>
+    /**
+     * Load a lobby from rows. An `in_progress`/`completed` row projects to
+     * `status: "started"` (members in seat order) so pre-game transitions can
+     * refuse it as a pure domain decision; a never-dealt row is invisible to
+     * `load`/`getEvents` (those fail `GameNotFound` — a lobby is not a game).
+     */
+    readonly loadLobby: (
+      gameId: GameId,
+    ) => Effect.Effect<
+      { readonly lobby: Lobby; readonly version: GameVersion },
+      GameNotFound | StorageError
+    >
   }
 >() {}
