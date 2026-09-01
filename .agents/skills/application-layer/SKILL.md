@@ -24,12 +24,16 @@ export const drawCard = (input: DrawCardInput) =>
     const clock = yield* ClockPort // port from application
     const state = yield* games.load(input.gameId)
     const now = yield* clock.now
-    // pure domain decision — Either lifted into the Effect error channel
-    const [next, events] = yield* engine.apply(state, command(input, now))
+    // pure domain decision — the Either yields straight into Effect.gen
+    const [next, events] = yield* applyCommand(state, command, now)
     yield* games.save(next, events) // persist state + append events
     yield* publishEvents(events) // realtime, via publisher port
   })
 ```
+
+(The engine's real entry points are the free functions
+`applyCommand(state, command, now)` and `dealGame(players, seed, config,
+now)`, both returning `Either` — there is no `engine` namespace object.)
 
 Requirements the shape must satisfy:
 
@@ -86,9 +90,11 @@ Consequences for use case authors:
   closed" from `ClockPort`. A live fiber may push the close event early as an
   optimization, but correctness never depends on it — the Render free tier
   spins down and fires no timers while asleep.
-- Rooms must be **reconstructible**: in-memory room state is a fold of
-  `game_events` from seq 0. Never keep authoritative state that exists only
-  in memory.
+- Rooms must be **reconstructible**: never keep authoritative state that
+  exists only in memory. As built (ADR-0014/0020), the actor rebuilds by
+  loading the persisted state row — itself a materialized fold of
+  `game_events` — and folding from seq 0 is the recovery mechanism behind
+  that row, not something the actor calls per restart.
 
 ## Testing
 
