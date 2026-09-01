@@ -15,7 +15,7 @@ packages nor `effect`.
 `eslint-plugin-boundaries`'s `boundaries/dependencies` rule evaluates its
 `policies` array with **last-write-wins** semantics (confirmed in
 `Dependencies.js`): the last policy object that matches determines the
-outcome, and `disallow` beats `allow` *within* a single policy but not
+outcome, and `disallow` beats `allow` _within_ a single policy but not
 across policies. Critically, ESLint's flat-config merge behavior means that
 if two config blocks both declare `boundaries/dependencies` for overlapping
 `files` globs, the **second block's rule options fully replace the
@@ -37,7 +37,7 @@ combined `src/**+test/**` block:
 - `files: ["src/**/*.{ts,tsx}"]` — carries the full policy set: the
   existing workspace-deny policy, plus two new ordered policies (`disallow`
   all `external` origin sources except `@cambio/**`, then `allow` `external`
-  source `effect` — order matters, since the allow must come *after* the
+  source `effect` — order matters, since the allow must come _after_ the
   disallow to win under last-write-wins).
 - `files: ["test/**/*.{ts,tsx}"]` — carries only the existing workspace-deny
   policy, unchanged.
