@@ -200,4 +200,20 @@ describe("temporary-user auth over HTTP (CAM-4)", () => {
     expect(renewed.expiresAt).toBeGreaterThanOrEqual(before + TTL_MS)
     expect(renewed.expiresAt).toBeLessThanOrEqual(after + TTL_MS)
   })
+
+  it("errors that never reach a route get a curated body, not Fastify's default", async () => {
+    // Malformed JSON dies in the content-type parser, before the handler —
+    // exactly the path the setErrorHandler fallback owns.
+    const res = await app.inject({
+      method: "POST",
+      url: "/users",
+      headers: { "content-type": "application/json" },
+      payload: '{"name": not-json',
+    })
+    expect(res.statusCode).toBe(400)
+    expect(res.cookies).toHaveLength(0)
+    const body = res.json() as Record<string, unknown>
+    expect(body).toEqual({ error: "bad request" })
+    expect(body).not.toHaveProperty("message")
+  })
 })

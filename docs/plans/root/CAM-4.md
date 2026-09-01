@@ -43,9 +43,13 @@ that cookie against `GET /me` → the same user.
   test, and test infrastructure for `packages/application`. Each of those is
   a first; this plan establishes the pattern.
 - **Boundary constraints (ADR-0017):** `domain`, `contracts`, `application`
-  may import only `effect` — `node:crypto`, `fastify`, and `@fastify/cookie`
-  are lint errors there. All crypto and cookie handling therefore lives in
-  `apps/api` behind the `SessionSignerPort`.
+  may import only `effect`. The rule bans `node:crypto`, `fastify`, and
+  `@fastify/cookie` there; the ESLint boundaries enforce it for npm packages
+  (`fastify` et al.) but — discovered at review — **not for Node builtins**,
+  which `eslint-plugin-boundaries` classifies as origin `"core"` rather than
+  `"external"`. The builtin half is review-and-grep-enforced until the
+  follow-up lint task lands. Either way, all crypto and cookie handling
+  lives in `apps/api` behind the `SessionSignerPort`.
 
 ## Functional contract
 
@@ -101,8 +105,12 @@ carrying an HMAC-SHA256-signed payload of `{ userId, expiresAt }`.
   `packages/application` gains the `SessionSignerPort` interface, its typed
   session errors, and use cases that acquire time/ids/signing exclusively
   via ports (`ClockPort`, `IdGeneratorPort`, `SessionSignerPort`) — no
-  `Date.now()`, no `crypto`. Enforced by the existing lint boundaries; the
-  gate passing is the check.
+  `Date.now()`, no `crypto`. Enforcement is split: npm-package imports are
+  lint-enforced (gate); Node-builtin imports and `Date.now()` are **not**
+  lint-catchable today (builtins are origin `"core"` to the boundaries
+  plugin; `Date.now` is a global, not an import) — those halves are pinned
+  by the child plan's grep sweeps and review until the follow-up lint task
+  closes the builtin gap.
 - **C5.2** The wire shapes (create-user request, session-user response) live
   in `packages/contracts` with the `decodeX`/`encodeX` helper convention,
   importable by `apps/web` without touching `domain`.
@@ -215,6 +223,13 @@ skill's bar.)_
   / `SESSION_COOKIE_SECURE` / `SESSION_COOKIE_SAMESITE`; 401 bodies are
   plain `{ error }` literals with the status mapping centralized in
   `presentation/errors.ts` (exhaustive, `satisfies never`).
+- 2026-09-01 — Fix cycle (review findings 2–3): a global `setErrorHandler`
+  now owns everything that escapes the typed channel — client-fault status
+  codes (4xx) from the framework are preserved, bodies are curated via
+  `unhandledErrorResponse`, the error is logged server-side, and Fastify's
+  default `{ message: err.message }` body can no longer reach a client.
+  `POST /users` routes its failure through `sessionErrorStatus` instead of
+  a literal 500, restoring the compile-time exhaustiveness guarantee.
 
 ## Surprises & discoveries
 

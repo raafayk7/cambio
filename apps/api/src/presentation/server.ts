@@ -6,6 +6,7 @@ import type { Logger } from "pino"
 
 import type { AppConfig } from "../config.js"
 import type { AppServices } from "../runtime.js"
+import { unhandledErrorResponse } from "./errors.js"
 import { healthRoutes } from "./health.js"
 import { usersRoutes } from "./users.js"
 
@@ -27,6 +28,15 @@ export const buildServer = async (options: {
   const loggerInstance: FastifyBaseLogger = options.logger
 
   const app = Fastify({ loggerInstance })
+
+  // Every error that escapes a route lands here: log it server-side, send a
+  // curated body. Without this, defects fall through to Fastify's default
+  // handler, whose `{ message: err.message }` body is unreviewed output.
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error({ err: error }, "unhandled route error")
+    const { status, body } = unhandledErrorResponse(error.statusCode)
+    return reply.code(status).send(body)
+  })
 
   await app.register(cors, {
     origin: options.config.webOrigin,

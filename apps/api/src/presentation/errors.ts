@@ -39,3 +39,18 @@ export const errorBody = (status: 400 | 401 | 500) => {
       return { error: "internal error" }
   }
 }
+
+/**
+ * Fallback for anything that never reached the typed channel: defects
+ * escaping `Effect.either`, and framework errors (malformed JSON, oversized
+ * payloads). Fastify's client-fault status codes are kept; the body is
+ * curated here — the default handler's `{ message: err.message }` is
+ * unreviewed output and must never reach a client (hidden-information
+ * posture).
+ */
+export const unhandledErrorResponse = (statusCode: number | undefined) => {
+  const clientFault = statusCode !== undefined && statusCode >= 400 && statusCode < 500
+  return clientFault
+    ? { status: statusCode, body: { error: "bad request" } }
+    : { status: 500, body: errorBody(500) }
+}

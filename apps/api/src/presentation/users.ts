@@ -6,7 +6,7 @@ import type { FastifyInstance } from "fastify"
 import type { AppConfig } from "../config.js"
 import type { AppServices } from "../runtime.js"
 import { makeRequireSession, setSessionCookie } from "./auth.js"
-import { errorBody } from "./errors.js"
+import { errorBody, sessionErrorStatus } from "./errors.js"
 
 /**
  * `POST /users` — create a temporary user and issue the session (C1.*).
@@ -31,7 +31,12 @@ export const usersRoutes =
         Effect.either(createTemporaryUser({ name: body.right.name, ttlMillis })),
       )
       if (Either.isLeft(result)) {
-        return reply.code(500).send(errorBody(500))
+        // Through the central mapping, not a literal: if this use case's
+        // error union widens in CAM-5+, `sessionErrorStatus`'s exhaustive
+        // switch (or this call's type) breaks the build instead of
+        // silently 500ing.
+        const status = sessionErrorStatus(result.left)
+        return reply.code(status).send(errorBody(status))
       }
       setSessionCookie(reply, result.right.token, config)
       return reply.code(201).send(
