@@ -43,9 +43,13 @@ that cookie against `GET /me` → the same user.
   test, and test infrastructure for `packages/application`. Each of those is
   a first; this plan establishes the pattern.
 - **Boundary constraints (ADR-0017):** `domain`, `contracts`, `application`
-  may import only `effect` — `node:crypto`, `fastify`, and `@fastify/cookie`
-  are lint errors there. All crypto and cookie handling therefore lives in
-  `apps/api` behind the `SessionSignerPort`.
+  may import only `effect`. The rule bans `node:crypto`, `fastify`, and
+  `@fastify/cookie` there; the ESLint boundaries enforce it for npm packages
+  (`fastify` et al.) but — discovered at review — **not for Node builtins**,
+  which `eslint-plugin-boundaries` classifies as origin `"core"` rather than
+  `"external"`. The builtin half is review-and-grep-enforced until the
+  follow-up lint task lands. Either way, all crypto and cookie handling
+  lives in `apps/api` behind the `SessionSignerPort`.
 
 ## Functional contract
 
@@ -101,22 +105,26 @@ carrying an HMAC-SHA256-signed payload of `{ userId, expiresAt }`.
   `packages/application` gains the `SessionSignerPort` interface, its typed
   session errors, and use cases that acquire time/ids/signing exclusively
   via ports (`ClockPort`, `IdGeneratorPort`, `SessionSignerPort`) — no
-  `Date.now()`, no `crypto`. Enforced by the existing lint boundaries; the
-  gate passing is the check.
+  `Date.now()`, no `crypto`. Enforcement is split: npm-package imports are
+  lint-enforced (gate); Node-builtin imports and `Date.now()` are **not**
+  lint-catchable today (builtins are origin `"core"` to the boundaries
+  plugin; `Date.now` is a global, not an import) — those halves are pinned
+  by the child plan's grep sweeps and review until the follow-up lint task
+  closes the builtin gap.
 - **C5.2** The wire shapes (create-user request, session-user response) live
   in `packages/contracts` with the `decodeX`/`encodeX` helper convention,
   importable by `apps/web` without touching `domain`.
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes.
-- [ ] The Purpose section's curl sequence works against `pnpm dev` (201 +
+- [x] `pnpm turbo build typecheck lint test` passes.
+- [x] The Purpose section's curl sequence works against `pnpm dev` (201 +
       cookie, then 200 `/me` with the same user).
-- [ ] ADR-0018 exists, is indexed in `docs/adr/README.md`, and the
+- [x] ADR-0018 exists, is indexed in `docs/adr/README.md`, and the
       implementation matches it.
-- [ ] `packages/application` has a `test` script wired into `turbo test`,
+- [x] `packages/application` has a `test` script wired into `turbo test`,
       with use-case tests running on stub layers.
-- [ ] `.env.example` and `turbo.json` (`globalPassThroughEnv`) cover every
+- [x] `.env.example` and `turbo.json` (`globalPassThroughEnv`) cover every
       new variable; a fresh clone with `.env` copied from the example boots.
 
 ## Plan of work
@@ -169,6 +177,13 @@ timestamp each entry)_
 
 - [x] 2026-09-01 — Planning: §9.5 resolved with Raafay (two interview
       rounds), ADR-0018 written, exploration report gathered, plans drafted.
+- [x] 2026-09-01 12:10 — Implementation complete, M1–M5 in order (detail in
+      the [backend child plan](../backend/CAM-4.md) Progress). Full gate
+      green (22 turbo tasks); manual curl matrix and the SESSION_SECRET
+      boot-failure check verified against a live server. Test counts:
+      application 12 (new), api 46 (28 CAM-3 + 18 new: Config 4,
+      SessionSigner 4, Auth HTTP matrix 10). All acceptance criteria
+      checked off above.
 
 ## Decision log
 
@@ -196,6 +211,28 @@ skill's bar.)_
 - 2026-09-01 — DECISIONS.md's "still open" §9 list is left as-is (history;
   precedent: ADRs 0009–0012 didn't edit it either — the ADR index is the
   record).
+- 2026-09-01 — Implement-time detail decisions, confirmed as built (full
+  list: child plan "Decisions this plan makes"): expiry is checked in the
+  **use case**, not the signer (signer proves authenticity + shape only,
+  stays clock-free); TTL reaches use cases as a plain `ttlMillis` input
+  from presentation — no config port; auth is a **per-route opt-in
+  `preHandler`** (`makeRequireSession`), not a global hook; the renewal
+  Set-Cookie happens inside that preHandler; contracts got **no test
+  infrastructure** (the name rule is pinned by the HTTP 400-matrix); cookie
+  name `cambio_session`, env names `SESSION_SECRET` / `SESSION_TTL_SECONDS`
+  / `SESSION_COOKIE_SECURE` / `SESSION_COOKIE_SAMESITE`; 401 bodies are
+  plain `{ error }` literals with the status mapping centralized in
+  `presentation/errors.ts` (exhaustive, `satisfies never`).
+- 2026-09-01 — Fix cycle (review findings 2–3): a global `setErrorHandler`
+  now owns everything that escapes the typed channel — client-fault status
+  codes (4xx) from the framework are preserved, bodies are curated via
+  `unhandledErrorResponse`, the error is logged server-side, and Fastify's
+  default `{ message: err.message }` body no longer reaches clients on any
+  matched route. (Unmatched routes still get Fastify's default 404 body,
+  which echoes only the caller's own method/URL — `setNotFoundHandler` is
+  CAM-5 material.)
+  `POST /users` routes its failure through `sessionErrorStatus` instead of
+  a literal 500, restoring the compile-time exhaustiveness guarantee.
 
 ## Surprises & discoveries
 
@@ -206,8 +243,80 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
   port (3100, per AGENTS.md and `.env`). Harmless until credentialed CORS +
   cookies; if the browser drops the cookie during manual testing, check
   `WEB_ORIGIN` first.
+- Implementation went to plan; no functional surprises. Two documentation
+  corrections logged in the child plan: the `node:crypto` sweep now greps
+  for imports (the port's own doc comments legitimately mention the module),
+  and `makeTestApp` returns `{ app, runtime, config }` (config included so
+  suites can assert against the TTL they configured).
 
 ## Outcomes & retrospective
 
 _(filled at the end, typically by `/review`: what shipped, what was cut,
 what should carry into the next task.)_
+
+**Review verdict (2026-09-01): fix-then-ship.** Every behavioral clause
+(C1.1–C4.2) is satisfied and genuinely pinned — the contract reviewer opened
+every mapped test body and confirmed each "What is asserted" phrase matches
+real assertions (including the two easiest to fake: C2.4's
+repository-untouched flag and C1.3's row-count check). Architecture review:
+boundaries, port placement, untrusted-input decoding, typed errors,
+soft-delete containment, runtime singularity, and secret handling all clean;
+implementation matches ADR-0017 and ADR-0018. Independent verification:
+uncached full gate green (22 tasks), all four sweeps print nothing, 58
+tests green (application 12, api 46).
+
+**Findings (ranked):**
+
+1. **C5.1 enforcement overclaim (must fix before ship — docs + follow-up).**
+   The clause claims "enforced by the existing lint boundaries; the gate
+   passing is the check" — **false**. `eslint-plugin-boundaries` classifies
+   Node builtins as origin `"core"`, not `"external"`, so the
+   `packages/config/eslint.base.js` effect-only policy never matches them:
+   a probe `import { randomUUID } from "node:crypto"` in
+   `packages/application/src/` lints clean (verified twice, independently).
+   The _code_ satisfies C5.1; the enforcement does not exist — only the
+   child plan's manual greps, which are not CI. This is a latent CAM-11 gap
+   (ADR-0017 presumed builtins count as external), surfaced by this review.
+   Fix: reword C5.1 + the coverage row honestly; close the lint gap in a
+   follow-up task against `packages/config` (an `origin: "core"` policy or
+   `no-restricted-imports`), not in CAM-4.
+2. **No `setErrorHandler` (medium).** Defects that escape the typed channel
+   (`Effect.either` catches typed errors only — e.g. an `encodeSync`
+   ParseError) fall through to Fastify's default handler, whose
+   `{statusCode, error, message}` body is unreviewed output. No plausible
+   secret in those messages today; the invariant, not a live leak.
+3. **`POST /users` hardcodes 500 (medium, convention).**
+   `users.ts` bypasses `errors.ts`; honest today (channel is
+   `StorageError`-only) but loses the exhaustiveness guarantee the moment
+   CAM-5 widens the union.
+4. **Advisories:** C4.2's wording is self-contradictory (unconditional
+   attributes are necessarily literals in the cookie helper — graded
+   satisfied under the only coherent reading; tighten wording); C3.1's
+   "every authenticated request" is structural with one protected route
+   (becomes load-bearing in CAM-5); `SessionPayload` is signed-not-encrypted
+   and should say so; consider redacting `res.headers["set-cookie"]` in
+   pino before any response-header serializer lands; `SessionResult` lives
+   in `CreateTemporaryUser.ts` (relocate when a third session use case
+   lands); three contract decode/encode helpers are unexercised;
+   `SameSite=none` without `Secure=true` is configurable but
+   browser-rejected (guard later); the dead defensive 401 branch in `/me`
+   is deliberate (child-plan decision 5).
+
+**Carry into next tasks:** the lint-gap follow-up (finding 1); findings 2–3
+are small presentation hardening items suitable for the CAM-4 fix cycle or
+CAM-5's route work.
+
+**Re-review (2026-09-01, after the fix cycle): ship.** Findings 2 and 3
+verified resolved (`setErrorHandler` registered on the root instance before
+all plugins/routes, `unknown`-safe narrowing with no throw path, curated
+constant bodies, malformed-JSON test pins the path; `POST /users` routes
+through `sessionErrorStatus` with the compile-time guarantee real via both
+the exhaustive switch and call-site assignability). Finding 1's doc rewrites
+verified accurate — the re-reviewer independently confirmed no
+`origin: "core"` policy exists in `eslint.base.js` — and caught one stale
+M2-checkpoint sentence still claiming lint-as-teeth, now corrected, along
+with softened wording for the 404 path (unmatched routes keep Fastify's
+default not-found body, which echoes only the caller's own method/URL;
+`setNotFoundHandler` deferred to CAM-5). Final state: uncached gate green
+(22 tasks), 59 tests (application 12, api 47). The lint-gap follow-up task
+remains open by design and is the only deferred item.

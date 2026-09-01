@@ -17,10 +17,11 @@
     "@cambio/contracts": "workspace:*",
     "@cambio/domain": "workspace:*",
     "@effect/platform": "0.97.1",
-    "@fastify/cors": "11.3.0",
     "@effect/platform-node": "0.108.1",
     "@effect/sql": "0.52.1",
     "@effect/sql-pg": "0.53.0",
+    "@fastify/cookie": "11.1.2",
+    "@fastify/cors": "11.3.0",
     "effect": "3.22.1",
     "fastify": "5.11.2",
     "pino": "10.3.1"
