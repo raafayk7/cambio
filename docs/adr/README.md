@@ -28,3 +28,4 @@ the point.
 | [0014](0014-self-contained-event-log-fold-transcribes.md)     | Shuffle events record resulting PrngState; the fold transcribes          | proposed | 2026-08-31 | CAM-3 |
 | [0015](0015-aggregate-game-repository-port.md)                | Aggregate GameRepository: state + events in one transaction              | proposed | 2026-08-31 | CAM-3 |
 | [0016](0016-domain-testing-export-subpath.md)                 | Simulation harness ships from domain via "./testing" subpath             | proposed | 2026-08-31 | CAM-3 |
+| [0017](0017-effect-only-external-imports-split-src-test-blocks.md) | Effect-only external imports via ordered boundaries/dependencies, split src/test blocks | proposed | 2026-09-01 | CAM-11 |
