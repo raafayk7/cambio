@@ -53,6 +53,14 @@ reporting it — read the code; drop anything that doesn't hold up. Rank:
 contract violations and hidden-information leaks first, then architecture
 violations, then deviations-not-logged, then advisory notes.
 
+When a finding is "a document claims X falsely", report the **claim**, not
+the citation: grep every plan doc and ADR the task touches for all
+phrasings of X and list each instance in the finding. A later fix cycle
+fixes cited lines and misses the rest (CAM-4's fix cycle missed a fourth
+instance of a three-instance finding); whoever fixes it must re-run the
+same sweep before closing, and a re-review verifies the sweep, not the
+spot-fix.
+
 Write the results into the root plan's **Outcomes & Retrospective** section
 (what passed, findings, anything deferred). Post a Linear comment on
 $ARGUMENTS with the verdict; if the verdict is ship, move the issue to

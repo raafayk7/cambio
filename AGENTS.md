@@ -116,6 +116,12 @@ The `lint` task also runs a repo-wide `prettier --check` (a root turbo
 task) — formatting is enforced, not aspirational. `pnpm format` fixes
 violations.
 
+**Never pipe the gate.** `pnpm turbo … | tail` (or any pipe) replaces the
+gate's exit code with the filter's, and a broken build has been committed
+that way. Run the gate bare and check its exit status directly; if output
+must be filtered, `set -o pipefail` first. This applies to every scripted
+invocation — commit gates, CI steps, agent tool calls.
+
 Environment lives in `.env` at the repo root (copy from `.env.example`). Tests
 are vitest + `@effect/vitest`; domain work is test-first (HANDOFF §12).
 
