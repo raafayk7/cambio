@@ -61,6 +61,12 @@ instance of a three-instance finding); whoever fixes it must re-run the
 same sweep before closing, and a re-review verifies the sweep, not the
 spot-fix.
 
+**Skill staleness sweep:** if any finding revealed a skill or command
+stating something the code now contradicts, fix that sentence in this
+cycle's scope or file a harness issue for it — a flagged-but-unowned stale
+skill is a finding without a fix, and skills are the docs every future
+session trusts blindly.
+
 Write the results into the root plan's **Outcomes & Retrospective** section
 (what passed, findings, anything deferred). Post a Linear comment on
 $ARGUMENTS with the verdict; if the verdict is ship, move the issue to

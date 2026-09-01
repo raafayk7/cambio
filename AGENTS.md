@@ -120,7 +120,10 @@ violations.
 gate's exit code with the filter's, and a broken build has been committed
 that way. Run the gate bare and check its exit status directly; if output
 must be filtered, `set -o pipefail` first. This applies to every scripted
-invocation — commit gates, CI steps, agent tool calls.
+invocation — commit gates, CI steps, agent tool calls. It is also
+mechanically enforced: a PreToolUse hook
+(`.agents/hooks/block-piped-gate.sh`, wired via `.claude/settings.json`)
+denies Bash commands that pipe a gate invocation without `pipefail`.
 
 Environment lives in `.env` at the repo root (copy from `.env.example`). Tests
 are vitest + `@effect/vitest`; domain work is test-first (HANDOFF §12).

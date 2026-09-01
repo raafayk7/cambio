@@ -69,7 +69,13 @@ instead. If the task contradicts an existing ADR, surface that now.
 - **Root plan** — `docs/plans/root/$ARGUMENTS.md` from
   `.agents/templates/root-plan.md`. You write this one yourself; the
   Functional Contract section is the task's spec and must be testable
-  statements, not vibes. Sequence the Plan of Work so `contracts` schemas
+  statements, not vibes. **Probe-verify rule claims:** any contract clause
+  asserting engine or existing-system behavior must be reproduced against
+  the running code (or cite the test that already pins it) before it is
+  written down — memory and priors are not sources. (Same discipline as the
+  architecture skill's enforcement-claim rule; CAM-5's review found a
+  contract clause encoding a wrong slam-race prior while the engine sat
+  there, runnable.) Sequence the Plan of Work so `contracts` schemas
   freeze before any parallel frontend/backend work.
 - **Child plans** — `docs/plans/backend/$ARGUMENTS.md` and/or
   `docs/plans/frontend/$ARGUMENTS.md` from
