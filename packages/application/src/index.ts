@@ -15,6 +15,9 @@
  * per-room actor registry (ADR-0019/0020).
  */
 export * from "./ports/Clock.js"
+export * from "./projection/CommandMapping.js"
+export * from "./projection/EventProjection.js"
+export * from "./projection/ViewFor.js"
 export * from "./ports/IdGenerator.js"
 export * from "./ports/RealtimePublisher.js"
 export * from "./ports/Seed.js"
