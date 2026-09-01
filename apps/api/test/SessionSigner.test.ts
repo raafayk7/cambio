@@ -38,8 +38,7 @@ describe("session signer adapter (ADR-0018)", () => {
   it("a tampered payload half is rejected (C2.3)", async () => {
     const token = await Effect.runPromise(signerA.sign(PAYLOAD))
     const [payloadPart, mac] = token.split(".")
-    const flipped =
-      payloadPart!.slice(0, -1) + (payloadPart!.endsWith("A") ? "B" : "A")
+    const flipped = payloadPart!.slice(0, -1) + (payloadPart!.endsWith("A") ? "B" : "A")
     const result = await verifyEither(signerA, `${flipped}.${mac}`)
     expect(Either.isLeft(result)).toBe(true)
     if (Either.isLeft(result)) expect(result.left._tag).toBe("SessionInvalid")
@@ -54,9 +53,7 @@ describe("session signer adapter (ADR-0018)", () => {
 
   it("structurally hopeless tokens fail as SessionInvalid, never throw", async () => {
     const nonJson = Buffer.from("not json at all").toString("base64url")
-    const wrongShape = Buffer.from(JSON.stringify({ hello: "world" })).toString(
-      "base64url",
-    )
+    const wrongShape = Buffer.from(JSON.stringify({ hello: "world" })).toString("base64url")
     const cases = [
       "",
       "no-dot",

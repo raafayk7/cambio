@@ -109,14 +109,14 @@ carrying an HMAC-SHA256-signed payload of `{ userId, expiresAt }`.
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes.
-- [ ] The Purpose section's curl sequence works against `pnpm dev` (201 +
+- [x] `pnpm turbo build typecheck lint test` passes.
+- [x] The Purpose section's curl sequence works against `pnpm dev` (201 +
       cookie, then 200 `/me` with the same user).
-- [ ] ADR-0018 exists, is indexed in `docs/adr/README.md`, and the
+- [x] ADR-0018 exists, is indexed in `docs/adr/README.md`, and the
       implementation matches it.
-- [ ] `packages/application` has a `test` script wired into `turbo test`,
+- [x] `packages/application` has a `test` script wired into `turbo test`,
       with use-case tests running on stub layers.
-- [ ] `.env.example` and `turbo.json` (`globalPassThroughEnv`) cover every
+- [x] `.env.example` and `turbo.json` (`globalPassThroughEnv`) cover every
       new variable; a fresh clone with `.env` copied from the example boots.
 
 ## Plan of work
@@ -169,6 +169,13 @@ timestamp each entry)_
 
 - [x] 2026-09-01 — Planning: §9.5 resolved with Raafay (two interview
       rounds), ADR-0018 written, exploration report gathered, plans drafted.
+- [x] 2026-09-01 12:10 — Implementation complete, M1–M5 in order (detail in
+      the [backend child plan](../backend/CAM-4.md) Progress). Full gate
+      green (22 turbo tasks); manual curl matrix and the SESSION_SECRET
+      boot-failure check verified against a live server. Test counts:
+      application 12 (new), api 46 (28 CAM-3 + 18 new: Config 4,
+      SessionSigner 4, Auth HTTP matrix 10). All acceptance criteria
+      checked off above.
 
 ## Decision log
 
@@ -196,6 +203,18 @@ skill's bar.)_
 - 2026-09-01 — DECISIONS.md's "still open" §9 list is left as-is (history;
   precedent: ADRs 0009–0012 didn't edit it either — the ADR index is the
   record).
+- 2026-09-01 — Implement-time detail decisions, confirmed as built (full
+  list: child plan "Decisions this plan makes"): expiry is checked in the
+  **use case**, not the signer (signer proves authenticity + shape only,
+  stays clock-free); TTL reaches use cases as a plain `ttlMillis` input
+  from presentation — no config port; auth is a **per-route opt-in
+  `preHandler`** (`makeRequireSession`), not a global hook; the renewal
+  Set-Cookie happens inside that preHandler; contracts got **no test
+  infrastructure** (the name rule is pinned by the HTTP 400-matrix); cookie
+  name `cambio_session`, env names `SESSION_SECRET` / `SESSION_TTL_SECONDS`
+  / `SESSION_COOKIE_SECURE` / `SESSION_COOKIE_SAMESITE`; 401 bodies are
+  plain `{ error }` literals with the status mapping centralized in
+  `presentation/errors.ts` (exhaustive, `satisfies never`).
 
 ## Surprises & discoveries
 
@@ -206,6 +225,11 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
   port (3100, per AGENTS.md and `.env`). Harmless until credentialed CORS +
   cookies; if the browser drops the cookie during manual testing, check
   `WEB_ORIGIN` first.
+- Implementation went to plan; no functional surprises. Two documentation
+  corrections logged in the child plan: the `node:crypto` sweep now greps
+  for imports (the port's own doc comments legitimately mention the module),
+  and `makeTestApp` returns `{ app, runtime, config }` (config included so
+  suites can assert against the TTL they configured).
 
 ## Outcomes & retrospective
 

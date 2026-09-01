@@ -65,9 +65,7 @@ describe("createTemporaryUser", () => {
         expect(result.expiresAt).toBe(NOW + TTL)
         expect(result.token).toBe(`tok:${MINTED}:${NOW + TTL}`)
       }),
-      Effect.provide(
-        Layer.mergeAll(clockStub, idsStub, signerStub, recordingRepo().layer),
-      ),
+      Effect.provide(Layer.mergeAll(clockStub, idsStub, signerStub, recordingRepo().layer)),
     ),
   )
 

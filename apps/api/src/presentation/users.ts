@@ -17,8 +17,7 @@ import { errorBody } from "./errors.js"
  * an exception (C1.3).
  */
 export const usersRoutes =
-  (runtime: Runtime.Runtime<AppServices>, config: AppConfig) =>
-  async (app: FastifyInstance) => {
+  (runtime: Runtime.Runtime<AppServices>, config: AppConfig) => async (app: FastifyInstance) => {
     const runPromise = Runtime.runPromise(runtime)
     const decodeBody = Schema.decodeUnknownEither(CreateUserRequest)
     const ttlMillis = config.sessionTtlSeconds * 1000
@@ -35,28 +34,22 @@ export const usersRoutes =
         return reply.code(500).send(errorBody(500))
       }
       setSessionCookie(reply, result.right.token, config)
-      return reply
-        .code(201)
-        .send(
-          encodeSessionUser({
-            userId: result.right.user.id,
-            name: result.right.user.name,
-          }),
-        )
+      return reply.code(201).send(
+        encodeSessionUser({
+          userId: result.right.user.id,
+          name: result.right.user.name,
+        }),
+      )
     })
 
-    app.get(
-      "/me",
-      { preHandler: makeRequireSession(runtime, config) },
-      async (request, reply) => {
-        // Defensive: the preHandler always sets this or short-circuits.
-        if (request.sessionUser === undefined) {
-          return reply.code(401).send(errorBody(401))
-        }
-        return encodeSessionUser({
-          userId: request.sessionUser.id,
-          name: request.sessionUser.name,
-        })
-      },
-    )
+    app.get("/me", { preHandler: makeRequireSession(runtime, config) }, async (request, reply) => {
+      // Defensive: the preHandler always sets this or short-circuits.
+      if (request.sessionUser === undefined) {
+        return reply.code(401).send(errorBody(401))
+      }
+      return encodeSessionUser({
+        userId: request.sessionUser.id,
+        name: request.sessionUser.name,
+      })
+    })
   }

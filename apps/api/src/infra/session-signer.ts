@@ -1,10 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
 
-import {
-  SessionInvalid,
-  SessionPayload,
-  SessionSignerPort,
-} from "@cambio/application"
+import { SessionInvalid, SessionPayload, SessionSignerPort } from "@cambio/application"
 import { Effect, Either, Layer, Redacted, Schema } from "effect"
 
 import { AppConfig } from "../config.js"
@@ -31,9 +27,7 @@ export const makeSessionSigner = (
   return {
     sign: (payload) =>
       Effect.sync(() => {
-        const part = Buffer.from(JSON.stringify(encodePayload(payload))).toString(
-          "base64url",
-        )
+        const part = Buffer.from(JSON.stringify(encodePayload(payload))).toString("base64url")
         return `${part}.${mac(key, part).toString("hex")}`
       }),
     verify: (token) =>
@@ -58,9 +52,7 @@ export const makeSessionSigner = (
           return new SessionInvalid()
         }
         const payload = decodePayload(parsed)
-        return Either.isRight(payload)
-          ? Effect.succeed(payload.right)
-          : new SessionInvalid()
+        return Either.isRight(payload) ? Effect.succeed(payload.right) : new SessionInvalid()
       }),
   }
 }

@@ -7,9 +7,7 @@ import { AppConfig } from "../src/config.js"
 const load = (entries: ReadonlyArray<readonly [string, string]>) =>
   Effect.runSync(
     Effect.either(
-      AppConfig.pipe(
-        Effect.withConfigProvider(ConfigProvider.fromMap(new Map(entries))),
-      ),
+      AppConfig.pipe(Effect.withConfigProvider(ConfigProvider.fromMap(new Map(entries)))),
     ),
   )
 
@@ -51,11 +49,7 @@ describe("AppConfig session entries (ADR-0018)", () => {
   })
 
   it("an unknown SameSite value is rejected, not passed through", () => {
-    const result = load([
-      DB,
-      ["SESSION_SECRET", "s3cret"],
-      ["SESSION_COOKIE_SAMESITE", "sideways"],
-    ])
+    const result = load([DB, ["SESSION_SECRET", "s3cret"], ["SESSION_COOKIE_SAMESITE", "sideways"]])
     expect(Either.isLeft(result)).toBe(true)
   })
 })

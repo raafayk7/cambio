@@ -1,12 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Either, Layer, Schema } from "effect"
-import {
-  StorageError,
-  Timestamp,
-  UserId,
-  UserNotFound,
-  UserRepository,
-} from "@cambio/domain"
+import { StorageError, Timestamp, UserId, UserNotFound, UserRepository } from "@cambio/domain"
 import { ClockPort } from "../src/ports/Clock.js"
 import {
   SessionInvalid,
@@ -30,10 +24,7 @@ const signerStub = (payload: SessionPayload | "invalid") =>
       payload === "invalid" ? Effect.fail(new SessionInvalid()) : Effect.succeed(payload),
   })
 
-const repoStub = (
-  findById: (typeof UserRepository.Service)["findById"],
-  onConsult?: () => void,
-) =>
+const repoStub = (findById: (typeof UserRepository.Service)["findById"], onConsult?: () => void) =>
   Layer.succeed(UserRepository, {
     create: () => Effect.die("create unused in this suite"),
     findById: (userId) => {
