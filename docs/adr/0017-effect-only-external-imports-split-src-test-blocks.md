@@ -135,7 +135,7 @@ Rejected:
   a devDependency, a `test` script wired into `pnpm turbo test`), asserting
   both gaps stay closed via `ESLint#lintText` against fixture imports.
 - **(CAM-12)** The effect-only-external policy pair per layer becomes a
-  policy *triple* (external disallow, external `effect` allow, core
+  policy _triple_ (external disallow, external `effect` allow, core
   disallow) — anyone touching these `src/**` blocks again must account for
   all three, not just the external pair, or a fourth silent gap of the same
   shape becomes possible. The regression suite gains a third "Gap" describe

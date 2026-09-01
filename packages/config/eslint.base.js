@@ -109,6 +109,18 @@ export function cambioConfig(options) {
   // disallow must come before the `effect` carve-out for the carve-out to
   // win. `!@cambio/**` excludes workspace packages so this pair doesn't
   // fight `workspacePolicies` above over the same import.
+  //
+  // Node builtins (`node:crypto`, or the bare form `crypto`) are a THIRD
+  // origin, `"core"` — distinct from `"external"` — that eslint-plugin-
+  // boundaries never matches against the pair above (ADR-0017 amendment,
+  // CAM-12). The `origin: "core"` disallow below omits `source` entirely:
+  // boundaries' selector matcher treats an absent key as "match anything",
+  // so this one policy catches every builtin, in either specifier form,
+  // via Node's own builtin-module list — no name enumeration to go stale.
+  // It has no `allow` counterpart: unlike `effect` among externals, no
+  // builtin is ever legitimate in these layers' `src/**`. Origins are
+  // mutually exclusive per import, so this never competes with the
+  // external pair above.
   const effectOnlyExternalPolicies = EFFECT_ONLY_EXTERNAL_LAYERS.includes(layer)
     ? [
         {
@@ -119,6 +131,11 @@ export function cambioConfig(options) {
         {
           from: { element: { type: layer } },
           allow: { to: { module: { origin: "external", source: EFFECT_ONLY_ALLOWED_EXTERNAL } } },
+        },
+        {
+          from: { element: { type: layer } },
+          disallow: { to: { module: { origin: "core" } } },
+          message: LAYER_RATIONALE[layer],
         },
       ]
     : []
