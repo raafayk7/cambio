@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Exit, Fiber, Layer, TestClock } from "effect"
+import { Cause, Effect, Exit, Fiber, Layer, TestClock } from "effect"
 import {
   applyCommand,
   type Command,
+  dealGame,
   decodeGameConfig,
   GameRepository,
   type GameId,
@@ -120,25 +121,58 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
   })
 
   it.effect(
-    "slam race: first-in-queue wins, deterministically, over 20 fresh rooms (clause 8)",
+    "slam race: serialized in enqueue order ≡ sequential A-then-B, deterministically, over 20 fresh rooms (clause 8)",
     () =>
       Effect.gen(function* () {
+        // Clause 8 as amended after review: the queue guarantees the race
+        // RESOLVES AS IF the two slams had been submitted sequentially in
+        // enqueue order — each reply and the final log are exactly what the
+        // engine gives A then B. (The engine may accept both: the window
+        // stays open and every failed slam costs a penalty — no "exactly
+        // one slam" prior.) So the expectation is computed PURE, from the
+        // engine itself, and the raced outcome must equal it.
+        const tagsOf = (events: ReadonlyArray<{ _tag: string }>) =>
+          events.map((e) => e._tag).join("+")
+        const expected = (() => {
+          const dealt = dealGame([uid(0), uid(1)], SEED, config, NOW)
+          if (dealt._tag === "Left") throw new Error("deal failed")
+          let state = dealt.right[0]
+          const log: Array<string> = dealt.right[1].map((e) => e._tag)
+          for (let i = 0; i < 60 && state.phase._tag !== "SlamWindow"; i++) {
+            const step = applyCommand(state, choose(state, NOW), NOW)
+            if (step._tag === "Left") throw new Error("pure drive hit an illegal command")
+            state = step.right[0]
+            log.push(...step.right[1].map((e) => e._tag))
+          }
+          const slams = legalCandidates(state, NOW).filter((c) => c._tag === "Slam")
+          const slamA = slams[0]!
+          // A genuine cross-player race when the engine offers one.
+          const slamB = slams.find((c) => c.playerId !== slamA.playerId) ?? slams[1] ?? slamA
+          const afterA = applyCommand(state, slamA, NOW)
+          const stateAfterA = afterA._tag === "Right" ? afterA.right[0] : state
+          const afterB = applyCommand(stateAfterA, slamB, NOW)
+          const tagOfPure = (r: typeof afterA): string =>
+            r._tag === "Right" ? `ok:${tagsOf(r.right[1])}` : `err:${r.left._tag}`
+          if (afterA._tag === "Right") log.push(...afterA.right[1].map((e) => e._tag))
+          if (afterB._tag === "Right") log.push(...afterB.right[1].map((e) => e._tag))
+          return {
+            slamA,
+            slamB,
+            triple: `${tagOfPure(afterA)} | ${tagOfPure(afterB)} | ${log.join(",")}`,
+          }
+        })()
+        expect(expected.slamB.playerId).not.toBe(expected.slamA.playerId) // cross-player race
+
         const outcomes: Array<string> = []
         for (let i = 0; i < 20; i++) {
           const h = makeHarness()
           const outcome = yield* Effect.gen(function* () {
             const registry = yield* RoomRegistry
-            const state = yield* driveToSlamWindow(gid(i))
-            const slams = legalCandidates(state, NOW).filter((c) => c._tag === "Slam")
-            expect(slams.length).toBeGreaterThan(0)
-            const slamA = slams[0]!
-            // A second racer: another legal slam if one exists, else the same
-            // command again — the classic double-submit race.
-            const slamB = slams[1] ?? slams[0]!
+            yield* driveToSlamWindow(gid(i))
 
-            const fiberA = yield* Effect.fork(registry.execute(gid(i), slamA))
+            const fiberA = yield* Effect.fork(registry.execute(gid(i), expected.slamA))
             yield* Effect.yieldNow()
-            const fiberB = yield* Effect.fork(registry.execute(gid(i), slamB))
+            const fiberB = yield* Effect.fork(registry.execute(gid(i), expected.slamB))
             const exitA = yield* Fiber.await(fiberA)
             const exitB = yield* Fiber.await(fiberB)
 
@@ -146,7 +180,7 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
               exit: Exit.Exit<{ events: ReadonlyArray<{ _tag: string }> }, { _tag: string }>,
             ): string =>
               Exit.isSuccess(exit)
-                ? `ok:${exit.value.events.map((e) => e._tag).join("+")}`
+                ? `ok:${tagsOf(exit.value.events)}`
                 : exit.cause._tag === "Fail"
                   ? `err:${exit.cause.error._tag}`
                   : "defect"
@@ -155,12 +189,12 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
           }).pipe(Effect.provide(h.layer))
           outcomes.push(outcome)
         }
-        // Deterministic: every iteration produced the identical triple.
+        // Deterministic: every iteration produced the identical triple, and
+        // that triple is the pure sequential A-then-B expectation — the
+        // first-in-queue-wins guarantee, asserted against the engine's own
+        // answer rather than any prior.
         expect(new Set(outcomes).size).toBe(1)
-        // And the first-enqueued slammer's reply is the success — it hit a
-        // fresh open window; the racer saw whatever the engine says comes
-        // second (asserted stable above, not invented here).
-        expect(outcomes[0]!.startsWith("ok:")).toBe(true)
+        expect(outcomes[0]).toBe(expected.triple)
       }),
   )
 
@@ -211,8 +245,9 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
         expect(cambio).toBeDefined()
         const ended = yield* registry.execute(gid(1), cambio!)
         expect(ended.state.phase._tag).toBe("Ended")
+        expect(yield* registry.roomCount).toBe(0) // the actor evicted itself
 
-        // The actor evicted itself. A later command finds a fresh actor whose
+        // A later command finds a fresh actor whose
         // bootstrap loads from the repository — and whose reply is the
         // engine's typed error for a finished game, not a crash.
         h.journal.splice(0)
@@ -227,18 +262,54 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
   )
 
   it.effect(
-    "eviction: an abandoned lobby's later join is a typed refusal, not a crash (clause 10)",
+    "eviction: abandoning a lobby removes its actor; a later join is a typed refusal, not a crash (clause 10)",
     () => {
       const h = makeHarness()
       return Effect.gen(function* () {
         const registry = yield* RoomRegistry
-        yield* seedLobby({ id: gid(1), members: [uid(0)], status: "open" })
+        yield* seedLobby({ id: gid(1), members: [uid(0), uid(1)], status: "open" })
+
+        // A non-abandoning leave keeps the actor resident…
+        yield* registry.leave(gid(1), uid(1))
+        expect(yield* registry.roomCount).toBe(1)
+
+        // …the abandoning leave evicts it (the observable clause 10 asks for).
         const left = yield* registry.leave(gid(1), uid(0))
         expect(left.lobby.status).toBe("abandoned")
+        expect(yield* registry.roomCount).toBe(0)
 
         const rejoin = yield* registry.join(gid(1), uid(1)).pipe(Effect.either)
         expect(rejoin._tag).toBe("Left")
         if (rejoin._tag === "Left") expect(rejoin.left._tag).toBe("LobbyNotJoinable")
+      }).pipe(Effect.provide(h.layer))
+    },
+  )
+
+  it.effect(
+    "a defect inside the actor fails the caller — never a hang — and the room keeps working (review finding 2)",
+    () => {
+      const h = makeHarness()
+      return Effect.gen(function* () {
+        const registry = yield* RoomRegistry
+        yield* seedLobby({ id: gid(1), members: [uid(0), uid(1)], status: "open" })
+        const started = yield* registry.start(gid(1), { starterId: uid(0), config })
+        const cmd = choose(started.state, NOW)
+
+        // The next save dies (simulating an adapter bug). The caller must
+        // receive the defect as its reply, not await a dead room forever.
+        h.repo.dieOnNextSave()
+        const exit = yield* Effect.exit(registry.execute(gid(1), cmd))
+        expect(Exit.isFailure(exit)).toBe(true)
+        if (Exit.isFailure(exit)) {
+          expect(Cause.dieOption(exit.cause)._tag).toBe("Some")
+        }
+
+        // Nothing was persisted, the actor survived the guarded defect, and
+        // the same command now succeeds off the intact cache.
+        h.journal.splice(0)
+        const healed = yield* registry.execute(gid(1), cmd)
+        expect(healed.version).toBe(started.version + 1)
+        expect(opsOf(h.journal)).toEqual(["save", "publishGame"])
       }).pipe(Effect.provide(h.layer))
     },
   )
@@ -342,7 +413,13 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
             // TestClock advances past the sleep — the timer fiber enqueues the
             // close itself before the probe arrives.
             yield* TestClock.adjust(config.slamWindowMs + 1000)
-            yield* Effect.yieldNow()
+            for (let i = 0; i < 100 && h.journal.length < 2; i++) {
+              yield* Effect.yieldNow()
+            }
+            // The timer path really ran: the close batch was persisted and
+            // published BEFORE any probe existed — this is what separates the
+            // timer world from the lazy fallback.
+            expect(opsOf(h.journal)).toEqual(["save", "publishGame"])
           }
           const reply = yield* registry.execute(gid(1), probe)
           const journalOps: ReadonlyArray<string> = opsOf(h.journal)
@@ -364,6 +441,7 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
         expect(lazyResult.journalOps).toEqual(["save", "publishGame", "save", "publishGame"])
 
         const timedResult = yield* world(timed, true)
+        expect(timedResult.journalOps).toEqual(["save", "publishGame", "save", "publishGame"])
 
         // The optimization changed nothing: identical replies, states, logs.
         expect(timedResult.reply.state).toEqual(lazyResult.reply.state)

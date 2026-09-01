@@ -64,6 +64,7 @@ interface GameRow {
  */
 export const makeGameRepoStub = (journal: Array<JournalEntry>) => {
   const rows = new Map<string, GameRow>()
+  let dieNextSave = false
 
   const guard = (
     gameId: GameId,
@@ -89,7 +90,14 @@ export const makeGameRepoStub = (journal: Array<JournalEntry>) => {
 
   const layer = Layer.succeed(GameRepository, {
     save: (input) =>
-      guard(input.gameId, input.expectedVersion).pipe(
+      Effect.suspend(() => {
+        if (dieNextSave) {
+          dieNextSave = false
+          return Effect.die(new Error("stub save defect (test-injected)"))
+        }
+        return Effect.void
+      }).pipe(
+        Effect.andThen(() => guard(input.gameId, input.expectedVersion)),
         Effect.map((row) => {
           row.version = GameVersion.make(input.expectedVersion + 1)
           row.state = input.state
@@ -147,6 +155,10 @@ export const makeGameRepoStub = (journal: Array<JournalEntry>) => {
       const row = rows.get(gameId)
       if (row === undefined) throw new Error(`poke: no row for ${gameId}`)
       row.version = GameVersion.make(version)
+    },
+    /** The next `save` dies with a defect — actor-resilience tests. */
+    dieOnNextSave: (): void => {
+      dieNextSave = true
     },
   }
 }

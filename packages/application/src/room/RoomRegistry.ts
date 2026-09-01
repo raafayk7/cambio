@@ -43,6 +43,11 @@ import { type GameAdvanced, startGame } from "../use-cases/StartGame.js"
  *   - **Eviction on end** — game `Ended` or lobby abandoned removes the
  *     actor once its queue is drained; a later message finds a fresh actor
  *     whose bootstrap reads rows/state and whose reply is a typed error.
+ *   - **A room can fail, never hang** — use-case calls are exit-guarded and
+ *     always complete the reply (defects included); a defect escaping the
+ *     guard fails the envelope's reply and tears the actor down, and an
+ *     `ensuring` finalizer on every exit unregisters the room and
+ *     interrupts stranded envelopes, so no caller awaits a dead room.
  */
 
 type ExecuteError = Effect.Effect.Error<ReturnType<typeof executeGameCommand>>
@@ -89,6 +94,11 @@ export class RoomRegistry extends Context.Tag("@cambio/application/RoomRegistry"
     readonly join: (gameId: GameId, userId: UserId) => Effect.Effect<LobbyChanged, JoinError>
     readonly leave: (gameId: GameId, userId: UserId) => Effect.Effect<LobbyChanged, LeaveError>
     readonly start: (gameId: GameId, input: StartInput) => Effect.Effect<GameAdvanced, StartError>
+    /**
+     * Live actors right now — observability for tests and ops (it is how
+     * eviction is asserted), never part of the §6 room semantics.
+     */
+    readonly roomCount: Effect.Effect<number>
   }
 >() {}
 
@@ -110,131 +120,145 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
     const lock = yield* Effect.makeSemaphore(1)
     const rooms = new Map<GameId, { readonly queue: Queue.Queue<Envelope> }>()
 
-    const runRoom = (gameId: GameId, queue: Queue.Queue<Envelope>) =>
-      Effect.gen(function* () {
-        // Owned by this single fiber — that is what makes them race-free.
-        let cache: { readonly state: GameState; readonly version: GameVersion } | null = null
-        let timer: Fiber.RuntimeFiber<void> | null = null
-        let evict = false
+    const runRoom = (gameId: GameId, queue: Queue.Queue<Envelope>) => {
+      // Owned by this single fiber — that is what makes them race-free.
+      let cache: { readonly state: GameState; readonly version: GameVersion } | null = null
+      let timer: Fiber.RuntimeFiber<void> | null = null
+      let evict = false
 
-        const clearTimer = Effect.suspend(() => {
-          const current = timer
-          timer = null
-          return current === null ? Effect.void : Fiber.interrupt(current)
-        })
+      const clearTimer = Effect.suspend(() => {
+        const current = timer
+        timer = null
+        return current === null ? Effect.void : Fiber.interrupt(current)
+      })
 
-        /** (Re)arm the close timer iff the cached phase is an open SlamWindow. */
-        const manageTimer = Effect.gen(function* () {
-          yield* clearTimer
-          const phase = cache?.state.phase
-          if (phase !== undefined && phase._tag === "SlamWindow") {
-            const now = yield* clock.now
-            timer = yield* Effect.fork(
-              Effect.sleep(Duration.millis(Math.max(0, phase.closesAt - now))).pipe(
-                Effect.andThen(Queue.offer(queue, { _tag: "TimerClose" })),
-                Effect.asVoid,
-              ),
-            )
-          }
-        })
-
-        /**
-         * Close the slam window iff the authority says it is due
-         * (`ClockPort.now >= closesAt` — never the timer). Its own persisted
-         * + published batch; failures are dropped silently (the other path
-         * won, or the game moved on).
-         */
-        const closeIfDue = Effect.gen(function* () {
-          const phase = cache?.state.phase
-          if (cache === null || phase === undefined || phase._tag !== "SlamWindow") return
+      /** (Re)arm the close timer iff the cached phase is an open SlamWindow. */
+      const manageTimer = Effect.gen(function* () {
+        yield* clearTimer
+        const phase = cache?.state.phase
+        if (phase !== undefined && phase._tag === "SlamWindow") {
           const now = yield* clock.now
-          if (now < phase.closesAt) return
-          const exit = yield* Effect.exit(
-            executeGameCommand({
-              gameId,
-              command: { _tag: "CloseSlamWindow" },
-              cached: cache,
-            }).pipe(Effect.provide(context)),
+          timer = yield* Effect.fork(
+            Effect.sleep(Duration.millis(Math.max(0, phase.closesAt - now))).pipe(
+              Effect.andThen(Queue.offer(queue, { _tag: "TimerClose" })),
+              Effect.asVoid,
+            ),
           )
-          if (Exit.isSuccess(exit)) {
-            cache = { state: exit.value.state, version: exit.value.version }
-          } else if (failureTag(exit.cause) === "VersionConflict") {
-            cache = null
+        }
+      })
+
+      /**
+       * Close the slam window iff the authority says it is due
+       * (`ClockPort.now >= closesAt` — never the timer). Its own persisted
+       * + published batch; failures are dropped silently (the other path
+       * won, or the game moved on).
+       */
+      const closeIfDue = Effect.gen(function* () {
+        const phase = cache?.state.phase
+        if (cache === null || phase === undefined || phase._tag !== "SlamWindow") return
+        const now = yield* clock.now
+        if (now < phase.closesAt) return
+        const exit = yield* Effect.exit(
+          executeGameCommand({
+            gameId,
+            command: { _tag: "CloseSlamWindow" },
+            cached: cache,
+          }).pipe(Effect.provide(context)),
+        )
+        if (Exit.isSuccess(exit)) {
+          cache = { state: exit.value.state, version: exit.value.version }
+        } else if (failureTag(exit.cause) === "VersionConflict") {
+          cache = null
+        }
+      })
+
+      const handle = (envelope: Envelope): Effect.Effect<void> =>
+        Effect.gen(function* () {
+          switch (envelope._tag) {
+            case "Execute": {
+              if (cache === null) {
+                // Bootstrap: rebuild from persisted state (§6 restart story).
+                const loaded = yield* Effect.exit(games.load(gameId).pipe(Effect.provide(context)))
+                if (Exit.isFailure(loaded)) {
+                  return yield* Deferred.failCause(envelope.reply, loaded.cause)
+                }
+                cache = loaded.value
+              }
+              const tag = envelope.command._tag
+              if (tag !== "Slam" && tag !== "CloseSlamWindow") yield* closeIfDue
+              const exit = yield* Effect.exit(
+                executeGameCommand({
+                  gameId,
+                  command: envelope.command,
+                  cached: cache ?? undefined,
+                }).pipe(Effect.provide(context)),
+              )
+              if (Exit.isSuccess(exit)) {
+                cache = { state: exit.value.state, version: exit.value.version }
+                if (exit.value.state.phase._tag === "Ended") evict = true
+              } else if (failureTag(exit.cause) === "VersionConflict") {
+                cache = null
+              }
+              yield* Deferred.done(envelope.reply, exit)
+              return yield* manageTimer
+            }
+            case "Join": {
+              const exit = yield* Effect.exit(
+                joinLobby({ gameId, userId: envelope.userId }).pipe(Effect.provide(context)),
+              )
+              return yield* Deferred.done(envelope.reply, exit)
+            }
+            case "Leave": {
+              const exit = yield* Effect.exit(
+                leaveLobby({ gameId, userId: envelope.userId }).pipe(Effect.provide(context)),
+              )
+              if (Exit.isSuccess(exit) && exit.value.lobby.status === "abandoned") evict = true
+              return yield* Deferred.done(envelope.reply, exit)
+            }
+            case "Start": {
+              const exit = yield* Effect.exit(
+                startGame({
+                  gameId,
+                  starterId: envelope.input.starterId,
+                  config: envelope.input.config,
+                }).pipe(Effect.provide(context)),
+              )
+              if (Exit.isSuccess(exit)) {
+                cache = { state: exit.value.state, version: exit.value.version }
+              }
+              yield* Deferred.done(envelope.reply, exit)
+              return yield* manageTimer
+            }
+            case "TimerClose": {
+              yield* closeIfDue
+              return yield* manageTimer
+            }
+            default:
+              return envelope satisfies never
           }
         })
 
-        const handle = (envelope: Envelope): Effect.Effect<void> =>
-          Effect.gen(function* () {
-            switch (envelope._tag) {
-              case "Execute": {
-                if (cache === null) {
-                  // Bootstrap: rebuild from persisted state (§6 restart story).
-                  const loaded = yield* Effect.exit(
-                    games.load(gameId).pipe(Effect.provide(context)),
-                  )
-                  if (Exit.isFailure(loaded)) {
-                    return yield* Deferred.failCause(envelope.reply, loaded.cause)
-                  }
-                  cache = loaded.value
-                }
-                const tag = envelope.command._tag
-                if (tag !== "Slam" && tag !== "CloseSlamWindow") yield* closeIfDue
-                const exit = yield* Effect.exit(
-                  executeGameCommand({
-                    gameId,
-                    command: envelope.command,
-                    cached: cache ?? undefined,
-                  }).pipe(Effect.provide(context)),
-                )
-                if (Exit.isSuccess(exit)) {
-                  cache = { state: exit.value.state, version: exit.value.version }
-                  if (exit.value.state.phase._tag === "Ended") evict = true
-                } else if (failureTag(exit.cause) === "VersionConflict") {
-                  cache = null
-                }
-                yield* Deferred.done(envelope.reply, exit)
-                return yield* manageTimer
-              }
-              case "Join": {
-                const exit = yield* Effect.exit(
-                  joinLobby({ gameId, userId: envelope.userId }).pipe(Effect.provide(context)),
-                )
-                return yield* Deferred.done(envelope.reply, exit)
-              }
-              case "Leave": {
-                const exit = yield* Effect.exit(
-                  leaveLobby({ gameId, userId: envelope.userId }).pipe(Effect.provide(context)),
-                )
-                if (Exit.isSuccess(exit) && exit.value.lobby.status === "abandoned") evict = true
-                return yield* Deferred.done(envelope.reply, exit)
-              }
-              case "Start": {
-                const exit = yield* Effect.exit(
-                  startGame({
-                    gameId,
-                    starterId: envelope.input.starterId,
-                    config: envelope.input.config,
-                  }).pipe(Effect.provide(context)),
-                )
-                if (Exit.isSuccess(exit)) {
-                  cache = { state: exit.value.state, version: exit.value.version }
-                }
-                yield* Deferred.done(envelope.reply, exit)
-                return yield* manageTimer
-              }
-              case "TimerClose": {
-                yield* closeIfDue
-                return yield* manageTimer
-              }
-              default:
-                return envelope satisfies never
-            }
-          })
-
+      const loop = Effect.gen(function* () {
         let running = true
         while (running) {
           const envelope = yield* Queue.take(queue)
-          yield* handle(envelope)
+          // Defect guard: handle() completes the reply on every typed path.
+          // If it DIES instead, complete this envelope's reply with the
+          // cause so its caller never hangs, then let the actor die too —
+          // its state is unknown; the ensuring-cleanup below unregisters
+          // the room so the next message gets a fresh actor rebuilt from
+          // persisted state.
+          const handled = yield* Effect.exit(handle(envelope))
+          if (Exit.isFailure(handled)) {
+            if (envelope._tag !== "TimerClose") {
+              // Cause<never> (defect/interrupt only) fits any reply's E.
+              yield* Deferred.failCause(
+                envelope.reply as unknown as Deferred.Deferred<never, never>,
+                handled.cause,
+              )
+            }
+            return yield* Effect.failCause(handled.cause)
+          }
           if (evict) {
             // Evict only with an empty queue, under the creation lock — an
             // envelope offered concurrently is either processed here (typed
@@ -259,6 +283,34 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
           }
         }
       })
+
+      // Runs on EVERY exit — graceful eviction, defect, or layer-scope
+      // interruption: unregister the room (identity-checked, under the
+      // creation lock so no sender is mid-offer), interrupt the timer, and
+      // interrupt any stranded envelopes so no caller ever awaits a dead
+      // room's Deferred.
+      const cleanup = clearTimer.pipe(
+        Effect.andThen(
+          lock.withPermits(1)(
+            Effect.gen(function* () {
+              if (rooms.get(gameId)?.queue === queue) rooms.delete(gameId)
+              const leftovers = yield* Queue.takeAll(queue)
+              yield* Queue.shutdown(queue)
+              for (const left of leftovers) {
+                if (left._tag !== "TimerClose") {
+                  // Union of invariant Deferred types — interrupt is shape-agnostic.
+                  yield* Deferred.interrupt(
+                    left.reply as unknown as Deferred.Deferred<unknown, unknown>,
+                  )
+                }
+              }
+            }),
+          ),
+        ),
+      )
+
+      return loop.pipe(Effect.ensuring(cleanup))
+    }
 
     const send = <A, E>(
       gameId: GameId,
@@ -292,6 +344,7 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
         send<LobbyChanged, LeaveError>(gameId, (reply) => ({ _tag: "Leave", userId, reply })),
       start: (gameId, input) =>
         send<GameAdvanced, StartError>(gameId, (reply) => ({ _tag: "Start", input, reply })),
+      roomCount: Effect.sync(() => rooms.size),
     }
   }),
 )

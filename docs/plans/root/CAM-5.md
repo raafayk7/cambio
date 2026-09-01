@@ -96,10 +96,16 @@ authority, the event log never contains lobby history):
 **Room actor** (ADR-0020):
 
 8. **Serialization** — all commands for a room pass through that room's
-   single queue and are processed by one fiber, in enqueue order. Two
-   concurrent slam submissions produce a deterministic outcome: the
-   first-enqueued wins, the second receives the typed error the engine
-   gives a late/second slam; state reflects exactly one slam.
+   single queue and are processed by one fiber, in enqueue order. A race
+   (two concurrent slam submissions from different players) resolves
+   exactly as if the commands had been submitted sequentially in enqueue
+   order: each racer's reply and the resulting persisted state/event log
+   equal what the engine returns for first-then-second, deterministically.
+   The engine — not this contract — decides what a second slam means; the
+   playtested rules keep the window open and charge each failed slam a
+   penalty. _(Corrected in review: an earlier phrasing promised "the
+   second receives a typed error; state reflects exactly one slam", a
+   rule prior the engine contradicts — review finding 1.)_
 9. **Reconstruction** — a room actor starting fresh (first command after a
    simulated restart: new registry, same repository) serves an in-game room
    from persisted state and a lobby room from lobby rows, with identical
@@ -208,6 +214,11 @@ timestamp each entry)_
       green (domain 190, application 41, api 52+)
 - [x] 2026-09-01 17:10 — M6: full gate green (22/22 tasks), untouched-
       surface and purity sweeps empty, plan docs reconciled
+- [x] 2026-09-01 18:00 — review fix cycle: findings 1–5 addressed (clause 8
+      corrected + race test pins the engine's sequential answer; actor
+      supervision + defect no-hang test; eviction/timer observability;
+      saveLobby status guard + contract precondition; plan reconciliation);
+      advisories from finding 6 deliberately deferred
 
 ## Decision log
 

@@ -47,6 +47,14 @@ that lazily creates one actor per room. The mechanics:
   registry when the game reaches `Ended` (or the lobby is abandoned). Idle
   live rooms stay resident — acceptable on a single small instance, and
   reconstructibility makes eviction safe to add later if needed.
+- **A room can fail, never hang** (added in the CAM-5 review fix cycle).
+  The actor is supervised: every use-case call is exit-guarded and
+  completes the caller's `Deferred` — defects included; a defect escaping
+  the guard completes the current envelope's reply with its cause and
+  tears the actor down; an `ensuring` finalizer on every exit (eviction,
+  defect, layer shutdown) unregisters the room under the creation lock and
+  interrupts any stranded envelopes, so the next message always reaches a
+  fresh actor rebuilt from persisted state.
 - **Slam-window close timer lives in the actor, as an optimization only.**
   When a save leaves the game in `SlamWindow`, the actor forks a fiber that
   sleeps until `closesAt` and enqueues `CloseSlamWindow` through the same

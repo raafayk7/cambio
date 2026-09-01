@@ -77,6 +77,14 @@ export class GameRepository extends Context.Tag("@cambio/domain/GameRepository")
      * (`status 'lobby'`/`'abandoned'`) + `game_players` only, under the same
      * `games.version` guard as `save`. Membership rows mirror `lobby.members`
      * (join order = `seat_index`, compacted; absentees soft-deleted).
+     *
+     * **Single-delta precondition:** each call's `lobby` must derive from
+     * the persisted lobby via the domain transitions — at most one
+     * order-preserving removal (`leaveLobby`) or one append-at-tail
+     * (`joinLobby`) per save. Arbitrary reorderings or multi-member deltas
+     * are outside the contract (the adapter's seat-compaction relies on
+     * this). Calling it against a dealt game is a defect: the lobby→game
+     * transition is one-way and belongs to `save`.
      */
     readonly saveLobby: (
       input: SaveLobbyInput,

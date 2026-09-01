@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import { SqlClient } from "@effect/sql"
-import { Effect, Either, Schema } from "effect"
+import { Cause, Effect, Either, Schema } from "effect"
 
 import {
   createLobby,
@@ -193,6 +193,47 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
         expect(seq0[0]!.type).toBe("GameStarted")
       }),
     )
+  })
+
+  it("saveLobby against a dealt game is a defect even at the correct version (review finding 4)", async () => {
+    const gameId = gid(5)
+    const exit = await runtime.runPromiseExit(
+      Effect.gen(function* () {
+        const games = yield* GameRepository
+        let lobby = createLobby(gameId, uid(0))
+        lobby = right(joinLobby(lobby, uid(1)))
+        const version = yield* games.saveLobby({
+          gameId,
+          lobby,
+          expectedVersion: GameVersion.make(0),
+        })
+        const [state, events] = right(dealGame(lobby.members, 7, config, ts(1000)))
+        const gameVersion = yield* games.save({
+          gameId,
+          state,
+          expectedVersion: version,
+          newEvents: events,
+          at: ts(1000),
+        })
+        // Correct version, dealt row: must die (one-way transition), and the
+        // row must be untouched — never silently downgraded to 'lobby'.
+        yield* games.saveLobby({ gameId, lobby, expectedVersion: gameVersion })
+      }) as Effect.Effect<void, unknown, never>,
+    )
+    expect(exit._tag).toBe("Failure")
+    if (exit._tag === "Failure") {
+      expect(Cause.dieOption(exit.cause)._tag).toBe("Some")
+    }
+    const status = await run(
+      SqlClient.SqlClient.pipe(
+        Effect.flatMap(
+          (sql) => sql<{ status: string }>`
+          SELECT status FROM games WHERE game_id = ${gameId}
+        `,
+        ),
+      ),
+    )
+    expect(status[0]!.status).toBe("in_progress")
   })
 
   it("load/getEvents on an undealt row are GameNotFound, not a decode error (13d)", async () => {

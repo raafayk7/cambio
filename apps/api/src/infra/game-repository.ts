@@ -327,27 +327,57 @@ export const GameRepositoryLive = Layer.effect(
                       return yield* failConflict(input.gameId, input.expectedVersion)
                     }
                   } else {
+                    // The status guard makes "saveLobby against a dealt
+                    // game" structurally impossible — without it a
+                    // correct-version call could silently downgrade an
+                    // in_progress row to 'lobby' (review finding 4).
                     const updated = yield* sql`
                       UPDATE games
                       SET status = ${status}, version = ${newVersion}, updated_at = now()
                       WHERE game_id = ${input.gameId}
                         AND version = ${input.expectedVersion}
+                        AND status IN ('lobby', 'abandoned')
                         AND deleted_at IS NULL
                       RETURNING game_id
                     `
                     if (updated.length === 0) {
-                      return yield* failConflict(input.gameId, input.expectedVersion)
+                      // Distinguish the two zero-row causes: a version race
+                      // is the typed VersionConflict; a version MATCH on a
+                      // dealt row is a caller contract violation — a defect,
+                      // like the status:"started" input above.
+                      const live = yield* liveVersion(input.gameId)
+                      if (live !== null && live === input.expectedVersion) {
+                        return yield* Effect.die(
+                          new Error(
+                            "saveLobby against a dealt game — the lobby→game transition is one-way (ADR-0019)",
+                          ),
+                        )
+                      }
+                      return yield* Effect.fail(
+                        new VersionConflict({
+                          gameId: input.gameId,
+                          expected: input.expectedVersion,
+                          actual: live,
+                        }),
+                      )
                     }
                   }
 
                   // 2. game_players — mirror lobby.members (join order =
-                  // seat_index, compacted). Soft-delete absentees FIRST so
-                  // their seats free up, then upsert in ascending position:
-                  // members only ever shift downward into just-vacated slots,
-                  // so the partial unique (game_id, seat_index) never
-                  // transiently collides. A rejoining leaver's tombstone row
-                  // is resurrected by the PK conflict update (deleted_at
-                  // back to NULL).
+                  // seat_index, compacted). Why the ascending upsert never
+                  // trips the partial unique (game_id, seat_index): the port
+                  // contract requires each saveLobby to differ from the
+                  // persisted membership by at most one order-preserving
+                  // removal or one append-at-tail (the only shapes the domain
+                  // transitions produce). Soft-deleting absentees FIRST frees
+                  // their seats; surviving members then only compact DOWNWARD
+                  // into just-vacated slots, and a joining/rejoining member
+                  // is always assigned the tail seat, which is free once the
+                  // survivors have moved. (A rejoiner's tombstone row —
+                  // possibly holding a LOWER old seat — resurrects at the
+                  // tail via the PK-conflict update, deleted_at back to
+                  // NULL.) An input outside that contract could collide
+                  // mid-loop and surface as a StorageError.
                   const live = yield* sql<{ user_id: string }>`
                     SELECT user_id FROM game_players
                     WHERE game_id = ${input.gameId} AND deleted_at IS NULL
