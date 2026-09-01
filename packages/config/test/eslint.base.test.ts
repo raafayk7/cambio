@@ -72,6 +72,48 @@ describe("cambioConfig — Gap 1: effect-only external imports (src only)", () =
   })
 })
 
+describe('cambioConfig — Gap 3: Node builtins bypass the effect-only rule via origin "core"', () => {
+  const cases = [
+    { layer: "domain", dir: "../../domain" },
+    { layer: "contracts", dir: "../../contracts" },
+    { layer: "application", dir: "../../application" },
+  ] as const
+
+  for (const { layer, dir } of cases) {
+    const cwd = packageDir(dir)
+
+    it(`blocks a node:-prefixed builtin import in ${layer}/src`, async () => {
+      const errors = await lintErrors(
+        layer,
+        cwd,
+        "src/probe.ts",
+        'import { randomUUID } from "node:crypto"\nexport const probe = randomUUID\n',
+      )
+      expect(errors).toHaveLength(1)
+    })
+  }
+
+  it("blocks a bare-specifier builtin import in domain/src", async () => {
+    const errors = await lintErrors(
+      "domain",
+      packageDir("../../domain"),
+      "src/probe.ts",
+      'import { randomUUID } from "crypto"\nexport const probe = randomUUID\n',
+    )
+    expect(errors).toHaveLength(1)
+  })
+
+  it("does not restrict builtin imports in domain/test (src/test split)", async () => {
+    const errors = await lintErrors(
+      "domain",
+      packageDir("../../domain"),
+      "test/probe.test.ts",
+      'import { randomUUID } from "node:crypto"\nexport const probe = randomUUID\n',
+    )
+    expect(errors).toHaveLength(0)
+  })
+})
+
 describe("cambioConfig — Gap 2: workspace export subpaths are denied like the bare package", () => {
   it("blocks apps/web importing the @cambio/domain/testing subpath", async () => {
     const errors = await lintErrors(

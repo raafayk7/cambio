@@ -42,20 +42,20 @@ revert both; run `pnpm turbo build typecheck lint test` clean. Separately,
 
 ## Context & orientation
 
-- **File to change:** [packages/config/eslint.base.js](../../../packages/config/eslint.base.js)
+- **File changed:** [packages/config/eslint.base.js](../../../packages/config/eslint.base.js)
   — the same shared `cambioConfig({layer, ...})` factory CAM-11 touched.
   `EFFECT_ONLY_EXTERNAL_LAYERS` (`domain`, `contracts`, `application`,
-  `eslint.base.js:58`) already identifies the three layers needing this
-  fix; `effectOnlyExternalPolicies` (`eslint.base.js:112-124`) already holds
-  the ordered external disallow/allow pair this task adds a third policy
-  next to.
+  `eslint.base.js:58`) identifies the three layers needing this fix;
+  `effectOnlyExternalPolicies` (`eslint.base.js:124-141`, as shipped) now
+  holds the ordered external disallow/allow pair plus the new source-less
+  `origin: "core"` disallow (`eslint.base.js:135-138`).
 - **The bug, precisely** (confirmed by exploration against the installed
   `@boundaries/elements` source, `node_modules/.pnpm/@boundaries+elements@3.1.0.../dist/index.js`):
   `eslint-plugin-boundaries` resolves an import's origin via
   `ORIGINS_MAP = { LOCAL, EXTERNAL, CORE }`. Node builtins — both the
   `node:`-prefixed form and the bare form — are classified `origin: "core"`
   via Node's own `module.builtinModules` (the prefix is stripped before the
-  lookup, so `node:crypto` and `crypto` resolve to the *same* origin). The
+  lookup, so `node:crypto` and `crypto` resolve to the _same_ origin). The
   `source` field the plugin reports back is **not** normalized, though: it
   preserves whichever string form appeared in the import, so `node:crypto`
   and `crypto` are the same origin with two different `source` strings. The
@@ -119,17 +119,17 @@ revert both; run `pnpm turbo build typecheck lint test` clean. Separately,
 3. `packages/ui`, `apps/api`, `apps/web` are unaffected — none of their
    written import rules restrict externals, and this task does not touch
    their config blocks.
-4. `packages/config` gains regression test coverage (extending
-   `packages/config/test/eslint.base.test.ts`) that:
+4. `packages/config` gains regression test coverage (shipped in
+   `packages/config/test/eslint.base.test.ts:75-115`, a new "Gap 3" describe
+   block) that:
    - asserts a `node:crypto` import in a simulated `src/*.ts` file produces
      a `boundaries/dependencies` error, for each of `domain`, `contracts`,
      `application`;
-   - asserts the bare-form equivalent (e.g. `crypto`) produces the same
-     error, for at least one of the three layers (the mechanism is
-     origin-based and identical across specifier forms and layers, so full
-     3×2 coverage is not required to pin the behavior — implementer's call
-     on how many of the six cells to cover explicitly, per the note in the
-     interview about not over-specifying test cases at plan time);
+   - asserts the bare-form equivalent (`crypto`) produces the same error, in
+     `domain` (the mechanism is origin-based and identical across specifier
+     forms and layers, so full 3×2 coverage was not needed to pin the
+     behavior — implementer's call, per the plan's note on not
+     over-specifying test cases);
    - asserts a builtin import in `domain/test/*.ts` produces **no** error
      (proving the src/test split still holds for the new policy).
 5. `Date.now()`/`new Date()` in `packages/application` is unchanged by this
@@ -140,21 +140,21 @@ revert both; run `pnpm turbo build typecheck lint test` clean. Separately,
 
 ### Acceptance criteria
 
-- [ ] `packages/config/eslint.base.js` adds a source-less
+- [x] `packages/config/eslint.base.js` adds a source-less
       `disallow: { to: { module: { origin: "core" } } }` policy to
       `effectOnlyExternalPolicies` (or an equivalent per-layer mechanism that
       achieves Functional Contract clause 1 without enumerating builtin
       names), reusing the existing `LAYER_RATIONALE` messages.
-- [ ] Manual verification performed and reverted: both `node:crypto` and
+- [x] Manual verification performed and reverted: both `node:crypto` and
       bare `crypto` imports added to `packages/domain/src` (and at least one
       of `contracts`/`application`) each make `pnpm turbo lint` fail with a
       `boundaries/dependencies` message; both reverted before commit
       (`git status --porcelain` clean on those files at close-out).
-- [ ] `packages/config/test/eslint.base.test.ts` gains a new "Gap 3" (or
+- [x] `packages/config/test/eslint.base.test.ts` gains a new "Gap 3" (or
       similarly named) describe block per Functional Contract clause 4,
       passing under `pnpm --filter @cambio/config test`.
-- [ ] `pnpm turbo build typecheck lint test` passes clean repo-wide.
-- [ ] ADR-0017 accurately reflects the as-shipped mechanism — it was amended
+- [x] `pnpm turbo build typecheck lint test` passes clean repo-wide.
+- [x] ADR-0017 accurately reflects the as-shipped mechanism — it was amended
       during planning (see Decision Log); implementer confirms no deviation,
       or updates it if the as-built mechanism differs from what's documented.
 
@@ -208,8 +208,30 @@ split; it slots one more policy into a structure CAM-11 already built).
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-01 — plan written; ADR-0017 amended during planning; pending
-      user sign-off
+- [x] 2026-09-01 — plan written; ADR-0017 amended during planning; user
+      signed off
+- [x] 2026-09-01 — task branch
+      `raafaykazmi/cam-12-harness-eslint-boundaries-node-builtins-bypass-the-effect`
+      created off `release-v0`; issue moved to In Progress
+- [x] 2026-09-01 — source-less `origin: "core"` disallow policy added to
+      `effectOnlyExternalPolicies` in `packages/config/eslint.base.js`
+      (`eslint.base.js:135-138`), one per effect-only layer, reusing
+      `LAYER_RATIONALE`
+- [x] 2026-09-01 — manual verify-then-revert performed: `node:crypto` and
+      bare `crypto` probes added to `packages/domain/src` and
+      `packages/application/src` each failed `pnpm --filter <pkg> lint`
+      with a `boundaries/dependencies` error (2 errors per package, one per
+      specifier form) as expected; all four probes removed,
+      `git status --porcelain` confirmed clean before continuing
+- [x] 2026-09-01 — regression suite extended: new "Gap 3" describe block
+      added to `packages/config/test/eslint.base.test.ts:75-115` (5 new
+      assertions: 3 layers × `node:crypto`, 1 bare-`crypto` in domain, 1
+      domain/test negative case); `pnpm --filter @cambio/config test` green
+      on first run (13/13, up from 8/8)
+- [x] 2026-09-01 — full gate green: `pnpm turbo build typecheck lint test`
+      — 22/22 tasks passed repo-wide (one `pnpm format` pass needed first,
+      for prettier formatting on the newly-written/edited files — no
+      substantive fallout in any other package)
 
 ## Decision log
 
@@ -255,8 +277,13 @@ timestamp each entry)_
 
 ## Surprises & discoveries
 
-_(none yet — plan just written; exploration's findings, all incorporated
-above, matched what the issue predicted with no contradictions)_
+None. Exploration's findings (origin `"core"` classification, the
+source-less-selector matching behavior, no existing violations in the repo)
+all held exactly as predicted during implementation. The only non-code
+surprise was a `pnpm format` pass being needed before the gate went green —
+prettier reformatted quote style/wrapping on the files just written/edited
+(`eslint.base.js`, `eslint.base.test.ts`, the ADR, the ADR index, this plan);
+not a logic issue, just a formatting pass this repo enforces in CI.
 
 ## Outcomes & retrospective
 
