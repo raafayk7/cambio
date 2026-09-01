@@ -115,7 +115,10 @@ authority, the event log never contains lobby history):
     `closesAt`), so the lazy path is the actor's: before processing any
     command while the room's phase is `SlamWindow` with
     `ClockPort.now >= closesAt`, it first executes a `CloseSlamWindow` as
-    its own persisted and published batch. With timers suppressed
+    its own persisted and published batch. (As built, the injection is
+    skipped for a `Slam` — so a late slammer gets the engine's specific
+    `SlamTooLate`, not a generic `WrongPhase` — and for an explicit
+    `CloseSlamWindow`, which simply runs.) With timers suppressed
     (test-controlled clock), that lazy path alone closes the window, and
     the timer-driven and lazy paths produce identical states.
 
@@ -137,14 +140,16 @@ authority, the event log never contains lobby history):
 
 ### Acceptance criteria
 
-- [ ] All contract clauses above are pinned by tests (coverage table in the
+- [x] All contract clauses above are pinned by tests (coverage table in the
       backend child plan).
-- [ ] A queue-determinism test exists (clause 8) and passes repeatedly, not
-      flakily.
-- [ ] `pnpm --filter @cambio/api migrate` applies 0003 idempotently on a
-      database that already ran 0001–0002.
-- [ ] The quality gate passes, run bare (never piped):
-      `pnpm turbo build typecheck lint test`.
+- [x] A queue-determinism test exists (clause 8) and passes repeatedly, not
+      flakily — 20 fresh-room repetitions inside the test body, plus three
+      bare re-runs of the package suite.
+- [x] `pnpm --filter @cambio/api migrate` applies 0003 idempotently on a
+      database that already ran 0001–0002 (second run: "no pending
+      migrations (3 applied)").
+- [x] The quality gate passes, run bare (never piped):
+      `pnpm turbo build typecheck lint test` — 22/22 tasks, exit 0.
 
 ## Plan of work
 
@@ -194,7 +199,15 @@ cases build on it.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-01 — plan written, awaiting implementation
+- [x] 2026-09-01 — plan written, awaiting implementation
+- [x] 2026-09-01 13:16 — M1 domain Lobby model (`e91da8e`; see the backend
+      child plan's Progress for per-milestone detail)
+- [x] 2026-09-01 13:21 — M2 ports + adapter, M3 migration 0003 +
+      integration tests (Docker Postgres)
+- [x] 2026-09-01 17:00 — M4 use cases, M5 room registry/actor, all suites
+      green (domain 190, application 41, api 52+)
+- [x] 2026-09-01 17:10 — M6: full gate green (22/22 tasks), untouched-
+      surface and purity sweeps empty, plan docs reconciled
 
 ## Decision log
 
@@ -253,6 +266,18 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
   point.
 - (from planning exploration) `CloseSlamWindow` deliberately carries no
   `playerId` — the actor's timer fiber is a legitimate issuer.
+- (implementation) A StartGame-specific VersionConflict unit test is
+  impossible from outside the use case: it loads the lobby's version
+  itself, so a stub can't get stale between its load and save. The
+  conflict path is pinned instead by ExecuteGameCommand's stale-`cached`
+  test, the registry's invalidate-and-reload test, and the integration
+  suite's stale-version test (13b).
+- (implementation) The repo-wide prettier check flagged a pre-existing
+  violation in `docs/plans/root/CAM-12.md` (landed unformatted); fixed in
+  the formatting commit rather than left to fail every future gate.
+- (implementation) The gate-piping trap AGENTS.md warns about bit during
+  M4: `pnpm --filter … lint | tail` masked a lint failure and a commit
+  landed red; caught immediately and amended. Bare runs only.
 
 ## Outcomes & retrospective
 

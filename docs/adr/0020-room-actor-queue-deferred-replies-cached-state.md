@@ -55,8 +55,11 @@ that lazily creates one actor per room. The mechanics:
   cached phase is `SlamWindow` with `ClockPort.now >= closesAt`, the actor
   first executes a `CloseSlamWindow` as its own persisted and published
   batch — the lazy path that works even when the process was asleep at
-  `closesAt`. A close that is illegal by the time it is processed (the
-  other path won) is dropped silently.
+  `closesAt`. The injection is skipped for a `Slam` (a late slammer gets
+  the engine's specific `SlamTooLate` rather than a post-close
+  `WrongPhase`) and for an explicit `CloseSlamWindow` (which simply runs).
+  A close that is illegal by the time it is processed (the other path won)
+  is dropped silently.
 
 ## Consequences
 
