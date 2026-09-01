@@ -32,9 +32,16 @@ export const buildServer = async (options: {
   // Every error that escapes a route lands here: log it server-side, send a
   // curated body. Without this, defects fall through to Fastify's default
   // handler, whose `{ message: err.message }` body is unreviewed output.
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: unknown, request, reply) => {
     request.log.error({ err: error }, "unhandled route error")
-    const { status, body } = unhandledErrorResponse(error.statusCode)
+    const statusCode =
+      typeof error === "object" &&
+      error !== null &&
+      "statusCode" in error &&
+      typeof error.statusCode === "number"
+        ? error.statusCode
+        : undefined
+    const { status, body } = unhandledErrorResponse(statusCode)
     return reply.code(status).send(body)
   })
 
