@@ -281,5 +281,71 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+_(filled by `/review`, 2026-09-01)_
+
+**Verdict: fix-then-ship.** Independently verified: gate `pnpm turbo build
+typecheck lint test --force` 22/22 tasks, 296 tests (domain 190,
+application 41, api 52, config 13); migrate idempotent ("no pending
+migrations (3 applied)"); application suite stable across repeated bare
+runs. Clean on all recurring high-value checks: import boundaries, domain
+purity, ports placement, typed errors end to end, soft-delete/codec
+discipline, hidden-information (no client-facing payloads; publisher port
+carries the §5 warning), and every Decision Log user call.
+
+**Findings (ranked; fix cycle must re-run each finding's sweep, not
+spot-fix cited lines):**
+
+1. **Clause 8's second half is a wrong rule prior, and no test pins it**
+   (contract violation — of the document, not the engine). Verified by
+   direct engine reproduction: in the pinned race scenario both slams are
+   accepted (`SlamFailed`+`PenaltyDrawn` each; the window stays open and
+   admits multiple attempts), and the two racers are the same player on
+   different targets. "The second receives the typed error the engine
+   gives a late/second slam; state reflects exactly one slam" is
+   contradicted by the playtested engine. Sweep (all instances):
+   `docs/plans/root/CAM-5.md:101-102` and
+   `docs/plans/backend/CAM-5.md:646-647`. The race test's determinism half
+   (20 fresh rooms, identical outcome triples, serialized enqueue order)
+   is real and stays. Fix: rewrite both clause texts to the engine's
+   actual semantics and either assert the second slam's observed outcome
+   explicitly or build a true two-player double-submit on one target.
+2. **Actor fiber is unsupervised** (`packages/application/src/room/
+RoomRegistry.ts`): a defect inside `closeIfDue` (which runs before the
+   reply `Deferred` completes) or an interruption kills the room fiber
+   with its map entry left behind — every later caller for that room hangs
+   on `Deferred.await` forever. Fix direction: `Effect.onExit` cleanup
+   (remove entry under the lock, fail pending deferreds) and hoist
+   `closeIfDue` into the exit-guarded region.
+3. **Two clause halves lack an observing assertion**: clause 10's
+   abandoned-lobby eviction (the test's `LobbyNotJoinable` assertion holds
+   whether or not eviction happened) and clause 11's timer path
+   (`timedResult.journalOps` is computed but never asserted, so a
+   never-fired timer would still pass via the lazy fallback).
+4. **`saveLobby` adapter**: the "members only ever shift downward"
+   comment is unsound (a rejoiner shifts upward to the tail — safety
+   actually comes from compact-survivors-first-then-append); the
+   single-delta precondition that makes the diff collision-free is absent
+   from the port contract; and the guarded UPDATE lacks a
+   `status IN ('lobby','abandoned')` clause, so a correct-version
+   `saveLobby` against an `in_progress` row would silently downgrade it.
+   Unreachable through today's use cases; structural fix recommended.
+5. **Plan reconciliation misses** in `docs/plans/backend/CAM-5.md`
+   despite the "reconciled" Progress claim: step 5.1's `loadLobby`-first
+   bootstrap and "bounded Queue" texts, decision 13's "shuts its queue",
+   `RoomRegistryLive` deps missing `SeedPort`, the stubs module-layout row
+   missing `usersStub`, and the domain table missing
+   `src/testing/fixtures.ts` (`gid`).
+6. **Advisories**: `GameAdvanced` (full-truth carrier) deserves the same
+   viewFor warning as the publisher port; `Effect.die` with a raw string
+   sets a weak defect precedent; `RoomRegistry.key` not pinned in
+   `Ports.test.ts`; the lobby-restart test is vacuous by construction (the
+   in-game restart test carries clause 9); the 0003 CHECK is one-way
+   (a lobby row with non-null phase passes); `Lobby.members` schema admits
+   duplicates at the codec boundary; the application-layer skill's "room
+   state is a fold of game_events from seq 0" wording is now stale
+   (ADR-0014 makes the state row a materialized fold; the actor loads it —
+   sanctioned by ADR-0020's "loads or folds").
+
+Deferred (unchanged from planning): wire contracts, viewFor, live
+seed/publisher adapters, SLAM_WINDOW_MS plumbing, `setNotFoundHandler` —
+all CAM-6.
