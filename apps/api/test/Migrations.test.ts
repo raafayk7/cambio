@@ -60,7 +60,11 @@ describe("0002_cambio_schema (C1)", () => {
     const before = await sqlRows<{ id: string }>(
       (sql) => sql`SELECT id FROM _cambio_migrations ORDER BY id`,
     )
-    expect(before.map((r) => r.id)).toStrictEqual(["0001_init.sql", "0002_cambio_schema.sql"])
+    expect(before.map((r) => r.id)).toStrictEqual([
+      "0001_init.sql",
+      "0002_cambio_schema.sql",
+      "0003_lobby_rows.sql",
+    ])
     await runtime.runPromise(migrate)
     const after = await sqlRows<{ id: string }>(
       (sql) => sql`SELECT id FROM _cambio_migrations ORDER BY id`,
@@ -142,6 +146,41 @@ describe("0002_cambio_schema (C1)", () => {
     const names = deckCols.map((c) => c.column_name)
     expect(names).not.toContain("deck_id")
     expect(names).not.toContain("size")
+  })
+
+  it("0003 relaxes the dealt-game columns for lobby rows only (CAM-5 clause 13)", async () => {
+    const cols = await sqlRows<{ column_name: string; is_nullable: string }>(
+      (sql) => sql`
+        SELECT column_name, is_nullable FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'games'
+          AND column_name IN ('phase', 'discard_pile', 'prng', 'config')
+      `,
+    )
+    expect(cols).toHaveLength(4)
+    for (const col of cols) expect(col.is_nullable, col.column_name).toBe("YES")
+
+    const checks = await sqlRows<{ conname: string }>(
+      (sql) => sql`
+        SELECT conname FROM pg_constraint
+        WHERE conrelid = 'games'::regclass AND contype = 'c'
+      `,
+    )
+    expect(checks.map((c) => c.conname)).toContain("games_dealt_columns_present")
+
+    // The CHECK has teeth: an in_progress row with NULL phase is rejected.
+    const rejected = await runtime.runPromise(
+      SqlClient.SqlClient.pipe(
+        Effect.flatMap(
+          (sql) => sql`
+            INSERT INTO games (game_id, status, version)
+            VALUES ('00000000-0000-4000-9000-00000000dead', 'in_progress', 1)
+          `,
+        ),
+        Effect.as(false),
+        Effect.catchAll(() => Effect.succeed(true)),
+      ),
+    )
+    expect(rejected).toBe(true)
   })
 
   it("every unique constraint is partial on deleted_at (C1.3, C1.5, C1.7)", async () => {

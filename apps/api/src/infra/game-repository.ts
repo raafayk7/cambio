@@ -9,9 +9,11 @@ import {
   GameRepository,
   GameState,
   GameVersion,
+  Lobby,
   StorageError,
   VersionConflict,
   type GameId,
+  type LobbyStatus,
   type UserId,
 } from "@cambio/domain"
 
@@ -102,9 +104,13 @@ export const GameRepositoryLive = Layer.effect(
         ),
       )
 
+    // A never-dealt row (NULL phase — a lobby, or an abandoned lobby) is not
+    // a game: `load`/`getEvents` treat it as GameNotFound rather than letting
+    // the NULL surface as a misleading decode StorageError (ADR-0019).
     const gameExists = (gameId: GameId) =>
       sql<{ ok: number }>`
-        SELECT 1 AS ok FROM games WHERE game_id = ${gameId} AND deleted_at IS NULL
+        SELECT 1 AS ok FROM games
+        WHERE game_id = ${gameId} AND deleted_at IS NULL AND phase IS NOT NULL
       `.pipe(Effect.map((rows) => rows.length > 0))
 
     const failConflict = (gameId: GameId, expected: GameVersion) =>
@@ -244,7 +250,8 @@ export const GameRepositoryLive = Layer.effect(
             WHERE game_id = ${gameId} AND deleted_at IS NULL
           `
           const gameRow = games[0]
-          if (gameRow === undefined) {
+          if (gameRow === undefined || gameRow.phase === null) {
+            // NULL phase = never dealt (lobby/abandoned lobby) — not a game.
             return yield* Effect.fail(new GameNotFound({ gameId }))
           }
           const players = yield* sql<{ user_id: string }>`
@@ -295,6 +302,139 @@ export const GameRepositoryLive = Layer.effect(
             ),
           )
         }).pipe(Effect.catchTag("SqlError", (e) => Effect.fail(storage("games.getEvents")(e)))),
+
+      saveLobby: (input) =>
+        input.lobby.status === "started"
+          ? Effect.die(
+              "saveLobby cannot write status 'started' — that transition is save() with the GameStarted batch (ADR-0019)",
+            )
+          : sql
+              .withTransaction(
+                Effect.gen(function* () {
+                  const status = input.lobby.status === "open" ? "lobby" : "abandoned"
+                  const newVersion = GameVersion.make(input.expectedVersion + 1)
+
+                  // 1. games — same version guard as save; lobby rows carry
+                  // NULL in the four dealt-game columns (migration 0003).
+                  if (input.expectedVersion === 0) {
+                    const inserted = yield* sql`
+                      INSERT INTO games (game_id, status, version)
+                      VALUES (${input.gameId}, ${status}, ${newVersion})
+                      ON CONFLICT (game_id) DO NOTHING
+                      RETURNING game_id
+                    `
+                    if (inserted.length === 0) {
+                      return yield* failConflict(input.gameId, input.expectedVersion)
+                    }
+                  } else {
+                    // The status guard makes "saveLobby against a dealt
+                    // game" structurally impossible — without it a
+                    // correct-version call could silently downgrade an
+                    // in_progress row to 'lobby' (review finding 4).
+                    const updated = yield* sql`
+                      UPDATE games
+                      SET status = ${status}, version = ${newVersion}, updated_at = now()
+                      WHERE game_id = ${input.gameId}
+                        AND version = ${input.expectedVersion}
+                        AND status IN ('lobby', 'abandoned')
+                        AND deleted_at IS NULL
+                      RETURNING game_id
+                    `
+                    if (updated.length === 0) {
+                      // Distinguish the two zero-row causes: a version race
+                      // is the typed VersionConflict; a version MATCH on a
+                      // dealt row is a caller contract violation — a defect,
+                      // like the status:"started" input above.
+                      const live = yield* liveVersion(input.gameId)
+                      if (live !== null && live === input.expectedVersion) {
+                        return yield* Effect.die(
+                          new Error(
+                            "saveLobby against a dealt game — the lobby→game transition is one-way (ADR-0019)",
+                          ),
+                        )
+                      }
+                      return yield* Effect.fail(
+                        new VersionConflict({
+                          gameId: input.gameId,
+                          expected: input.expectedVersion,
+                          actual: live,
+                        }),
+                      )
+                    }
+                  }
+
+                  // 2. game_players — mirror lobby.members (join order =
+                  // seat_index, compacted). Why the ascending upsert never
+                  // trips the partial unique (game_id, seat_index): the port
+                  // contract requires each saveLobby to differ from the
+                  // persisted membership by at most one order-preserving
+                  // removal or one append-at-tail (the only shapes the domain
+                  // transitions produce). Soft-deleting absentees FIRST frees
+                  // their seats; surviving members then only compact DOWNWARD
+                  // into just-vacated slots, and a joining/rejoining member
+                  // is always assigned the tail seat, which is free once the
+                  // survivors have moved. (A rejoiner's tombstone row —
+                  // possibly holding a LOWER old seat — resurrects at the
+                  // tail via the PK-conflict update, deleted_at back to
+                  // NULL.) An input outside that contract could collide
+                  // mid-loop and surface as a StorageError.
+                  const live = yield* sql<{ user_id: string }>`
+                    SELECT user_id FROM game_players
+                    WHERE game_id = ${input.gameId} AND deleted_at IS NULL
+                  `
+                  const memberSet = new Set<string>(input.lobby.members)
+                  for (const row of live) {
+                    if (!memberSet.has(row.user_id)) {
+                      yield* sql`
+                        UPDATE game_players SET deleted_at = now(), updated_at = now()
+                        WHERE game_id = ${input.gameId} AND user_id = ${row.user_id}
+                          AND deleted_at IS NULL
+                      `
+                    }
+                  }
+                  for (const [position, userId] of input.lobby.members.entries()) {
+                    yield* sql`
+                      INSERT INTO game_players (game_id, user_id, seat_index)
+                      VALUES (${input.gameId}, ${userId}, ${position})
+                      ON CONFLICT (game_id, user_id) DO UPDATE
+                      SET seat_index = EXCLUDED.seat_index, deleted_at = NULL,
+                          updated_at = now()
+                    `
+                  }
+
+                  return newVersion
+                }),
+              )
+              .pipe(Effect.catchTag("SqlError", (e) => Effect.fail(storage("games.saveLobby")(e)))),
+
+      loadLobby: (gameId) =>
+        Effect.gen(function* () {
+          const games = yield* sql<{ status: string; version: number }>`
+            SELECT status, version FROM games
+            WHERE game_id = ${gameId} AND deleted_at IS NULL
+          `
+          const gameRow = games[0]
+          if (gameRow === undefined) {
+            return yield* Effect.fail(new GameNotFound({ gameId }))
+          }
+          const members = yield* sql<{ user_id: string }>`
+            SELECT user_id FROM game_players
+            WHERE game_id = ${gameId} AND deleted_at IS NULL
+            ORDER BY seat_index
+          `
+          const status: LobbyStatus =
+            gameRow.status === "lobby"
+              ? "open"
+              : gameRow.status === "abandoned"
+                ? "abandoned"
+                : "started"
+          const lobby = yield* Schema.decodeUnknown(Lobby)({
+            id: gameId,
+            members: members.map((m) => m.user_id),
+            status,
+          }).pipe(Effect.mapError(storage("games.loadLobby.decode")))
+          return { lobby, version: GameVersion.make(Number(gameRow.version)) }
+        }).pipe(Effect.catchTag("SqlError", (e) => Effect.fail(storage("games.loadLobby")(e)))),
     }
   }),
 )

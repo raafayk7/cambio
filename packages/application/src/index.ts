@@ -9,13 +9,21 @@
  *     logger) live here.
  *   - Implementations of both live in `apps/api/src/infra`.
  *
- * Contents so far: the clock and id-generation ports (Task 1), plus CAM-4's
- * session signer port and the repo's first use cases — create-temporary-user
- * and verify-session (ADR-0018). The realtime publisher port arrives with
- * the event types it publishes.
+ * Contents: the clock, id-generation, seed, and realtime-publisher ports;
+ * CAM-4's session signer port; the user/session use cases (ADR-0018); and
+ * CAM-5's game lifecycle — lobby use cases, `executeGameCommand`, and the
+ * per-room actor registry (ADR-0019/0020).
  */
 export * from "./ports/Clock.js"
 export * from "./ports/IdGenerator.js"
+export * from "./ports/RealtimePublisher.js"
+export * from "./ports/Seed.js"
 export * from "./ports/SessionSigner.js"
+export * from "./room/RoomRegistry.js"
+export * from "./use-cases/CreateLobby.js"
 export * from "./use-cases/CreateTemporaryUser.js"
+export * from "./use-cases/ExecuteGameCommand.js"
+export * from "./use-cases/JoinLobby.js"
+export * from "./use-cases/LeaveLobby.js"
+export * from "./use-cases/StartGame.js"
 export * from "./use-cases/VerifySession.js"

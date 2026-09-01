@@ -96,10 +96,16 @@ authority, the event log never contains lobby history):
 **Room actor** (ADR-0020):
 
 8. **Serialization** — all commands for a room pass through that room's
-   single queue and are processed by one fiber, in enqueue order. Two
-   concurrent slam submissions produce a deterministic outcome: the
-   first-enqueued wins, the second receives the typed error the engine
-   gives a late/second slam; state reflects exactly one slam.
+   single queue and are processed by one fiber, in enqueue order. A race
+   (two concurrent slam submissions from different players) resolves
+   exactly as if the commands had been submitted sequentially in enqueue
+   order: each racer's reply and the resulting persisted state/event log
+   equal what the engine returns for first-then-second, deterministically.
+   The engine — not this contract — decides what a second slam means; the
+   playtested rules keep the window open and charge each failed slam a
+   penalty. _(Corrected in review: an earlier phrasing promised "the
+   second receives a typed error; state reflects exactly one slam", a
+   rule prior the engine contradicts — review finding 1.)_
 9. **Reconstruction** — a room actor starting fresh (first command after a
    simulated restart: new registry, same repository) serves an in-game room
    from persisted state and a lobby room from lobby rows, with identical
@@ -115,7 +121,10 @@ authority, the event log never contains lobby history):
     `closesAt`), so the lazy path is the actor's: before processing any
     command while the room's phase is `SlamWindow` with
     `ClockPort.now >= closesAt`, it first executes a `CloseSlamWindow` as
-    its own persisted and published batch. With timers suppressed
+    its own persisted and published batch. (As built, the injection is
+    skipped for a `Slam` — so a late slammer gets the engine's specific
+    `SlamTooLate`, not a generic `WrongPhase` — and for an explicit
+    `CloseSlamWindow`, which simply runs.) With timers suppressed
     (test-controlled clock), that lazy path alone closes the window, and
     the timer-driven and lazy paths produce identical states.
 
@@ -137,14 +146,16 @@ authority, the event log never contains lobby history):
 
 ### Acceptance criteria
 
-- [ ] All contract clauses above are pinned by tests (coverage table in the
+- [x] All contract clauses above are pinned by tests (coverage table in the
       backend child plan).
-- [ ] A queue-determinism test exists (clause 8) and passes repeatedly, not
-      flakily.
-- [ ] `pnpm --filter @cambio/api migrate` applies 0003 idempotently on a
-      database that already ran 0001–0002.
-- [ ] The quality gate passes, run bare (never piped):
-      `pnpm turbo build typecheck lint test`.
+- [x] A queue-determinism test exists (clause 8) and passes repeatedly, not
+      flakily — 20 fresh-room repetitions inside the test body, plus three
+      bare re-runs of the package suite.
+- [x] `pnpm --filter @cambio/api migrate` applies 0003 idempotently on a
+      database that already ran 0001–0002 (second run: "no pending
+      migrations (3 applied)").
+- [x] The quality gate passes, run bare (never piped):
+      `pnpm turbo build typecheck lint test` — 22/22 tasks, exit 0.
 
 ## Plan of work
 
@@ -194,7 +205,20 @@ cases build on it.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-01 — plan written, awaiting implementation
+- [x] 2026-09-01 — plan written, awaiting implementation
+- [x] 2026-09-01 13:16 — M1 domain Lobby model (`e91da8e`; see the backend
+      child plan's Progress for per-milestone detail)
+- [x] 2026-09-01 13:21 — M2 ports + adapter, M3 migration 0003 +
+      integration tests (Docker Postgres)
+- [x] 2026-09-01 17:00 — M4 use cases, M5 room registry/actor, all suites
+      green (domain 190, application 41, api 52+)
+- [x] 2026-09-01 17:10 — M6: full gate green (22/22 tasks), untouched-
+      surface and purity sweeps empty, plan docs reconciled
+- [x] 2026-09-01 18:00 — review fix cycle: findings 1–5 addressed (clause 8
+      corrected + race test pins the engine's sequential answer; actor
+      supervision + defect no-hang test; eviction/timer observability;
+      saveLobby status guard + contract precondition; plan reconciliation);
+      advisories from finding 6 deliberately deferred
 
 ## Decision log
 
@@ -253,8 +277,105 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
   point.
 - (from planning exploration) `CloseSlamWindow` deliberately carries no
   `playerId` — the actor's timer fiber is a legitimate issuer.
+- (implementation) A StartGame-specific VersionConflict unit test is
+  impossible from outside the use case: it loads the lobby's version
+  itself, so a stub can't get stale between its load and save. The
+  conflict path is pinned instead by ExecuteGameCommand's stale-`cached`
+  test, the registry's invalidate-and-reload test, and the integration
+  suite's stale-version test (13b).
+- (implementation) The repo-wide prettier check flagged a pre-existing
+  violation in `docs/plans/root/CAM-12.md` (landed unformatted); fixed in
+  the formatting commit rather than left to fail every future gate.
+- (implementation) The gate-piping trap AGENTS.md warns about bit during
+  M4: `pnpm --filter … lint | tail` masked a lint failure and a commit
+  landed red; caught immediately and amended. Bare runs only.
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+_(filled by `/review`, 2026-09-01)_
+
+**Verdict: fix-then-ship.** Independently verified: gate `pnpm turbo build
+typecheck lint test --force` 22/22 tasks, 296 tests (domain 190,
+application 41, api 52, config 13); migrate idempotent ("no pending
+migrations (3 applied)"); application suite stable across repeated bare
+runs. Clean on all recurring high-value checks: import boundaries, domain
+purity, ports placement, typed errors end to end, soft-delete/codec
+discipline, hidden-information (no client-facing payloads; publisher port
+carries the §5 warning), and every Decision Log user call.
+
+**Findings (ranked; fix cycle must re-run each finding's sweep, not
+spot-fix cited lines):**
+
+1. **Clause 8's second half is a wrong rule prior, and no test pins it**
+   (contract violation — of the document, not the engine). Verified by
+   direct engine reproduction: in the pinned race scenario both slams are
+   accepted (`SlamFailed`+`PenaltyDrawn` each; the window stays open and
+   admits multiple attempts), and the two racers are the same player on
+   different targets. "The second receives the typed error the engine
+   gives a late/second slam; state reflects exactly one slam" is
+   contradicted by the playtested engine. Sweep (all instances):
+   `docs/plans/root/CAM-5.md:101-102` and
+   `docs/plans/backend/CAM-5.md:646-647`. The race test's determinism half
+   (20 fresh rooms, identical outcome triples, serialized enqueue order)
+   is real and stays. Fix: rewrite both clause texts to the engine's
+   actual semantics and either assert the second slam's observed outcome
+   explicitly or build a true two-player double-submit on one target.
+2. **Actor fiber is unsupervised** (`packages/application/src/room/
+RoomRegistry.ts`): a defect inside `closeIfDue` (which runs before the
+   reply `Deferred` completes) or an interruption kills the room fiber
+   with its map entry left behind — every later caller for that room hangs
+   on `Deferred.await` forever. Fix direction: `Effect.onExit` cleanup
+   (remove entry under the lock, fail pending deferreds) and hoist
+   `closeIfDue` into the exit-guarded region.
+3. **Two clause halves lack an observing assertion**: clause 10's
+   abandoned-lobby eviction (the test's `LobbyNotJoinable` assertion holds
+   whether or not eviction happened) and clause 11's timer path
+   (`timedResult.journalOps` is computed but never asserted, so a
+   never-fired timer would still pass via the lazy fallback).
+4. **`saveLobby` adapter**: the "members only ever shift downward"
+   comment is unsound (a rejoiner shifts upward to the tail — safety
+   actually comes from compact-survivors-first-then-append); the
+   single-delta precondition that makes the diff collision-free is absent
+   from the port contract; and the guarded UPDATE lacks a
+   `status IN ('lobby','abandoned')` clause, so a correct-version
+   `saveLobby` against an `in_progress` row would silently downgrade it.
+   Unreachable through today's use cases; structural fix recommended.
+5. **Plan reconciliation misses** in `docs/plans/backend/CAM-5.md`
+   despite the "reconciled" Progress claim: step 5.1's `loadLobby`-first
+   bootstrap and "bounded Queue" texts, decision 13's "shuts its queue",
+   `RoomRegistryLive` deps missing `SeedPort`, the stubs module-layout row
+   missing `usersStub`, and the domain table missing
+   `src/testing/fixtures.ts` (`gid`).
+6. **Advisories**: `GameAdvanced` (full-truth carrier) deserves the same
+   viewFor warning as the publisher port; `Effect.die` with a raw string
+   sets a weak defect precedent; `RoomRegistry.key` not pinned in
+   `Ports.test.ts`; the lobby-restart test is vacuous by construction (the
+   in-game restart test carries clause 9); the 0003 CHECK is one-way
+   (a lobby row with non-null phase passes); `Lobby.members` schema admits
+   duplicates at the codec boundary; the application-layer skill's "room
+   state is a fold of game_events from seq 0" wording is now stale
+   (ADR-0014 makes the state row a materialized fold; the actor loads it —
+   sanctioned by ADR-0020's "loads or folds").
+
+**Fix cycle + re-review (2026-09-01, commit `abb53ba`): findings 1–5 all
+CLOSED — verdict upgraded to ship.** The re-review verified the finding-1
+sweep independently (widened grep; the old phrasing survives only inside
+corrective quotations), the race test's pure sequential expectation and
+cross-player assertion, the actor supervision code and defect no-hang
+test, the `roomCount`/timer-path observations, the `saveLobby`
+guard/comment/precondition and its dealt-row-defect integration test, and
+every plan-reconciliation item — with no regressions or scope creep.
+Gate after fixes: 22/22 tasks, 298 tests, application suite stable across
+repeated bare runs.
+
+Residual advisories from the re-review, deferred with finding 6's (all
+non-blocking): a caller racing a _dying_ actor gets a bare interrupt
+rather than a typed error or rerouting to the fresh actor (CAM-6's HTTP
+edge may want to map it); the outer per-envelope defect guard and the
+`ensuring` cleanup paths are correct by inspection but have no dedicated
+test (the finding-2 test exercises the inner guard); the defect no-hang
+test has no clause-indexed coverage-table row.
+
+Deferred (unchanged from planning): wire contracts, viewFor, live
+seed/publisher adapters, SLAM_WINDOW_MS plumbing, `setNotFoundHandler` —
+all CAM-6.
