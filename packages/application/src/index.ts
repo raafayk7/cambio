@@ -9,9 +9,13 @@
  *     logger) live here.
  *   - Implementations of both live in `apps/api/src/infra`.
  *
- * Task 1 is scaffolding only, so there are no use cases yet — just the two
- * infrastructure ports needed to prove the layering compiles. The realtime
- * publisher port arrives with the event types it publishes.
+ * Contents so far: the clock and id-generation ports (Task 1), plus CAM-4's
+ * session signer port and the repo's first use cases — create-temporary-user
+ * and verify-session (ADR-0018). The realtime publisher port arrives with
+ * the event types it publishes.
  */
 export * from "./ports/Clock.js"
 export * from "./ports/IdGenerator.js"
+export * from "./ports/SessionSigner.js"
+export * from "./use-cases/CreateTemporaryUser.js"
+export * from "./use-cases/VerifySession.js"

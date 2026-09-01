@@ -559,7 +559,17 @@ overclaim waiting to become a review finding.)_
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
-- [ ] 2026-09-01 — backend plan written; awaiting `/implement`
+- [x] 2026-09-01 — backend plan written; awaiting `/implement`
+- [x] 2026-09-01 11:20 — M1: `packages/contracts/src/User.ts` + barrel;
+      trim/length semantics verified in node before commit (padded name →
+      trimmed, ""/whitespace/33 rejected, 32 accepted). Commit `a75875c`.
+- [x] 2026-09-01 11:30 — M2: application test infra (vitest 3.2.7 +
+      @effect/vitest 0.30.0, `test` script, tsconfig include,
+      vitest.config.ts); `SessionSignerPort`+`SessionInvalid`+`SessionPayload`,
+      `createTemporaryUser`, `verifySession`+`SessionExpired` — each
+      test-first (red observed) — 12 tests green in 3 files; build,
+      typecheck, lint clean; `pnpm turbo test --filter=@cambio/application`
+      picks the script up.
 
 ## Surprises & notes for the root plan
 
