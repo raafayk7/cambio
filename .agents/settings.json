@@ -12,6 +12,19 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/format-markdown.sh",
+            "timeout": 30,
+            "statusMessage": "Formatting edited Markdown"
+          }
+        ]
+      }
     ]
   }
 }

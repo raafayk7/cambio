@@ -1,16 +1,24 @@
 ---
 description: Review an implemented Linear task against its functional contract and the architecture skills
-argument-hint: CAM-xxx
+argument-hint: CAM-xxx [extra instructions…]
 ---
 
-Review the implementation of **$ARGUMENTS** on two axes: does it satisfy the
+> **Arguments:** the issue id is `$1` — the first whitespace-delimited token
+> of the invocation. Every `$1` below means that id and nothing else. The
+> full invocation was “$ARGUMENTS”; anything in it beyond the id is the
+> user's accompanying instruction — honor it alongside or after this
+> workflow, and never substitute it into ids, file paths, branch names, or
+> Linear lookups. (A multi-line invocation once expanded into every id slot
+> of this template and produced garbled paths — this rule is the fix.)
+
+Review the implementation of **$1** on two axes: does it satisfy the
 plan's functional contract, and does it conform to this repo's architecture.
 This command is conformance-focused; generic bug-hunting is `/code-review`'s
 job and can be run separately.
 
 ## 1. Load
 
-Read `docs/plans/root/$ARGUMENTS.md` (the Functional Contract and Validation
+Read `docs/plans/root/$1.md` (the Functional Contract and Validation
 sections are the review baseline), the child plans, referenced ADRs, and the
 diff of the work: the task branch against the current release branch (per
 the Linear ["Release
@@ -57,6 +65,14 @@ result as unverified until you have re-run it fresh at least once during the
 review. If the plan's Validation section names knobs (e.g. a raised
 simulation/adversarial count), run at least one pass with the knob raised.
 
+**Timing and concurrency claims need an executed probe.** A finding, fix,
+or verdict about timer, queue, clock, or race behavior must be backed by
+at least one probe actually run against the real code (a throwaway test,
+deleted after) — never code reading alone. CAM-7's reviewers audited the
+timer logic hard from source and were sound as far as reading goes; a
+five-minute probe then found a zero-duration-timer behavior none of them
+could see, which had three assertions passing on scheduling margins.
+
 ## 4. Adjudicate and report
 
 Merge findings, deduplicate, and verify each finding yourself before
@@ -80,9 +96,9 @@ session trusts blindly.
 
 Write the results into the root plan's **Outcomes & Retrospective** section
 (what passed, findings, anything deferred). Post a Linear comment on
-$ARGUMENTS with the verdict; if the verdict is ship, move the issue to
+$1 with the verdict; if the verdict is ship, move the issue to
 **Development Done**, otherwise leave it in **In Progress** for the fix
 cycle. Then report to the user: overall verdict first
 (ship / fix-then-ship / re-plan), findings with evidence, and what you ran.
 Do not fix findings in this command — the user decides what gets addressed.
-On a ship verdict, suggest `/ship $ARGUMENTS` as the next step.
+On a ship verdict, suggest `/ship $1` as the next step.

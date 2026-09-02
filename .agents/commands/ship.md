@@ -1,18 +1,26 @@
 ---
 description: Open the PR for a finished task — sweep up final commits, push, create the PR against the release branch, link it to Linear
-argument-hint: CAM-xxx
+argument-hint: CAM-xxx [extra instructions…]
 ---
 
-Ship task **$ARGUMENTS**: turn the finished task branch into a PR against
+> **Arguments:** the issue id is `$1` — the first whitespace-delimited token
+> of the invocation. Every `$1` below means that id and nothing else. The
+> full invocation was “$ARGUMENTS”; anything in it beyond the id is the
+> user's accompanying instruction — honor it alongside or after this
+> workflow, and never substitute it into ids, file paths, branch names, or
+> Linear lookups. (A multi-line invocation once expanded into every id slot
+> of this template and produced garbled paths — this rule is the fix.)
+
+Ship task **$1**: turn the finished task branch into a PR against
 the current release branch. This command never merges — merging the PR is
 the user's decision.
 
 ## 1. Preflight
 
-- Confirm the current branch is the task branch for $ARGUMENTS (Linear's
+- Confirm the current branch is the task branch for $1 (Linear's
   suggested branch name, e.g. `raafaykazmi/cam-1-…`). If not, find and check
   it out; if it doesn't exist, stop — there is nothing to ship.
-- Read `docs/plans/root/$ARGUMENTS.md`. If the Outcomes & Retrospective
+- Read `docs/plans/root/$1.md`. If the Outcomes & Retrospective
   section does not show a passing `/review` verdict, warn the user and ask
   before proceeding — shipping unreviewed work should be a deliberate
   choice, not a default.
@@ -25,7 +33,7 @@ the user's decision.
 
 - If the working tree has uncommitted changes (typically review fixes),
   commit them on the task branch with a conventional message referencing
-  $ARGUMENTS. Unrelated-looking changes: ask before including.
+  $1. Unrelated-looking changes: ask before including.
 - If anything was committed in this step, rerun
   `pnpm turbo build typecheck lint test` — never open a PR from a red gate.
 - If the release branch has moved since the task branch was cut, rebase or
@@ -38,12 +46,12 @@ the user's decision.
 Use `gh pr create` with base = the release branch (never `main` or
 `development` — task PRs target the release branch only):
 
-- **Title:** `$ARGUMENTS: <task title>` — the identifier prefix is what the
+- **Title:** `$1: <task title>` — the identifier prefix is what the
   Linear GitHub integration keys on.
 - **Body**, generated from the root plan, not written from scratch:
   functional contract in two or three sentences; milestones completed;
   deviations and notable Decision Log entries; ADRs written or touched;
-  links to the plan docs (`docs/plans/root/$ARGUMENTS.md` and child plans);
+  links to the plan docs (`docs/plans/root/$1.md` and child plans);
   the review verdict. End the body with:
   `🤖 Generated with [Claude Code](https://claude.com/claude-code)`
 
@@ -56,9 +64,9 @@ Done below overrides it.
 The Linear GitHub integration auto-attaches the PR via the branch name and
 title; verify the attachment appeared on the issue (MCP `get_issue`), and if
 it didn't, attach the PR URL explicitly (`save_issue` with `links`). Post a
-Linear comment on $ARGUMENTS with the PR URL and a one-line summary.
+Linear comment on $1 with the PR URL and a one-line summary.
 
-**Downstream brief sweep:** fetch the issues $ARGUMENTS blocks or is
+**Downstream brief sweep:** fetch the issues $1 blocks or is
 related to (MCP `get_issue` with `includeRelations`) and re-read each
 description against what this task actually decided, built, or resolved. A
 brief whose premises this task consumed — e.g. it promises a decision an

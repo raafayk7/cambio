@@ -1,9 +1,17 @@
 ---
 description: Plan a Linear task — interview, explore code, decide ADRs, write root + child plans
-argument-hint: CAM-xxx
+argument-hint: CAM-xxx [extra instructions…]
 ---
 
-Plan the task **$ARGUMENTS** end to end. The output is a set of plan
+> **Arguments:** the issue id is `$1` — the first whitespace-delimited token
+> of the invocation. Every `$1` below means that id and nothing else. The
+> full invocation was “$ARGUMENTS”; anything in it beyond the id is the
+> user's accompanying instruction — honor it alongside or after this
+> workflow, and never substitute it into ids, file paths, branch names, or
+> Linear lookups. (A multi-line invocation once expanded into every id slot
+> of this template and produced garbled paths — this rule is the fix.)
+
+Plan the task **$1** end to end. The output is a set of plan
 documents the `/implement` command can execute without this session's
 context. Do not write any implementation code.
 
@@ -22,11 +30,11 @@ context. Do not write any implementation code.
 
 ## 2. Pull the brief
 
-Fetch issue $ARGUMENTS from Linear (MCP `get_issue` — team "Cambio").
+Fetch issue $1 from Linear (MCP `get_issue` — team "Cambio").
 Read its description, comments, and linked issues, and move the issue to
 **Planning**. Read `AGENTS.md`, and the HANDOFF/ADR sections the task
 plausibly touches. If plan files for
-$ARGUMENTS already exist in `docs/plans/`, stop and ask whether to revise or
+$1 already exist in `docs/plans/`, stop and ask whether to revise or
 restart.
 
 ## 3. Classify and interview
@@ -66,7 +74,7 @@ instead. If the task contradicts an existing ADR, surface that now.
 
 ## 6. Write the plans
 
-- **Root plan** — `docs/plans/root/$ARGUMENTS.md` from
+- **Root plan** — `docs/plans/root/$1.md` from
   `.agents/templates/root-plan.md`. You write this one yourself; the
   Functional Contract section is the task's spec and must be testable
   statements, not vibes. **Probe-verify rule claims:** any contract clause
@@ -77,8 +85,8 @@ instead. If the task contradicts an existing ADR, surface that now.
   contract clause encoding a wrong slam-race prior while the engine sat
   there, runnable.) Sequence the Plan of Work so `contracts` schemas
   freeze before any parallel frontend/backend work.
-- **Child plans** — `docs/plans/backend/$ARGUMENTS.md` and/or
-  `docs/plans/frontend/$ARGUMENTS.md` from
+- **Child plans** — `docs/plans/backend/$1.md` and/or
+  `docs/plans/frontend/$1.md` from
   `.agents/templates/child-plan.md`, one per affected side. Delegate each to
   a subagent that receives the root plan, the relevant explorer report, and
   the instruction to follow the layer skills. Review what comes back against
@@ -97,7 +105,7 @@ Single-side tasks get root + that one child plan only.
 Present the root plan to the user for sign-off; do not start
 implementation. **After sign-off**, commit the planning outputs (plan docs +
 any ADRs — nothing else) to the release branch with message
-`docs($ARGUMENTS): plan` and push, so the tree is clean for the next
-command. Then post a Linear comment on $ARGUMENTS summarizing the plan
+`docs($1): plan` and push, so the tree is clean for the next
+command. Then post a Linear comment on $1 summarizing the plan
 (contract in two sentences, milestones, ADRs written); the issue stays in
 **Planning** until `/implement` picks it up.
