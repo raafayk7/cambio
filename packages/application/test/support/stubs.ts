@@ -45,7 +45,7 @@ export const makeJournal = (): Array<JournalEntry> => []
 export const opsOf = (journal: ReadonlyArray<JournalEntry>): ReadonlyArray<string> =>
   journal.map((e) => e.op)
 
-interface GameRow {
+export interface GameRow {
   version: GameVersion
   lobby: Lobby | null
   state: GameState | null

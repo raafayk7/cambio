@@ -1,11 +1,13 @@
 import {
+  ClockPort,
   RealtimePublisherPort,
   RoomRegistryLive,
   SeedPort,
   SessionSignerPort,
 } from "@cambio/application"
 import type { GameEvent, GameId, GameState, Lobby } from "@cambio/domain"
-import { Effect, Layer, ManagedRuntime, Redacted } from "effect"
+import { Timestamp } from "@cambio/domain"
+import { Effect, Layer, ManagedRuntime, Redacted, Ref } from "effect"
 import { pino } from "pino"
 
 import type { AppConfig } from "../../src/config.js"
@@ -67,21 +69,52 @@ const recordingPublisher = Layer.succeed(RealtimePublisherPort, {
     }),
 })
 
-const PortsLayer = Layer.mergeAll(
-  ClockLive,
-  IdGeneratorLive,
-  Layer.succeed(SessionSignerPort, testSigner),
-  Layer.succeed(SeedPort, { nextSeed: Effect.succeed(TEST_SEED) }),
-  recordingPublisher,
-  GameRepositoryLive,
-  UserRepositoryLive,
-)
+/**
+ * Settable authority clock (CAM-7): a `Ref`-backed `ClockPort`, twin of the
+ * one in `packages/application/test/support/stubs.ts`. Only the engine and
+ * lateness checks read it — the actor's timer fiber sleeps on the runtime
+ * clock (real time here; no TestClock in a ManagedRuntime), so suites that
+ * must keep timers inert use a large `slamWindowMs` and move only this.
+ */
+export const makeSettableClock = (start: number) => {
+  const ref = Effect.runSync(Ref.make<Timestamp>(Timestamp.make(start)))
+  return {
+    layer: Layer.succeed(ClockPort, { now: Ref.get(ref) }),
+    set: (t: number): void => Effect.runSync(Ref.set(ref, Timestamp.make(t))),
+  }
+}
 
-/** Everything `AppServices` needs, over the test database. */
-export const TestAppLayer = Layer.mergeAll(
-  PortsLayer,
-  RoomRegistryLive.pipe(Layer.provide(PortsLayer)),
-).pipe(Layer.provideMerge(TestDatabaseLive))
+/** Port overrides for `makeTestApp` (CAM-7). Defaults match production-shape wiring. */
+export interface TestPorts {
+  readonly clock?: Layer.Layer<ClockPort>
+  readonly seed?: number
+}
+
+/**
+ * Ports assembled per app so an injected clock reaches `RoomRegistryLive`
+ * at construction — a layer merged on top of a built `TestAppLayer` would
+ * never be seen by the registry (root plan Surprise, milestone M1).
+ */
+const makePortsLayer = (ports?: TestPorts) =>
+  Layer.mergeAll(
+    ports?.clock ?? ClockLive,
+    IdGeneratorLive,
+    Layer.succeed(SessionSignerPort, testSigner),
+    Layer.succeed(SeedPort, { nextSeed: Effect.succeed(ports?.seed ?? TEST_SEED) }),
+    recordingPublisher,
+    GameRepositoryLive,
+    UserRepositoryLive,
+  )
+
+const makeAppLayer = (ports?: TestPorts) => {
+  const portsLayer = makePortsLayer(ports)
+  return Layer.mergeAll(portsLayer, RoomRegistryLive.pipe(Layer.provide(portsLayer))).pipe(
+    Layer.provideMerge(TestDatabaseLive),
+  )
+}
+
+/** Everything `AppServices` needs, over the test database (default ports). */
+export const TestAppLayer = makeAppLayer()
 
 const baseConfig: AppConfig = {
   port: 0,
@@ -105,11 +138,12 @@ const baseConfig: AppConfig = {
 /**
  * One `{ app, runtime }` per suite file; `afterAll` must `app.close()` and
  * `runtime.dispose()`. Overrides let attribute/TTL tests pin that cookie
- * behavior follows config (C4.2).
+ * behavior follows config (C4.2); `ports` lets timing suites inject a
+ * settable clock or a per-scenario seed (CAM-7 M1).
  */
-export const makeTestApp = async (overrides?: Partial<AppConfig>) => {
+export const makeTestApp = async (overrides?: Partial<AppConfig>, ports?: TestPorts) => {
   const config: AppConfig = { ...baseConfig, ...overrides }
-  const runtime = ManagedRuntime.make(TestAppLayer)
+  const runtime = ManagedRuntime.make(ports === undefined ? TestAppLayer : makeAppLayer(ports))
   const app = await buildServer({
     config,
     logger: pino({ level: "silent" }),
