@@ -179,6 +179,13 @@ describe("GET /games/:gameId/view (C1.6)", () => {
     expect(real.json()).toEqual(unknown.json())
   })
 
+  it("requires a session: unauthenticated → 401 (C1.7)", async () => {
+    const { gameId } = await startGame()
+    const res = await get(`/games/${gameId}/view`)
+    expect(res.statusCode).toBe(401)
+    expect((res.json() as { error: { tag: string } }).error.tag).toBe("Unauthorized")
+  })
+
   it("unmatched routes get the curated contract 404 (C1.11)", async () => {
     const res = await app.inject({ method: "GET", url: "/definitely/not/a/route" })
     expect(res.statusCode).toBe(404)
