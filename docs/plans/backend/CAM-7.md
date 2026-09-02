@@ -97,23 +97,23 @@ release-v0 tip, 2026-09-02):
   real-slam e2e (`:278-360`, 60s window) stays as-is; lazy close is
   implicitly exercised by the `slamWindowMs: 1` full-game script
   (`:146,:198-203`).
-- **Application actor harness**
-  (`packages/application/test/RoomRegistry.test.ts`): the two-clock design
-  documented at `:27-37` — `makeSettableClock`
-  (`test/support/stubs.ts:186-192`, Ref-backed `ClockPort`) is the engine
-  authority; Effect's `TestClock` governs the timer fiber's `Effect.sleep`
-  (it.effect provides `TestClock`, so in-process timers never fire unless
-  `TestClock.adjust` runs — determinism for free). Harness `makeHarness`
-  (`:44-57`), chooser (`:65-80`), `seedLobby` (`:83-88`),
-  `driveToSlamWindow` (`:91-103`). Already pinned there: slam-race
-  serialization over 20 rooms (`:123-`, frozen clock),
-  timer-vs-lazy-close equivalence + stale-timer no-op (`:388-453`),
-  restart reconstruction (`:317-386` — never restarted while the phase is
-  `SlamWindow`; "one `Effect.provide(h.layer)` = one process lifetime; a
-  second provide over the same repo stub IS the simulated restart").
-  Stub kit: `makeGameRepoStub` (honours version guards, `poke()`,
-  `dieOnNextSave()`), `makeJournal`/`opsOf`, `makePublisherStub`,
-  `seedStub`, `usersStub` (`test/support/stubs.ts`).
+- **Application actor harness** — since this task's M2 extraction it lives
+  in `packages/application/test/support/registry.ts` (two-clock design in
+  its header doc: the Ref-backed `makeSettableClock` `ClockPort` from
+  `test/support/stubs.ts` is the engine authority; Effect's `TestClock`
+  governs the timer fiber's `Effect.sleep`; it.effect provides `TestClock`,
+  so in-process timers with a positive duration never fire unless
+  `TestClock.adjust` runs — but see Surprises: a ZERO-duration sleep fires
+  regardless). Exports: `makeHarness`, `choose`, `seedLobby`,
+  `driveToSlamWindow`, `config`/`NOW`/`SEED`. Pinned in
+  `RoomRegistry.test.ts` (post-extraction coordinates): slam-race
+  serialization over 20 rooms (`:42-118`, frozen clock),
+  restart reconstruction (`:236-306`), timer-vs-lazy-close equivalence +
+  stale-timer no-op (`:307-372`); "one `Effect.provide(h.layer)` = one
+  process lifetime; a second provide over the same repo stub IS the
+  simulated restart". Stub kit: `makeGameRepoStub` (honours version
+  guards, `poke()`, `dieOnNextSave()`), `makeJournal`/`opsOf`,
+  `makePublisherStub`, `seedStub`, `usersStub` (`test/support/stubs.ts`).
 - **Domain testing subpath** `@cambio/domain/testing`: `legalCandidates`
   enumerates every legal slam including the give-slot fan-out (excludes
   `CloseSlamWindow`); fixtures `gid`/`uid`/`ts`. Boundary discipline from
@@ -197,7 +197,7 @@ Layer.Layer<ClockPort>; seed?: number })` — and assembles
    socket request would; real sockets add only OS nondeterminism.
    Because enqueue order is not controllable, the assertion is
    **order-agnostic**, mirroring the amended clause-8 stance of
-   `RoomRegistry.test.ts:123-`: read the processing order back from the
+   `RoomRegistry.test.ts:42-118`: read the processing order back from the
    publisher journal, replay the two slams **pure** in that order, and
    require each HTTP reply (status + view) and the final persisted
    outcome to equal the sequential replay exactly, with versions
@@ -220,8 +220,11 @@ Layer.Layer<ClockPort>; seed?: number })` — and assembles
 9. **Driver extraction, api side:** `makePlayers`, `toWire`,
    `normalize`, `apply`, and the lobby-create/join/start boilerplate
    move from `EndToEndGame.test.ts` into a new
-   `apps/api/test/support/game-driver.ts`; `EndToEndGame.test.ts` gets
-   an import-only edit. The slam suite's chooser differs from the
+   `apps/api/test/support/game-driver.ts`; `EndToEndGame.test.ts`
+   consumes them. NOT purely import-only (review F4): `setupGame` asserts
+   the join status and clears the publisher journal before start, which
+   its second suite previously did not; and (fix cycle) the room-stream
+   whitelist scan now calls `rulePublicSlugs` from `support/leaks.ts`. The slam suite's chooser differs from the
    existing `choose` (it must _seek_ slams, not filter them out), so the
    chooser stays per-suite; only the mechanical plumbing is shared.
 10. **New suites, not extensions:** application timing tests land in a
@@ -236,16 +239,17 @@ Layer.Layer<ClockPort>; seed?: number })` — and assembles
 New/changed files — all under test directories; **no production file
 changes are planned** (any exception is a Surprise with its forcing test):
 
-| File                                             | Change | Job                                                                                                                                               |
-| ------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/api/test/support/http.ts`                  | edit   | M1: per-call ports assembly; `makeTestApp(overrides?, ports?)` with `clock`/`seed` overrides (decisions 1, 3); settable-clock helper (decision 2) |
-| `packages/application/test/support/registry.ts`  | new    | Extracted actor harness: `makeHarness`, `choose`, `seedLobby`, `driveToSlamWindow` (decision 8)                                                   |
-| `packages/application/test/RoomRegistry.test.ts` | edit   | Import-only: consume the extracted helpers; zero assertion changes                                                                                |
-| `packages/application/test/SlamTiming.test.ts`   | new    | M2: C1.3 actor pin, C2.3 processing-time race, C4.2 application half                                                                              |
-| `apps/api/test/support/game-driver.ts`           | new    | Extracted e2e plumbing: `makePlayers`, `toWire`, `normalize`, `apply`, lobby setup (decision 9)                                                   |
-| `apps/api/test/EndToEndGame.test.ts`             | edit   | Import-only: consume the extracted helpers; zero assertion changes                                                                                |
-| `apps/api/test/SlamWindow.test.ts`               | new    | M3: four cells + leak assertions, late-slam 422, HTTP race, sleeping-server lazy close, timer close, restart                                      |
-| `packages/application/test/support/stubs.ts`     | edit   | One-word change: `export` on `interface GameRow` — TS4023 once `makeHarness` (whose repo stub type names it) became an export of `registry.ts`    |
+| File                                             | Change | Job                                                                                                                                                                  |
+| ------------------------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/test/support/http.ts`                  | edit   | M1: per-call ports assembly; `makeTestApp(overrides?, ports?)` with `clock`/`seed` overrides (decisions 1, 3); settable-clock helper (decision 2)                    |
+| `packages/application/test/support/registry.ts`  | new    | Extracted actor harness: `makeHarness`, `choose`, `seedLobby`, `driveToSlamWindow` (decision 8)                                                                      |
+| `packages/application/test/RoomRegistry.test.ts` | edit   | Import-only: consume the extracted helpers; zero assertion changes                                                                                                   |
+| `packages/application/test/SlamTiming.test.ts`   | new    | M2: C1.3 actor pin, C2.3 processing-time race, C4.2 application half                                                                                                 |
+| `apps/api/test/support/game-driver.ts`           | new    | Extracted e2e plumbing: `makePlayers`, `toWire`, `normalize`, `apply`, lobby setup (decision 9)                                                                      |
+| `apps/api/test/EndToEndGame.test.ts`             | edit   | Consume the extracted helpers; `setupGame` adds a join assertion + pre-start journal clear to the second suite (review F4); whitelist scan now via `rulePublicSlugs` |
+| `apps/api/test/SlamWindow.test.ts`               | new    | M3: four cells + leak assertions, late-slam 422, HTTP race, sleeping-server lazy close, timer close, restart                                                         |
+| `packages/application/test/support/stubs.ts`     | edit   | One-word change: `export` on `interface GameRow` — TS4023 once `makeHarness` (whose repo stub type names it) became an export of `registry.ts`                       |
+| `apps/api/test/support/leaks.ts`                 | edit   | Fix cycle (review F7): `rulePublicSlugs` — the single rule-public whitelist, typed over `GameEvent`, shared by both room-stream scans                                |
 
 Untouched surfaces (the close-out sweep enforces): `packages/domain/src`,
 `packages/contracts/src`, `packages/application/src`, `apps/api/src`,
@@ -495,23 +499,23 @@ below are plan-time orientation only.)_
 New tests live in `packages/application/test/SlamTiming.test.ts` ("ST")
 and `apps/api/test/SlamWindow.test.ts` ("SW").
 
-| Clause | Test (file + name)                                                                                                                                                                                                                     | What is asserted                                                                                                                                                                                                                                                                                   |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1.1   | pre-existing `Slam.test.ts:337` stands; SW "opponent/correct with give, then two incorrect attempts by the same player (C3.1/C3.2/C2.2)" re-observes it e2e                                                                            | `closesAt === EPOCH + BIG` unchanged after three slam attempts in one window                                                                                                                                                                                                                       |
-| C1.2   | pre-existing — `Config.test.ts:86-90`, `Lobbies.test.ts:160`, `EventProjection.test.ts` GameStarted rows; CAM-7 adds nothing                                                                                                           | (standing citations)                                                                                                                                                                                                                                                                               |
-| C1.3   | ST "a late Slam is SlamTooLate, never WrongPhase — the lazy close is skipped for slams (C1.3)"; HTTP halves in SW "a late slam is 422 SlamTooLate and closes nothing (C1.3/C1.4)" and SW restart                                       | at `now === closesAt` (half-open boundary) the actor's reply error tag is `SlamTooLate` and NOT `WrongPhase`, with an empty journal — nothing persisted or published for the refusal                                                                                                               |
-| C1.4   | SW "a late slam is 422 SlamTooLate and closes nothing (C1.3/C1.4)"                                                                                                                                                                     | HTTP 422 with `error.tag === "SlamTooLate"`; `GET /view` still shows `SlamWindow` with the original `closesAt`; zero journal entries                                                                                                                                                               |
-| C1.5   | pre-existing — `GameCommands.test.ts:114-119` (wire `CloseSlamWindow` → 400); CAM-7 adds nothing                                                                                                                                       | (standing citation)                                                                                                                                                                                                                                                                                |
-| C1.6   | actor level stands (`RoomRegistry.test.ts` timer-vs-lazy); SW "the timer-fired close arrives through the same persist+publish path, unprompted (C1.6)"                                                                                 | with no further command, the `[SlamWindowClosed, TurnAdvanced]` batch appears in the real publisher journal within the 10s deadline-poll, exactly once; `GET /view` equals the pure replay; the next command adds one batch                                                                        |
-| C2.1   | actor level stands (`RoomRegistry.test.ts` slam race); SW "concurrent slams over HTTP resolve exactly as the sequential replay in processing order (C2.1)"                                                                             | `Promise.all` injected slams: processing order read from journal `slammerId`s; each reply's status/view/version equals the pure sequential replay in that order (versions `V+1`, `V+2`); final `GET /view` matches                                                                                 |
-| C2.2   | domain pin stands (`Slam.test.ts:337`); e2e half in SW "opponent/correct with give, then two incorrect attempts by the same player (C3.1/C3.2/C2.2)"                                                                                   | three slam attempts by the same player (Alice) inside one window over HTTP, each 200 with reply-view equality                                                                                                                                                                                      |
-| C2.3   | ST "lateness is read per envelope at processing time: the clock crossing closesAt mid-race fails only the later slam (C2.3)"                                                                                                           | one-shot publisher hook moves the clock to `closesAt` inside slam A's processing: A equals the pure engine answer at `closesAt - 1`, B fails `SlamTooLate`, journal holds exactly A's `["save","publishGame"]`                                                                                     |
-| C3.1   | domain pin stands (`Slam.test.ts:51-149`); e2e in SW "own/correct: the §1.5 reveal rides the room channel and the hand shrinks (C3.1/C3.2)" + SW "opponent/correct with give, …"                                                       | all four cells over HTTP (own±, opponent±): 200 replies with UNnormalized view equality against the local replay, hand shrink/hole, give fills the vacated slot, penalties into the lowest free slot — all leak-free                                                                               |
-| C3.2   | projection pin stands (`EventProjection.test.ts:94-268`); e2e via `expectRoomRevealOnly` in both SW cell tests                                                                                                                         | `SlamSucceeded`/`SlamFailed` carry the card on the room stream (the reveal); projected `PenaltyDrawn` and `CardGivenFromHand` have no `card` property; slam-only batches produce zero per-player deliveries                                                                                        |
-| C3.3   | pre-existing — `Slam.test.ts:245,293,313`, `Simulation.test.ts:250-253`; e2e reach not required (root clause): no chosen seed reaches zero-card/`DrawSkipped` cells over HTTP, domain pins remain the coverage                         | (standing citations)                                                                                                                                                                                                                                                                               |
-| C4.1   | actor level stands; SW "sleeping server: the next command lazily closes the expired window as its own batch (C4.1)"                                                                                                                    | after expiry with an inert timer, the next command returns 200; journal shows the `[SlamWindowClosed, TurnAdvanced]` batch before the command's batch; reply version is `V+2` (two saves)                                                                                                          |
-| C4.2   | ST "restart mid-window: the rebuilt actor arms no timer, rejects the late slam, and closes lazily on the next command (C4.2)"; SW "restart mid-window over the same rows: late slam 422, then a lazy close on the next command (C4.2)" | second registry/app over the same rows: bootstrap `["load"]` only for the refused late slam (`SlamTooLate`), then `["load","save","publishGame","save","publishGame"]` with the close batch `[SlamWindowClosed, TurnAdvanced]` first; over HTTP the same story with 422 then 200 and view equality |
-| C4.3   | no test by design — documented-not-fixed (root Decision Log); the C4.2 tests are the evidence that a parked window is safe (`closesAt` still governs, nobody slams late)                                                               | (justification, not a test)                                                                                                                                                                                                                                                                        |
+| Clause | Test (file + name)                                                                                                                                                                                                                        | What is asserted                                                                                                                                                                                                                                                                                                                                                                            |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1.1   | pre-existing `Slam.test.ts:337` stands; SW "opponent/correct with give, then two incorrect attempts by the same player (C3.1/C3.2/C2.2)" re-observes it e2e                                                                               | `closesAt === EPOCH + BIG` unchanged after three slam attempts in one window                                                                                                                                                                                                                                                                                                                |
+| C1.2   | pre-existing — `Config.test.ts:86-90`, `Lobbies.test.ts:160`, `EventProjection.test.ts` GameStarted rows; CAM-7 adds nothing                                                                                                              | (standing citations)                                                                                                                                                                                                                                                                                                                                                                        |
+| C1.3   | ST "a late Slam is SlamTooLate, never WrongPhase — the lazy close is skipped for slams (C1.3)"; HTTP halves in SW "a late slam is 422 SlamTooLate, persists nothing, and the window closes exactly once (C1.3/C1.4)" and SW restart       | at `now === closesAt` (half-open boundary) the actor's reply error tag is `SlamTooLate` and NOT `WrongPhase`; no journal batch carries a slam outcome (race-free form — a due window's zero-duration timer close may legally follow, see Surprises)                                                                                                                                         |
+| C1.4   | SW "a late slam is 422 SlamTooLate, persists nothing, and the window closes exactly once (C1.3/C1.4)"                                                                                                                                     | HTTP 422 with `error.tag === "SlamTooLate"`; no slam outcome in any journal batch; exactly one `[SlamWindowClosed, TurnAdvanced]` batch precedes the next command's batch                                                                                                                                                                                                                   |
+| C1.5   | pre-existing — `GameCommands.test.ts:114-119` (wire `CloseSlamWindow` → 400); CAM-7 adds nothing                                                                                                                                          | (standing citation)                                                                                                                                                                                                                                                                                                                                                                         |
+| C1.6   | actor level stands (`RoomRegistry.test.ts` timer-vs-lazy); SW "the timer-fired close arrives through the same persist+publish path, unprompted (C1.6)"                                                                                    | with no further command, the `[SlamWindowClosed, TurnAdvanced]` batch appears in the real publisher journal within the 10s deadline-poll, exactly once; `GET /view` equals the pure replay; the next command adds one batch                                                                                                                                                                 |
+| C2.1   | actor level stands (`RoomRegistry.test.ts:42-118`); SW "concurrent slams over HTTP resolve exactly as the sequential replay in processing order (C2.1)"                                                                                   | `Promise.all` injected slams: processing order read from journal `slammerId`s (a headless batch throws); each reply's status/view/version equals the pure sequential replay in that order (loser: 422 with the engine's exact error tag); final `GET /view` matches and is leak-scanned                                                                                                     |
+| C2.2   | domain pin stands (`Slam.test.ts:337`); e2e half in SW "opponent/correct with give, then two incorrect attempts by the same player (C3.1/C3.2/C2.2)"                                                                                      | three slam attempts by the same player (Alice) inside one window over HTTP, each 200 with reply-view equality                                                                                                                                                                                                                                                                               |
+| C2.3   | ST "processing-time lateness: a slam submitted in-window but queued behind a slower command is SlamTooLate (C2.3)"                                                                                                                        | BOTH slams enqueued at `closesAt - 1` (A parks in its publish on a gate until B is queued, then the clock crosses): A equals the pure engine answer at `closesAt - 1`, B fails `SlamTooLate` — arrival-time stamping would have let B succeed, so the test discriminates the designs (review F1)                                                                                            |
+| C3.1   | domain pin stands (`Slam.test.ts:51-149`); e2e in SW "own/correct: the §1.5 reveal rides the room channel and the hand shrinks (C3.1/C3.2)" + SW "opponent/correct with give, …"                                                          | all four cells over HTTP (own±, opponent±): 200 replies with UNnormalized view equality against the local replay, hand shrink/hole, give fills the vacated slot, penalties into the lowest free slot — all leak-free                                                                                                                                                                        |
+| C3.2   | projection pin stands (`EventProjection.test.ts:94-268`); e2e via `expectRoomRevealOnly` + explicit reveal-presence assertions in both SW cell tests                                                                                      | `SlamSucceeded` AND `SlamFailed` reveal cards asserted PRESENT on the room stream (review F3); projected `PenaltyDrawn` and `CardGivenFromHand` have no `card` property; slam-only batches produce zero per-player deliveries; whitelist is the shared `rulePublicSlugs`                                                                                                                    |
+| C3.3   | pre-existing — `Slam.test.ts:245,293,313`, `Simulation.test.ts:250-253`; e2e reach not required (root clause): no chosen seed reaches zero-card/`DrawSkipped` cells over HTTP, domain pins remain the coverage                            | (standing citations)                                                                                                                                                                                                                                                                                                                                                                        |
+| C4.1   | actor level stands; SW "sleeping server: the next command lazily closes the expired window as its own batch (C4.1)"                                                                                                                       | after expiry with an inert timer, the next command returns 200; journal shows the `[SlamWindowClosed, TurnAdvanced]` batch before the command's batch; reply version is `V+2` (two saves)                                                                                                                                                                                                   |
+| C4.2   | ST "restart mid-window: the late slam is refused and the window closes exactly once before the next command (C4.2)"; SW "restart mid-window over the same rows: late slam 422, window closed exactly once before the next command (C4.2)" | second registry/app over the same rows: refusal is `SlamTooLate` with no slam outcome persisted; journal reads `["load","save","publishGame","save","publishGame"]` with the `[SlamWindowClosed, TurnAdvanced]` batch first — identical whether the zero-duration timer or the lazy path closes (race-free form); over HTTP the same story with 422 then 200, view equality and a leak scan |
+| C4.3   | no test by design — documented-not-fixed (root Decision Log); the C4.2 tests are the evidence that a parked window is safe (`closesAt` still governs, nobody slams late)                                                                  | (justification, not a test)                                                                                                                                                                                                                                                                                                                                                                 |
 
 ## Progress
 
@@ -554,6 +558,19 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       and prettier passes; untouched-surfaces sweep prints nothing;
       coverage table filled; plan docs reconciled with as-built code.
 
+- [x] 2026-09-02 22:00 — review fix cycle (F1–F7): C2.3 rewritten to
+      enqueue both slams in-window behind a publish gate (now discriminates
+      processing-time from arrival-time stamping); late-slam and restart
+      tests restructured race-free against the zero-duration timer re-arm
+      (see Surprises); `rulePublicSlugs` centralized in `support/leaks.ts`
+      and adopted by both scans; `SlamFailed` reveal presence asserted;
+      race loser now checked against the engine's exact error tag and the
+      order read-back throws on a headless batch; leak scans added to every
+      direct `GET /view` read; tautological hand-size ternary fixed; dead
+      `alice` binding removed; restart journal reads filtered by gameId;
+      stale `RoomRegistry.test.ts` citations updated across both plan docs.
+      Suites green: SlamTiming 3/3, SlamWindow 7/7, EndToEndGame 2/2.
+
 ## Surprises & notes for the root plan
 
 _(anything the root plan's Decision Log or the reviewer must know)_
@@ -587,3 +604,16 @@ _(anything the root plan's Decision Log or the reviewer must know)_
   probe had predicted C1.3; the rest confirmed CAM-1/5/6 behavior). The
   root plan's "tests-mostly, production edits only if forced" stance held
   with zero forced edits.
+- 2026-09-02 (review fix cycle) — **the zero-duration timer re-arm**:
+  `manageTimer` runs after EVERY envelope (`RoomRegistry.ts:202`), and for
+  a past-due window it arms `Effect.sleep(0)` — which fires even under an
+  un-adjusted TestClock (probe-verified this cycle). Consequence: after a
+  refused LATE slam, the actor may close the window at any moment via that
+  timer, so "nothing happened after the refusal" is only assertable as "no
+  slam outcome was persisted", never as "journal empty" — the original
+  suite had three such assertions passing on scheduling margins (a real
+  flake risk on the real-clock api side). All were restructured race-free;
+  the journal sequence is provably identical whichever close mechanism
+  wins, which is what the tests now assert. Production behavior itself is
+  correct and ADR-0020-consistent (a due window closes promptly); no
+  production change made.

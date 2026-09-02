@@ -74,12 +74,12 @@ All slam **production** code already ships and matches its ADRs
 
 | Scenario                                          | Today                                                                        | CAM-7                                                                                                   |
 | ------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Slam races serialized deterministically           | actor-level, frozen clock (`RoomRegistry.test.ts:124`)                       | + over HTTP against real DB; + race where processing crosses `closesAt`                                 |
+| Slam races serialized deterministically           | actor-level, frozen clock (`RoomRegistry.test.ts:42-118`)                    | + over HTTP against real DB; + race where processing crosses `closesAt`                                 |
 | Late slam rejected                                | domain boundary (`Slam.test.ts:355`, `Fuzz.test.ts:63-86`)                   | + through the actor (`SlamTooLate` not `WrongPhase`); + over HTTP as 422                                |
-| Timer vs lazy close equivalent; stale timer no-op | actor-level (`RoomRegistry.test.ts:389,429`)                                 | + lazy close and timer close observed through the real route/publisher stack                            |
+| Timer vs lazy close equivalent; stale timer no-op | actor-level (`RoomRegistry.test.ts:307-372`)                                 | + lazy close and timer close observed through the real route/publisher stack                            |
 | Four outcome cells + penalties + give             | domain (`Slam.test.ts`) + projection (`EventProjection.test.ts`)             | + e2e over HTTP with publisher-capture assertions incl. reveal + leak-freedom                           |
 | Window expiry with dead/sleeping actor            | none                                                                         | new: window expires with no live timer; next command lazily closes                                      |
-| Restart-refold mid-window                         | restart tests never restart in `SlamWindow` (`RoomRegistry.test.ts:318,360`) | new: teardown mid-window, `closesAt` passes, rebuilt actor lazily closes; late slam still `SlamTooLate` |
+| Restart-refold mid-window                         | restart tests never restart in `SlamWindow` (`RoomRegistry.test.ts:236-306`) | new: teardown mid-window, `closesAt` passes, rebuilt actor lazily closes; late slam still `SlamTooLate` |
 
 Governing docs: HANDOFF §1.5, §6; skills `cambio-rules`,
 `application-layer`, `hidden-information` (for the publisher-capture
@@ -117,7 +117,7 @@ already frozen — CAM-7 changes nothing in `packages/contracts`.
 - **C1.6** The timer-fired close and the lazy close produce equivalent
   state, log, and publishes; both go through the same persist+publish
   path; a stale/illegal close is a silent no-op. _(pinned at actor level:
-  `RoomRegistry.test.ts:389,429`; **(new)** observe both paths through the
+  `RoomRegistry.test.ts:307-372`; **(new)** observe both paths through the
   real route + recording-publisher stack)_
 
 **C2 — Races**
@@ -125,7 +125,7 @@ already frozen — CAM-7 changes nothing in `packages/contracts`.
 - **C2.1** Concurrent slam submissions serialize in enqueue order —
   first-in-queue wins; the loser is judged against the post-winner state;
   the outcome is deterministic and equivalent to sequential execution.
-  _(pinned at actor level: `RoomRegistry.test.ts:124`; **(new)** concurrent
+  _(pinned at actor level: `RoomRegistry.test.ts:42-118`; **(new)** concurrent
   submissions over HTTP against real Postgres: exactly one consistent
   outcome set, monotonically increasing versions, coherent event log)_
 - **C2.2** A player may slam multiple times within one window; each
@@ -164,7 +164,7 @@ already frozen — CAM-7 changes nothing in `packages/contracts`.
 - **C4.1** When the window expires while **no close fiber is alive**, the
   next non-`Slam` command first executes the lazy close as its own
   persisted and published batch, then processes normally. _(pinned at
-  actor level with timer disabled: `RoomRegistry.test.ts:389`; **(new)**
+  actor level with timer disabled: `RoomRegistry.test.ts:307-372`; **(new)**
   through the real HTTP stack: post-expiry command returns 200 and
   `SlamWindowClosed` is published before the command's own events)_
 - **C4.2** Restart-refold mid-window: if the actor (process) dies while
@@ -262,6 +262,11 @@ timestamp each entry)_
 - [x] 2026-09-02 20:45 — M4: bare gate exit 0 (22/22); untouched-surfaces
       sweep empty; plan docs reconciled with as-built code. Implementation
       complete — ready for `/review CAM-7`
+- [x] 2026-09-02 22:00 — review fix cycle (F1–F7) landed: C2.3 test now
+      discriminates processing-time from arrival-time; race-free
+      restructuring around the zero-duration timer re-arm (backend plan
+      Surprises); doc claims corrected (stale citations, C3.2 row,
+      import-only wording); leak-tripwire hygiene. Awaiting re-review.
 
 ## Decision log
 
@@ -329,7 +334,7 @@ violations, zero production-file changes.
   the clause row and test title to the narrower claim.
 - **F2 — stale line citations** invalidated by this diff's own harness
   extraction, in docs this diff edited. Sweep (all instances):
-  `RoomRegistry.test.ts:124` (root gap table + C2.1) → race test now
+  `RoomRegistry.test.ts:42-118` (root gap table + C2.1) → race test now
   `:42-118`; `:389,429`/`:389` (root gap table, C1.6, C4.1) → timer/lazy
   test now `:307-372`; `:318,360` (root gap table) → restart tests now
   `:236-306`; backend decision 6's `:123-`; backend Context refs
