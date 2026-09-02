@@ -312,8 +312,9 @@ twice is fine, C2.2 allows it); `execute` A (succeeds — judged at
 journal holds exactly A's save+publish after the drive.
 
 **Step 2.4 — restart-refold mid-window (C4.2, application half).**
-Follow the `:317-386` restart pattern and the timer/lazy world shape at
-`:388-453`: inside a first `Effect.provide(h.layer)`, drive to
+Follow `RoomRegistry.test.ts`'s restart pattern (`:236-306`
+post-extraction) and its timer/lazy world shape (`:307-372`): inside a
+first `Effect.provide(h.layer)`, drive to
 `SlamWindow` and capture the state + `closesAt`; let the provide scope
 close (the process death — actor and timer die with it); `clock.set`
 past `closesAt`; then, in a **second** provide over the same stubs:
@@ -544,7 +545,7 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       `TEST_SEED` reaches all four cells at its first window (decision 3
       as-built note) — no per-cell seed constants needed.
 - [x] 2026-09-02 20:38 — M3: `support/game-driver.ts` extracted
-      (EndToEndGame.test.ts import-only edit + `setupGame` boilerplate
+      (EndToEndGame.test.ts edit + `setupGame` boilerplate
       swap); `SlamWindow.test.ts` lands all seven e2e tests (four cells +
       reveal/leak, late slam 422, HTTP race, sleeping-server lazy close,
       timer close, restart) — 7/7 green on the FIRST run and across four

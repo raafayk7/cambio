@@ -382,3 +382,22 @@ C2.1 order-agnostic replay and the C1.6 timer-provenance argument were
 audited hard and are sound (the timer close is conclusively
 timer-originated: journal cleared, no command issued during the poll,
 and the lazy path requires a command).
+
+**Fix cycle + re-review (2026-09-02, same day): verdict upgraded to
+SHIP.** F1–F7 landed (commits `84aa0c5`, `4720023`, plus a straggler-fix
+docs commit): the C2.3 test now enqueues both slams in-window behind a
+publish gate and genuinely discriminates processing-time from
+arrival-time stamping; the citation sweep was re-run and caught two
+stragglers the spot-fix missed (step 2.4 prose, an M3 progress phrase) —
+both fixed, sweep now clean outside this section's historical quotes;
+C3.2's `SlamFailed` reveal presence asserted; leak-tripwire hygiene done
+(shared `rulePublicSlugs`, no casts, leak scans on all view reads).
+The fix cycle's probe also surfaced a genuine latent flake: `manageTimer`
+re-arms a ZERO-duration timer after any envelope on a past-due window
+(fires even under TestClock), so three "nothing happened after the
+refusal" assertions had been passing on scheduling margins — all
+restructured race-free (backend plan Surprises). Re-verified: forced
+fresh `--force` runs (application 83/83, api 101/101 against live
+containers), full bare gate exit 0, and three consecutive runs each of
+`SlamWindow` (7/7) and `SlamTiming` (3/3). F8 (advisory) deliberately
+not taken. Deferred: nothing.
