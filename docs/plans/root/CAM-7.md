@@ -182,17 +182,24 @@ already frozen — CAM-7 changes nothing in `packages/contracts`.
 
 ### Acceptance criteria
 
-- [ ] Every **(new)** clause above has a landed test; the backend child
+- [x] Every **(new)** clause above has a landed test; the backend child
       plan's Contract coverage table maps clause → test file + name +
-      assertion phrase.
-- [ ] No production behavior changes (contracts, domain, application,
+      assertion phrase. _(filled 2026-09-02: 3 tests in `SlamTiming.test.ts`,
+      7 in `SlamWindow.test.ts`)_
+- [x] No production behavior changes (contracts, domain, application,
       api `src/`) unless a test exposed a real gap — any such change is
       recorded in Surprises with the failing test that forced it.
-- [ ] Test-support changes (clock injectability, any seed override) live
+      _(zero production edits; every new test passed against unmodified
+      production code — child plan Surprises)_
+- [x] Test-support changes (clock injectability, any seed override) live
       only under `apps/api/test/` / `packages/application/test/`.
-- [ ] The full gate passes, run bare: `pnpm turbo build typecheck lint test`.
-- [ ] No new flake: timing tests use injected/settable clocks or generous
+      _(sweep prints nothing for any production dir)_
+- [x] The full gate passes, run bare: `pnpm turbo build typecheck lint test`.
+      _(exit 0, 22/22 tasks, 2026-09-02)_
+- [x] No new flake: timing tests use injected/settable clocks or generous
       real-time margins with polling; no bare `sleep`-and-assert.
+      _(the one real-time test — timer close — deadline-polls; stable over
+      four repeat runs at ~0.5 s)_
 
 ## Plan of work
 
@@ -243,7 +250,18 @@ timestamp each entry)_
 
 - [x] 2026-09-02 19:40 — planning: preflight, brief, interviews, exploration
 - [x] 2026-09-02 20:00 — probe-verified C1.3 at the actor level (temp test, deleted)
-- [ ] pending `/implement`
+- [x] 2026-09-02 20:26 — M1 landed: injectable clock/seed in the api harness
+      (`makeTestApp(overrides?, ports?)`); existing suites untouched-green
+- [x] 2026-09-02 20:29 — M2 landed: `SlamTiming.test.ts` pins C1.3, C2.3,
+      C4.2 (application half); harness extracted to `support/registry.ts`
+- [x] 2026-09-02 20:38 — M3 landed: `SlamWindow.test.ts` — four cells with
+      reveal/leak assertions, late slam 422, HTTP race, sleeping-server lazy
+      close, timer-fired close (deadline-poll), restart over the same DB
+      rows; driver extracted to `support/game-driver.ts`; all seven green
+      first run and across repeats
+- [x] 2026-09-02 20:45 — M4: bare gate exit 0 (22/22); untouched-surfaces
+      sweep empty; plan docs reconciled with as-built code. Implementation
+      complete — ready for `/review CAM-7`
 
 ## Decision log
 
