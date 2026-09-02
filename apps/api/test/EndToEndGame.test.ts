@@ -15,12 +15,7 @@ import {
 import { legalCandidates, ts } from "@cambio/domain/testing"
 import { Either, Schema } from "effect"
 
-import {
-  clearPublisherJournal,
-  makeTestApp,
-  publisherJournal,
-  TEST_SEED,
-} from "./support/http.js"
+import { clearPublisherJournal, makeTestApp, publisherJournal, TEST_SEED } from "./support/http.js"
 import { entitledSlugs, expectNoLeak, slugsIn } from "./support/leaks.js"
 
 /**
@@ -87,9 +82,7 @@ const toWire = (command: Command): Record<string, unknown> => {
 }
 
 const normalize = (view: PlayerGameView): PlayerGameView =>
-  view.phase._tag === "SlamWindow"
-    ? { ...view, phase: { ...view.phase, closesAt: 0 } }
-    : view
+  view.phase._tag === "SlamWindow" ? { ...view, phase: { ...view.phase, closesAt: 0 } } : view
 
 const apply = (state: GameState, command: Command, at: number): GameState => {
   const result = applyCommand(state, command, ts(at))
@@ -195,9 +188,7 @@ describe("end-to-end scripted game (acceptance, C6.1)", () => {
       let state = dealt.right[0]
 
       const startBody = startRes.json() as { view: PlayerGameView; version: number }
-      expect(normalize(startBody.view)).toEqual(
-        normalize(viewFor(toUserId(alice!.userId), state)),
-      )
+      expect(normalize(startBody.view)).toEqual(normalize(viewFor(toUserId(alice!.userId), state)))
 
       let at = 0
       let turns = 0
@@ -229,11 +220,7 @@ describe("end-to-end scripted game (acceptance, C6.1)", () => {
         expect(normalize(body.view), `view after ${command._tag}`).toEqual(
           normalize(viewFor(command.playerId, state)),
         )
-        expectNoLeak(
-          body,
-          entitledSlugs(state, command.playerId),
-          `reply to ${command._tag}`,
-        )
+        expectNoLeak(body, entitledSlugs(state, command.playerId), `reply to ${command._tag}`)
       }
 
       expect(state.phase._tag).toBe("Ended")

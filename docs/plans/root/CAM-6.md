@@ -252,20 +252,27 @@ payload}`), authenticated with a self-signed HS256 JWT (claims `role`,
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes (run bare — never
-      piped).
-- [ ] A scripted end-to-end game (create → join → start → commands through
+- [x] `pnpm turbo build typecheck lint test` passes (run bare — never
+      piped). — green 2026-09-01 (16 turbo tasks; api 93 tests, application
+      80, domain 190).
+- [x] A scripted end-to-end game (create → join → start → commands through
       an ended game) succeeds over `app.inject` with only HTTP + the
-      publisher stub/journal, asserting projected payloads throughout.
-- [ ] The realtime integration suite passes against the compose Realtime
+      publisher stub/journal, asserting projected payloads throughout. —
+      `apps/api/test/EndToEndGame.test.ts` (full game to `Ended` + a real
+      slam over HTTP).
+- [x] The realtime integration suite passes against the compose Realtime
       container (hard-fails if the container is down, like the Postgres
-      suites — no silent skip).
-- [ ] Adversarial suites exist and pass: per-phase view assertions (C2),
+      suites — no silent skip). — `RealtimeIntegration.test.ts`; hard-fail
+      probed by stopping the container.
+- [x] Adversarial suites exist and pass: per-phase view assertions (C2),
       per-event channel assertions (C3), reply assertions (C6.1), secret
       isolation (C4.4), impersonation rejection (C1.5) — each asserting
-      what payloads do **not** contain.
-- [ ] All four ADRs committed with the index updated; `.env.example` and
-      `turbo.json` consistent with `config.ts`.
+      what payloads do **not** contain. — `ViewFor`, `EventProjection`,
+      `AdversarialProjection`, `EndToEndGame`, `Topics`+`Lobbies`,
+      `GameCommands`.
+- [x] All four ADRs committed with the index updated; `.env.example` and
+      `turbo.json` consistent with `config.ts`. — ADRs 0021–0024 on
+      release-v0 (planning commit); env vars in all four places.
 
 ## Plan of work
 
@@ -326,6 +333,16 @@ timestamp each entry)_
 
 - [x] 2026-09-01 — Planning: interview rounds 1–3 complete, explorers
       reported, ADRs 0021–0024 written, root + backend plans drafted.
+- [x] 2026-09-01 — Implementation complete on branch
+      `raafaykazmi/cam-6-…`. M1 contracts freeze (c31f815) → M2 projections
+      (2f05be1) → M3 infra + realtime container (1618a8f) → M4 presentation
+      & wiring (d6f47d6). Full gate green:
+      `pnpm turbo build typecheck lint test` (api 93, application 80,
+      domain 190 tests). All acceptance criteria checked above. Both
+      containers (Postgres + Realtime) must be up for the api suites.
+      As-built deviations from advisory sketches are reconciled in the
+      backend plan's "As-built deviations" section (notably
+      `projectEvents(events)` and the required `METRICS_JWT_SECRET`).
 
 ## Decision log
 

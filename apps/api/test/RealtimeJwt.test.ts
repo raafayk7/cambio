@@ -21,9 +21,10 @@ describe("signRealtimeJwt", () => {
 
   it("carries the role and a future exp claim", () => {
     const token = signRealtimeJwt("some-secret", { role: "anon", expiresInSeconds: 60 })
-    const payload = JSON.parse(
-      Buffer.from(token.split(".")[1] ?? "", "base64url").toString(),
-    ) as { role: string; exp: number }
+    const payload = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString()) as {
+      role: string
+      exp: number
+    }
     expect(payload.role).toBe("anon")
     expect(payload.exp).toBeGreaterThan(Math.floor(Date.now() / 1000))
     expect(payload.exp).toBeLessThanOrEqual(Math.floor(Date.now() / 1000) + 61)

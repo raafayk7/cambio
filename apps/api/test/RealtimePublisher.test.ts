@@ -3,10 +3,7 @@ import { type GameEvent, type GameState, decodeGameConfig } from "@cambio/domain
 import { card, gid, slot, ts, uid } from "@cambio/domain/testing"
 import { Effect } from "effect"
 
-import {
-  type BroadcastMessage,
-  makeRealtimePublisher,
-} from "../src/infra/realtime-publisher.js"
+import { type BroadcastMessage, makeRealtimePublisher } from "../src/infra/realtime-publisher.js"
 import { playerTopic, roomTopic } from "../src/infra/topics.js"
 
 /**
@@ -34,7 +31,12 @@ const makeRecorder = () => {
 
 const events: ReadonlyArray<GameEvent> = [
   { _tag: "CardDrawn", playerId: p0, card: card("QC") },
-  { _tag: "CardPeeked", viewerId: p1, target: { playerId: p0, slotIndex: slot(0) }, card: card("AS") },
+  {
+    _tag: "CardPeeked",
+    viewerId: p1,
+    target: { playerId: p0, slotIndex: slot(0) },
+    card: card("AS"),
+  },
   { _tag: "TurnAdvanced", playerId: p1 },
 ]
 
@@ -121,9 +123,7 @@ describe("failure containment (C4.3)", () => {
 
   it.effect("a defective transport is swallowed too", () =>
     Effect.gen(function* () {
-      const publisher = makeRealtimePublisher(SECRET, () =>
-        Effect.die(new Error("boom")),
-      )
+      const publisher = makeRealtimePublisher(SECRET, () => Effect.die(new Error("boom")))
       const result = yield* publisher.publishLobby(game, {
         id: game,
         members: [p0],

@@ -65,11 +65,7 @@ describe(`adversarial projection sweep (${GAMES} games, seed base ${SEED_BASE})`
           statesChecked++
           for (const player of state.players) {
             const view = viewFor(player.id, state)
-            expectNoLeak(
-              view,
-              entitledSlugs(state, player.id),
-              `game ${i} viewer ${player.id}`,
-            )
+            expectNoLeak(view, entitledSlugs(state, player.id), `game ${i} viewer ${player.id}`)
             viewsChecked++
           }
         },

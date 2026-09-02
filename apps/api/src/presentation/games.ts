@@ -1,9 +1,5 @@
 import { RoomRegistry, toDomainCommand, viewFor } from "@cambio/application"
-import {
-  decodeWireCommandEither,
-  encodeGameReply,
-  encodeViewResponse,
-} from "@cambio/contracts"
+import { decodeWireCommandEither, encodeGameReply, encodeViewResponse } from "@cambio/contracts"
 import { GameId, GameRepository, seatOf } from "@cambio/domain"
 import { Effect, Either, Option, Redacted, type Runtime, Schema } from "effect"
 import type { FastifyInstance } from "fastify"

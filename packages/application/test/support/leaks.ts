@@ -1,10 +1,5 @@
 import { expect } from "@effect/vitest"
-import {
-  ALL_CARD_SLUGS,
-  type CardSlug,
-  type GameState,
-  type UserId,
-} from "@cambio/domain"
+import { ALL_CARD_SLUGS, type CardSlug, type GameState, type UserId } from "@cambio/domain"
 
 /**
  * The adversarial no-leak toolkit (root plan C2/C3/C6): given a full

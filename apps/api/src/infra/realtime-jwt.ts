@@ -9,8 +9,7 @@ import { createHmac } from "node:crypto"
  * integration suite's subscriber `apikey`.
  */
 
-const b64url = (value: object): string =>
-  Buffer.from(JSON.stringify(value)).toString("base64url")
+const b64url = (value: object): string => Buffer.from(JSON.stringify(value)).toString("base64url")
 
 export const signRealtimeJwt = (
   secret: string,
@@ -25,8 +24,6 @@ export const signRealtimeJwt = (
     role: options?.role ?? "anon",
     exp: Math.floor(Date.now() / 1000) + (options?.expiresInSeconds ?? 3600),
   })
-  const signature = createHmac("sha256", secret)
-    .update(`${header}.${payload}`)
-    .digest("base64url")
+  const signature = createHmac("sha256", secret).update(`${header}.${payload}`).digest("base64url")
   return `${header}.${payload}.${signature}`
 }

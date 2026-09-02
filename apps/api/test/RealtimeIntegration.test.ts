@@ -5,10 +5,7 @@ import { RealtimeClient, type RealtimeChannel } from "@supabase/realtime-js"
 import { Effect } from "effect"
 
 import { signRealtimeJwt } from "../src/infra/realtime-jwt.js"
-import {
-  makeFetchTransport,
-  makeRealtimePublisher,
-} from "../src/infra/realtime-publisher.js"
+import { makeFetchTransport, makeRealtimePublisher } from "../src/infra/realtime-publisher.js"
 import { playerTopic, roomTopic } from "../src/infra/topics.js"
 
 /**

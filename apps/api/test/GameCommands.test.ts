@@ -137,11 +137,9 @@ describe("POST /games/:gameId/commands (C1.4, C6.1)", () => {
 
   it("unknown game → 404 GameNotFound; unauthenticated → 401 (C1.7, C1.9)", async () => {
     const { alice } = await startGame()
-    const missing = await post(
-      "/games/00000000-0000-4000-9000-000000000777/commands",
-      alice,
-      { _tag: "DrawFromDeck" },
-    )
+    const missing = await post("/games/00000000-0000-4000-9000-000000000777/commands", alice, {
+      _tag: "DrawFromDeck",
+    })
     expect(missing.statusCode).toBe(404)
     expect((missing.json() as { error: { tag: string } }).error.tag).toBe("GameNotFound")
 

@@ -120,10 +120,7 @@ describe("join/leave (C1.2, C1.9)", () => {
     expect((dup.json() as { error: { tag: string } }).error.tag).toBe("AlreadyInLobby")
 
     // Unknown game → 404 GameNotFound.
-    const missing = await post(
-      `/lobbies/00000000-0000-4000-9000-000000000999/join`,
-      alice,
-    )
+    const missing = await post(`/lobbies/00000000-0000-4000-9000-000000000999/join`, alice)
     expect(missing.statusCode).toBe(404)
     expect((missing.json() as { error: { tag: string } }).error.tag).toBe("GameNotFound")
 

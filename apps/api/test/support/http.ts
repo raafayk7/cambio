@@ -39,7 +39,12 @@ export const testSigner = makeSessionSigner(Redacted.make(TEST_SESSION_SECRET))
 export const TEST_SEED = 424_242
 
 export type PublishedEntry =
-  | { readonly _tag: "game"; readonly gameId: GameId; readonly state: GameState; readonly events: ReadonlyArray<GameEvent> }
+  | {
+      readonly _tag: "game"
+      readonly gameId: GameId
+      readonly state: GameState
+      readonly events: ReadonlyArray<GameEvent>
+    }
   | { readonly _tag: "lobby"; readonly gameId: GameId; readonly lobby: Lobby }
 
 /**

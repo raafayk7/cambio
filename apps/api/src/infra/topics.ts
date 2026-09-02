@@ -18,7 +18,11 @@ import type { GameId, UserId } from "@cambio/domain"
 const TOPIC_TOKEN_BYTES = 16
 
 const capability = (secret: string, message: string): string =>
-  createHmac("sha256", secret).update(message).digest().subarray(0, TOPIC_TOKEN_BYTES).toString("base64url")
+  createHmac("sha256", secret)
+    .update(message)
+    .digest()
+    .subarray(0, TOPIC_TOKEN_BYTES)
+    .toString("base64url")
 
 /** The game's public room channel — identical grant for every participant. */
 export const roomTopic = (secret: string, gameId: GameId): string =>

@@ -191,17 +191,22 @@ describe("endgame reveal (C2.5)", () => {
       },
     ])
     const scores = gameScores(state)
-    expect(view.reveal?.scores).toEqual(scores.map((s) => ({ playerId: s.playerId, total: s.total })))
+    expect(view.reveal?.scores).toEqual(
+      scores.map((s) => ({ playerId: s.playerId, total: s.total })),
+    )
     expect(view.reveal?.winners).toEqual(winnersOf(scores))
   })
 
   it("ties are representable: equal totals produce a plural winner set", () => {
-    const state = makeState({ _tag: "Ended", calledBy: p0 }, {
-      players: [
-        { id: p0, hand: hand([0, "AS"]) },
-        { id: p1, hand: hand([0, "AC"]) },
-      ],
-    })
+    const state = makeState(
+      { _tag: "Ended", calledBy: p0 },
+      {
+        players: [
+          { id: p0, hand: hand([0, "AS"]) },
+          { id: p1, hand: hand([0, "AC"]) },
+        ],
+      },
+    )
     const view = viewFor(p1, state)
     expect(view.reveal?.winners).toEqual([p0, p1])
   })

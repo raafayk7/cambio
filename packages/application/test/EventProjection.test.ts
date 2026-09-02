@@ -2,7 +2,12 @@ import { describe, expect, it } from "@effect/vitest"
 import { type GameEvent, type Hand } from "@cambio/domain"
 import { card, slot, ts, uid } from "@cambio/domain/testing"
 import { Either, Schema } from "effect"
-import { decodePlayerGameEventEither, decodeRoomGameEventEither, PlayerGameEvent, RoomGameEvent } from "@cambio/contracts"
+import {
+  decodePlayerGameEventEither,
+  decodeRoomGameEventEither,
+  PlayerGameEvent,
+  RoomGameEvent,
+} from "@cambio/contracts"
 import { projectEvents } from "../src/projection/EventProjection.js"
 import { slugsIn } from "./support/leaks.js"
 
@@ -74,9 +79,7 @@ describe("C3.3 — value-stripped for everyone", () => {
       placed: card("QC"),
       discarded: card("7H"),
     })
-    expect(out.room).toEqual([
-      { _tag: "HeldSwapped", playerId: p0, slotIndex: 1, discarded: "7H" },
-    ])
+    expect(out.room).toEqual([{ _tag: "HeldSwapped", playerId: p0, slotIndex: 1, discarded: "7H" }])
     expect(slugsIn(out.room)).toEqual(["7H"])
     noPrivate(out)
   })

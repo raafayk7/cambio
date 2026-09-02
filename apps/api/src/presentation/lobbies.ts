@@ -1,9 +1,5 @@
 import { createLobby, lobbyView, RoomRegistry, viewFor } from "@cambio/application"
-import {
-  encodeGameReply,
-  encodeLeaveLobbyResponse,
-  encodeLobbyResponse,
-} from "@cambio/contracts"
+import { encodeGameReply, encodeLeaveLobbyResponse, encodeLobbyResponse } from "@cambio/contracts"
 import { GameId } from "@cambio/domain"
 import { Effect, Either, Redacted, type Runtime, Schema } from "effect"
 import type { FastifyInstance } from "fastify"
