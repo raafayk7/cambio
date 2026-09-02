@@ -305,4 +305,75 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+_(filled by `/review`, 2026-09-02)_
+
+**Verdict: fix-then-ship.** Production behavior fully satisfies the
+contract; the fix cycle is tests-and-docs only. Independently verified by
+the reviewer: forced fresh (`--force`) runs of `@cambio/application`
+(14 files / 83 tests) and `@cambio/api` (19 files / 101 tests) against
+live Postgres + realtime containers, full bare gate exit 0, and two extra
+`SlamWindow` runs (7/7 each; ~7 consecutive green runs of the timing
+suite this cycle). No hidden-information leaks, no architecture
+violations, zero production-file changes.
+
+**Findings (ranked; F1–F4 gate the ship):**
+
+- **F1 — C2.3 is under-pinned.** The `SlamTiming` processing-time test
+  submits slam B _after_ the hook has crossed `closesAt` (both executes
+  are sequentially awaited), so an arrival-time-stamping implementation
+  would also reject B — the test cannot discriminate the two designs the
+  clause and Decision Log distinguish. It does pin the narrower fact
+  (lateness re-read per envelope). Fix: enqueue both slams in-window
+  (fork A / `yieldNow` / fork B, the `RoomRegistry.test.ts:42-118`
+  technique) with the hook crossing during A's processing — or restate
+  the clause row and test title to the narrower claim.
+- **F2 — stale line citations** invalidated by this diff's own harness
+  extraction, in docs this diff edited. Sweep (all instances):
+  `RoomRegistry.test.ts:124` (root gap table + C2.1) → race test now
+  `:42-118`; `:389,429`/`:389` (root gap table, C1.6, C4.1) → timer/lazy
+  test now `:307-372`; `:318,360` (root gap table) → restart tests now
+  `:236-306`; backend decision 6's `:123-`; backend Context refs
+  `:27-37`, `:44-57`, `:65-80`, `:83-88`, `:91-103`, `:317-386`,
+  `:388-453` → the harness now lives in `test/support/registry.ts`.
+  (A reviewer sub-claim that the `:188` exemption ref is off by one was
+  checked and is FALSE — `:188` is correct.)
+- **F3 — coverage row C3.2 over-credits `expectRoomRevealOnly`**: the
+  helper asserts only the converse (no non-public slug); `SlamSucceeded`
+  card presence is asserted once (`SlamWindow.test.ts:250-252`), and
+  `SlamFailed` card presence is asserted nowhere in the new suites (it
+  stands on `EventProjection.test.ts:188-196`). Add the one assertion or
+  reword the row.
+- **F4 — "import-only / zero assertion changes" is inaccurate for
+  `EndToEndGame.test.ts`** (backend plan table, step 3.1 prose, M3
+  progress): `setupGame` added a join-status assertion and a journal
+  clear before start to the second test. (The identical claim for
+  `RoomRegistry.test.ts` is accurate.)
+- **F5 — "arms no timer" appears in the ST C4.2 title and SW narrative
+  with no assertion behind it** (inferred from journal sequences).
+  Soften, or assert via `TestClock.adjust` in ST lifetime two — which
+  would also strengthen C4.3's evidence.
+- **F6 — C2.1 weak spots**: the `orderIds` `"unknown"` fallback silently
+  picks a branch (should throw); the loser branch asserts 422 without
+  `error.tag`; step 3.4's "versions strictly increase across journal
+  entries" is only assertable via reply versions (the journal records no
+  version).
+- **F7 — leak-tripwire hygiene** (from the architecture review): the
+  `expectRoomRevealOnly` `as never` casts + unused `state` param lose the
+  compile-time exhaustiveness the original `EndToEndGame` scan had; the
+  rule-public whitelist is now duplicated instead of living in
+  `support/leaks.ts`; four direct `GET /view` reads assert
+  `toEqual(viewFor(...))` without an independent `expectNoLeak`; the
+  `SlamWindow.test.ts:244` ternary is tautological (both arms are 3);
+  dead `alice`/`void alice`; the restart test reads the journal
+  unfiltered by gameId.
+- **F8 — advisory**: `ports.seed` landed unused (documented as-built);
+  the C1.6 "exactly one close" comment over-promises for the snapshot
+  assertion (the real duplicate guard is the +1-batch check after the
+  next command).
+
+**What passed**: all fifteen contract clauses except C2.3's coverage
+depth; every acceptance criterion re-verified against repo state; the
+C2.1 order-agnostic replay and the C1.6 timer-provenance argument were
+audited hard and are sound (the timer close is conclusively
+timer-originated: journal cleared, no command issued during the poll,
+and the lazy path requires a command).
