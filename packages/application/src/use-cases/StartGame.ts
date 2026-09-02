@@ -39,6 +39,15 @@ export interface StartGameInput {
   readonly config: GameConfig
 }
 
+/**
+ * **Hidden-information warning (§5):** everything in here is full truth —
+ * `state` carries every hand, the deck order, and the PRNG state; `events`
+ * carry card identities. This is server-side plumbing only, exactly like
+ * what crosses `RealtimePublisherPort`: nothing from a `GameAdvanced` may
+ * reach a client unprojected. Routes reply with
+ * `{view: viewFor(caller, state), version}` and never serialize this shape
+ * (root plan C6.1).
+ */
 export interface GameAdvanced {
   readonly state: GameState
   readonly version: GameVersion

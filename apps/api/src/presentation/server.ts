@@ -6,8 +6,10 @@ import type { Logger } from "pino"
 
 import type { AppConfig } from "../config.js"
 import type { AppServices } from "../runtime.js"
-import { unhandledErrorResponse } from "./errors.js"
+import { errorBody, unhandledErrorResponse } from "./errors.js"
+import { gamesRoutes } from "./games.js"
 import { healthRoutes } from "./health.js"
+import { lobbiesRoutes } from "./lobbies.js"
 import { usersRoutes } from "./users.js"
 
 /**
@@ -45,6 +47,10 @@ export const buildServer = async (options: {
     return reply.code(status).send(body)
   })
 
+  // Unmatched routes get the curated contract body, not Fastify's default
+  // `{ message: "Route GET /x not found" }` (C1.11 — deferred since CAM-4).
+  app.setNotFoundHandler((_request, reply) => reply.code(404).send(errorBody(404)))
+
   await app.register(cors, {
     origin: options.config.webOrigin,
     credentials: true,
@@ -56,6 +62,8 @@ export const buildServer = async (options: {
 
   await app.register(healthRoutes(options.runtime))
   await app.register(usersRoutes(options.runtime, options.config))
+  await app.register(lobbiesRoutes(options.runtime, options.config))
+  await app.register(gamesRoutes(options.runtime, options.config))
 
   return app
 }
