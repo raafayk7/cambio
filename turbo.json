@@ -19,7 +19,11 @@
     "SESSION_SECRET",
     "SESSION_TTL_SECONDS",
     "SESSION_COOKIE_SECURE",
-    "SESSION_COOKIE_SAMESITE"
+    "SESSION_COOKIE_SAMESITE",
+    "SLAM_WINDOW_MS",
+    "REALTIME_URL",
+    "REALTIME_JWT_SECRET",
+    "TOPIC_SECRET"
   ],
   "tasks": {
     "build": {
@@ -45,11 +49,12 @@
     "test": {
       "dependsOn": ["^build"],
       "outputs": [],
-      // CAM-2 simulation knobs (packages/domain/test/sim/Simulation.test.ts)
-      // and CAM-3 round-trip knobs (apps/api/test/RoundTrip.test.ts).
+      // CAM-2 simulation knobs (packages/domain/test/sim/Simulation.test.ts),
+      // CAM-3 round-trip knobs (apps/api/test/RoundTrip.test.ts), and CAM-6
+      // adversarial-projection knobs (packages/application/test/AdversarialProjection.test.ts).
       // Hashed, not passed through: a different game count or seed is a genuinely
       // different test run and must miss the cache.
-      "env": ["SIM_GAMES", "SIM_SEED", "RT_GAMES", "RT_SEED"]
+      "env": ["SIM_GAMES", "SIM_SEED", "RT_GAMES", "RT_SEED", "VIEW_GAMES", "VIEW_SEED"]
     },
     "dev": {
       "dependsOn": ["^build"],

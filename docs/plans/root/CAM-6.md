@@ -252,20 +252,27 @@ payload}`), authenticated with a self-signed HS256 JWT (claims `role`,
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes (run bare — never
-      piped).
-- [ ] A scripted end-to-end game (create → join → start → commands through
+- [x] `pnpm turbo build typecheck lint test` passes (run bare — never
+      piped). — green 2026-09-01 (16 turbo tasks; api 93 tests, application
+      80, domain 190).
+- [x] A scripted end-to-end game (create → join → start → commands through
       an ended game) succeeds over `app.inject` with only HTTP + the
-      publisher stub/journal, asserting projected payloads throughout.
-- [ ] The realtime integration suite passes against the compose Realtime
+      publisher stub/journal, asserting projected payloads throughout. —
+      `apps/api/test/EndToEndGame.test.ts` (full game to `Ended` + a real
+      slam over HTTP).
+- [x] The realtime integration suite passes against the compose Realtime
       container (hard-fails if the container is down, like the Postgres
-      suites — no silent skip).
-- [ ] Adversarial suites exist and pass: per-phase view assertions (C2),
+      suites — no silent skip). — `RealtimeIntegration.test.ts`; hard-fail
+      probed by stopping the container.
+- [x] Adversarial suites exist and pass: per-phase view assertions (C2),
       per-event channel assertions (C3), reply assertions (C6.1), secret
       isolation (C4.4), impersonation rejection (C1.5) — each asserting
-      what payloads do **not** contain.
-- [ ] All four ADRs committed with the index updated; `.env.example` and
-      `turbo.json` consistent with `config.ts`.
+      what payloads do **not** contain. — `ViewFor`, `EventProjection`,
+      `AdversarialProjection`, `EndToEndGame`, `Topics`+`Lobbies`,
+      `GameCommands`.
+- [x] All four ADRs committed with the index updated; `.env.example` and
+      `turbo.json` consistent with `config.ts`. — ADRs 0021–0024 on
+      release-v0 (planning commit); env vars in all four places.
 
 ## Plan of work
 
@@ -326,6 +333,16 @@ timestamp each entry)_
 
 - [x] 2026-09-01 — Planning: interview rounds 1–3 complete, explorers
       reported, ADRs 0021–0024 written, root + backend plans drafted.
+- [x] 2026-09-01 — Implementation complete on branch
+      `raafaykazmi/cam-6-…`. M1 contracts freeze (c31f815) → M2 projections
+      (2f05be1) → M3 infra + realtime container (1618a8f) → M4 presentation
+      & wiring (d6f47d6). Full gate green:
+      `pnpm turbo build typecheck lint test` (api 93, application 80,
+      domain 190 tests). All acceptance criteria checked above. Both
+      containers (Postgres + Realtime) must be up for the api suites.
+      As-built deviations from advisory sketches are reconciled in the
+      backend plan's "As-built deviations" section (notably
+      `projectEvents(events)` and the required `METRICS_JWT_SECRET`).
 
 ## Decision log
 
@@ -379,4 +396,54 @@ broadcast` is just Kong routing to it). Tenant resolution is by Host
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+**Review verdict (2026-09-02): SHIP.** No contract violations, no
+hidden-information leaks, no architecture violations, no unlogged
+deviations.
+
+**What was verified.** Independent gate run green —
+`pnpm turbo build typecheck lint test`, 22/22 tasks (config 13, domain 190,
+application 80, api 93 = 376 tests); the container-dependent api suite was
+force-re-run fresh (not cached) against live Postgres + Realtime and passed
+18 files / 93 tests; the adversarial projection sweep was run at
+`VIEW_GAMES=40` and passed. Two read-only reviewers (contract + architecture)
+plus direct spot-checks.
+
+**Contract.** All clauses C1.1–C6.2 SATISFIED, each pinned by a test whose
+body genuinely asserts the clause (verified, not grepped from titles). The
+three adversarial suites do real negative-space work: `AdversarialProjection`
+scans every player's `viewFor` at every simulated step against an
+independently-computed entitled-slug set plus forbidden-key rejection
+(`deck`/`prng`/`seed`), which mirrors C2.4 and would catch over-entitlement.
+
+**Architecture.** Clean against all five governing skills. Highlights:
+contracts import `effect` only (brands re-declared as unbranded wire shapes);
+projections are pure; the `RoomGameEvent` union **structurally cannot**
+represent a private card value (private values live in a separate
+`PlayerGameEvent` union) — the "split, don't send mostly-public" rule holds
+by construction; the publisher routes everything through
+`projectEvents`/`lobbyView`; compose Realtime is Broadcast-only (no Postgres
+Changes config); secrets are `Redacted` from config and never logged.
+
+**Advisory notes (non-blocking, no fix required to ship).**
+
+- `CommandMapping.ts:15-16` uses `Schema.decodeUnknownSync` for the
+  wire→domain re-brand. It cannot throw in practice — inputs are already
+  validated by `decodeWireCommandEither` at `games.ts:44` before
+  `toDomainCommand` runs — but it is the one spot in the pure layer that
+  raises rather than returning `Either`. Fine as the standard re-brand idiom.
+- `realtime-publisher.ts:73` logs `String(defect)` in the defect branch. No
+  code path routes a topic/secret into a defect today; a constant message
+  would be marginally more defensive.
+- C1.7's unauthenticated-401 path is dedicated-tested for the command route
+  and all lobby routes, but not for `GET /games/:gameId/view` specifically
+  (identical `makeRequireSession` guard, `games.ts:64`). Behavior is sound;
+  a one-line negative test would close the gap.
+
+None of the three warrant blocking the PR; capture them as follow-ups if
+desired.
+
+**Carry-forward.** CAM-7 (slam window end-to-end) inherits the exposed
+`Slam` route and the exit-folding route runner; the actor's dying-race
+teardown paths (`RoomRegistry.ts:252-310`) remain correct-by-inspection with
+the HTTP edge now mapping them to 500 (tested via a stub registry, not the
+real teardown race — that race is CAM-7's to exercise).

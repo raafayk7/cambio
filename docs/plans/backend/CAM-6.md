@@ -715,46 +715,88 @@ file, test name, and assertion phrase as each test actually lands —
 invented test titles become review findings. The "Planned approach"
 column below is plan-time orientation only.)_
 
-| Clause | Planned approach (plan time)                                                                                                                                                              | Test (file + name) | What is asserted |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------- |
-| C1.1   | lobby-route HTTP suite: authenticated create ⇒ 201 + lobby view/version/caller's grants matching the topic derivation                                                                     | —                  | —                |
-| C1.2   | lobby-route HTTP suite: join returns view/version/joiner's grants; leave returns view/version                                                                                             | —                  | —                |
-| C1.3   | lobby-route HTTP suite: config-overridden `slamWindowMs` observed in the started game's persisted `GameConfig`                                                                            | —                  | —                |
-| C1.4   | contracts construction (9-variant union, no `CloseSlamWindow`) + command-route decode test rejecting a wire `CloseSlamWindow` with 400                                                    | —                  | —                |
-| C1.5   | adversarial command-route test: spoofed `playerId` in the body executes as the session user, never the spoofed one (wire schemas carry no issuer, decision 3)                             | —                  | —                |
-| C1.6   | view-route suite: participant gets `viewFor` snapshot + version + grants; non-participant gets the 404 body identical to unknown-game                                                     | —                  | —                |
-| C1.7   | every new route probed without a session ⇒ 401 with the contract body                                                                                                                     | —                  | —                |
-| C1.8   | malformed body/params ⇒ 400 before effects, publisher/registry journal untouched                                                                                                          | —                  | —                |
-| C1.9   | `lobbyErrorStatus`/`commandErrorStatus` exhaustive switches (`satisfies never` — compile-time totality) + route tests sampling each status class                                          | —                  | —                |
-| C1.10  | bespoke suite over a stub registry whose `execute` dies/interrupts ⇒ 500 contract body, response always completes (decision 13)                                                           | —                  | —                |
-| C1.11  | unknown-path request ⇒ curated 404 contract body via `setNotFoundHandler`                                                                                                                 | —                  | —                |
-| C2.1   | `viewFor` unit suite + simulation sweep: all hands (own included) occupancy-only in every phase                                                                                           | —                  | —                |
-| C2.2   | unit + sweep negatives: no view at any step contains deck contents or any `prng` component (leaks helper)                                                                                 | —                  | —                |
-| C2.3   | unit suite: discard pile appears as-is in every view                                                                                                                                      | —                  | —                |
-| C2.4   | unit suite: the phase matrix — holder-always / everyone-on-discard-source / absent-otherwise; power phases holder-only; `SlamWindow` public; others value-free                            | —                  | —                |
-| C2.5   | unit suite: `Ended` reveal with all hands, totals = `gameScores`, winners = `winnersOf`, tie case included                                                                                | —                  | —                |
-| C2.6   | unit suite: seat order + phase/turn in the view; version pinned beside it in the reply envelope (decision 2)                                                                              | —                  | —                |
-| C2.7   | unit test: `lobbyView` output is viewer-independent                                                                                                                                       | —                  | —                |
-| C3.1   | event-projection unit suite: each C3.1 variant lands on room unchanged                                                                                                                    | —                  | —                |
-| C3.2   | unit suite: the five public-with-value events keep their card value on room                                                                                                               | —                  | —                |
-| C3.3   | unit suite: each stripped projection loses exactly the named fields (absent, not null); `PenaltyDrawn` slug in no output (ADR-0022); totality via `satisfies never`                       | —                  | —                |
-| C3.4   | unit suite: `CardDrawn`/`CardPeeked` yield one private payload to the entitled player + a value-free room event                                                                           | —                  | —                |
-| C3.5   | simulation sweep: after the entitling phase passes, subsequent views/events never re-contain the delivered value                                                                          | —                  | —                |
-| C4.1   | publisher unit suite (injectable transport): one call ⇒ one batch of room + per-player messages, payloads = `projectEvents` output on derived topics                                      | —                  | —                |
-| C4.2   | publisher unit (Bearer HS256 JWT, `/api/broadcast` body shape) + container integration suite over the real endpoint                                                                       | —                  | —                |
-| C4.3   | publisher unit: rejecting/non-2xx transport ⇒ effect succeeds void, failure logged                                                                                                        | —                  | —                |
-| C4.4   | topics unit suite (deterministic, distinct, secret-dependent) + lobby-route adversarial test (A's responses never contain B's player secret)                                              | —                  | —                |
-| C5.1   | compile-time (`AppServices` widened, `AppLayer` provides all) + api suites booting over the full `TestAppLayer`; `pnpm dev` boot recorded in Progress                                     | —                  | —                |
-| C5.2   | one-change discipline across `config.ts`/`.env.example`/`turbo.json`/`baseConfig`; reviewed by diff, no dedicated test (config plumbing)                                                  | —                  | —                |
-| C5.3   | compose service landed + the container-backed integration suite passing (and hard-failing with the container stopped — checked once in M3)                                                | —                  | —                |
-| C6.1   | e2e scripted game: every command/start reply and snapshot passes the no-leak assertion, body is `{view, version}` with no `state`/`events` keys; M2 sweep covers the projection generally | —                  | —                |
-| C6.2   | doc-only (warning comment on `GameAdvanced`) — no test can pin a comment; verified by `/review` reading `StartGame.ts`                                                                    | —                  | —                |
+| Clause | Test (file + name)                                                                                                                                                        | What is asserted                                                                                                           |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| C1.1   | `apps/api/test/Lobbies.test.ts` › "creates a lobby: 201 with the lobby view, version, and the caller's grants"                                                            | 201; body `lobby`/`version`/`grants`; grants equal `grantsFor(secret, gameId, caller)`                                     |
+| C1.2   | `Lobbies.test.ts` › "join returns the joiner's grants…" and "leave returns the view and version, no grants"                                                               | join body carries the joiner's grants; leave body keys are exactly `lobby`+`version`                                       |
+| C1.3   | `Lobbies.test.ts` › "assembles GameConfig from AppConfig — the override lands in the persisted game"                                                                      | started game's persisted `config.slamWindowMs` equals the route's overridden config                                        |
+| C1.4   | `apps/api/test/GameCommands.test.ts` › "CloseSlamWindow is not on the wire: 400 at decode"                                                                                | a wire `CloseSlamWindow` body is rejected 400 (`BadRequest`) before any effect                                             |
+| C1.5   | `GameCommands.test.ts` › "a spoofed playerId in the body executes as the session user, never the spoofed player"                                                          | Bob's body claiming `playerId: alice` executes as Bob → 422 `NotYourTurn`                                                  |
+| C1.6   | `GameCommands.test.ts` › "a participant gets snapshot + version + their grants…" and "a non-participant gets a 404 body identical to an unknown game"                     | participant view equals recomputed `viewFor`; non-participant 404 body byte-identical to unknown-game                      |
+| C1.7   | `Lobbies.test.ts` › "all lobby routes 401 without a session" + `GameCommands.test.ts` › "…unauthenticated → 401" and "requires a session: unauthenticated → 401"          | every game/lobby route without a session → 401 `Unauthorized` (commands + view routes both covered)                        |
+| C1.8   | `GameCommands.test.ts` › "malformed bodies 400 before any effect"; `Lobbies.test.ts` › "malformed :gameId is a 400 before any effect — no registry or publisher activity" | malformed body/params → 400; publisher journal empty                                                                       |
+| C1.9   | `Lobbies.test.ts` › "typed refusals surface their mapped status and tag" + `errors.ts` exhaustive `satisfies never` switches                                              | 409 `AlreadyInLobby`/`NotInLobby`, 404 `GameNotFound`, 422 `NotYourTurn`; exhaustiveness compile-time                      |
+| C1.10  | `apps/api/test/DyingActor.test.ts` › "a defect escaping the typed union becomes a 500…" and "a bare interrupt becomes a 500 too"                                          | stub-registry defect and interrupt each → 500 `Internal`; reply always completes                                           |
+| C1.11  | `GameCommands.test.ts` › "unmatched routes get the curated contract 404"                                                                                                  | unknown path → 404 `{error:{tag:"NotFound"}}`                                                                              |
+| C2.1   | `packages/application/test/ViewFor.test.ts` › "hands are occupancy-only for everyone…" + `AdversarialProjection.test.ts` sweep                                            | every hand (own included) is slot indices only, all phases                                                                 |
+| C2.2   | `ViewFor.test.ts` › "the deck is a count; deck order and prng exist in no view" + sweep (`expectNoLeak`)                                                                  | `deckCount` only; no `deck`/`prng` key at any depth in any view                                                            |
+| C2.3   | `ViewFor.test.ts` › "the discard pile is included as-is, top first"                                                                                                       | discard array projected verbatim                                                                                           |
+| C2.4   | `ViewFor.test.ts` › "phase projection (C2.4)" block (6 tests)                                                                                                             | held value holder-only / everyone-on-discard-source / absent otherwise; power phases holder-only; SlamWindow public        |
+| C2.5   | `ViewFor.test.ts` › "Ended: all hands revealed…", "ties are representable…", "the reveal is identical for every viewer"                                                   | reveal hands+totals = `gameScores`, winners = `winnersOf`; plural winners on a tie                                         |
+| C2.6   | `ViewFor.test.ts` › "seat order and the phase are present" (+ C1.1/C6.1 envelope tests for version)                                                                       | players in seat order, phase present; version rides the reply envelope                                                     |
+| C2.7   | `ViewFor.test.ts` › "is fully public and round-trips the contracts codec"                                                                                                 | `lobbyView` output is viewer-independent                                                                                   |
+| C3.1   | `packages/application/test/EventProjection.test.ts` › "C3.1 — pass-throughs"                                                                                              | each pass-through lands on room unchanged, no private counterpart                                                          |
+| C3.2   | `EventProjection.test.ts` › "C3.2 — public with value, by rule" (5 tests)                                                                                                 | DiscardTaken/HeldDiscarded/PowerDiscarded/SlamSucceeded/SlamFailed keep their card on room                                 |
+| C3.3   | `EventProjection.test.ts` › "C3.3 — value-stripped for everyone" (6 tests)                                                                                                | stripped fields absent (not null); `PenaltyDrawn` slug in no output; totality via `satisfies never`                        |
+| C3.4   | `EventProjection.test.ts` › "C3.4 — split into private value + value-free room event"                                                                                     | CardDrawn/CardPeeked → one private payload to the entitled player + value-free room event                                  |
+| C3.5   | `AdversarialProjection.test.ts` sweep (private-delivery invariants)                                                                                                       | each private draw/peek delivered exactly to the entitled player; none stray                                                |
+| C4.1   | `apps/api/test/RealtimePublisher.test.ts` › "one call, one batch: room messages + per-player messages on derived topics"                                                  | single transport call; batch = `projectEvents` output on `roomTopic`/`playerTopic`                                         |
+| C4.2   | `apps/api/test/RealtimeIntegration.test.ts` › "delivers room and private messages to their topics…" + `RealtimeJwt.test.ts`                                               | real REST publish + websocket delivery to intended topics; HS256 JWT verifies                                              |
+| C4.3   | `RealtimePublisher.test.ts` › "a failing transport is swallowed…" and "a defective transport is swallowed too"                                                            | failing/defective transport → effect still succeeds void                                                                   |
+| C4.4   | `apps/api/test/Topics.test.ts` (4 tests) + `Lobbies.test.ts` › "…never carries another's private topic"                                                                   | topics deterministic/distinct/secret-dependent; Bob's body omits Alice's playerTopic                                       |
+| C5.1   | full api suite boots over `TestAppLayer` (Seed+Publisher+RoomRegistry) + `pnpm dev` boot recorded in Progress                                                             | app resolves the full layer stack; `/health` ok, no startup exception                                                      |
+| C5.2   | `apps/api/test/Config.test.ts` › realtime entries block (3 tests)                                                                                                         | `REALTIME_JWT_SECRET`/`TOPIC_SECRET` required; `slamWindowMs`/`realtimeUrl` defaults                                       |
+| C5.3   | `RealtimeIntegration.test.ts` `beforeAll` health gate                                                                                                                     | suite hard-fails when the container is down (probed in M3); passes when up                                                 |
+| C6.1   | `apps/api/test/EndToEndGame.test.ts` › "plays a full game over HTTP…" and "a real Slam over HTTP…"                                                                        | every reply is `{view, version}` == recomputed `viewFor`, leak-free; published room stream carries only rule-public values |
+| C6.2   | doc-only — warning comment on `GameAdvanced` (`packages/application/src/use-cases/StartGame.ts`)                                                                          | no test pins a comment; verified by reading the source                                                                     |
 
 ## Progress
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [x] 2026-09-01 — backend plan written; awaiting `/implement`
+- [x] 2026-09-01 15:20 — M1 complete (c31f815): seven contracts files landed
+      (`GamePrimitives`, `GameCommand`, `GameView`, `GameEvents`, `Channel`,
+      `Error`, `Responses`) + barrel; contracts build/typecheck/lint green.
+      Private events got distinct tags (`PrivateCardDrawn`,
+      `PrivateCardPeeked`) so the two streams can never be confused — see
+      Surprises.
+- [x] 2026-09-01 15:45 — M2 complete: `src/projection/{ViewFor,
+EventProjection,CommandMapping}.ts` + four test suites + `leaks.ts`
+      helper, TDD (suites written first, red on missing modules, then green).
+      Application suite 80 tests green; raised-knob sweep `VIEW_GAMES=25`
+      green (thousands of per-step views checked). `VIEW_GAMES`/`VIEW_SEED`
+      added to `turbo.json` test env. Deviation: `projectEvents(events)` —
+      the advisory `(state, events)` first parameter proved unnecessary
+      (deck counts come from the events themselves).
+- [x] 2026-09-01 16:30 — M3 complete (1618a8f): compose gained `realtime-init` + `supabase/realtime:v2.102.3` (pin re-verified against the
+      supabase/supabase compose today; one surprise: `METRICS_JWT_SECRET` is
+      required at boot — added, set to the same dev secret). Schema checks
+      recorded: `_realtime.{tenants,extensions,schema_migrations,feature_flags}`
+      only; `public` untouched; tenant `realtime-dev` seeded. Health endpoint
+      answered with the self-signed JWT. `seed.ts`, `topics.ts`,
+      `realtime-jwt.ts`, `realtime-publisher.ts` landed; 16 tests green incl.
+      the container-backed integration suite (real REST publish → real
+      websocket delivery; wrong player's channel silent). Hard-fail acceptance
+      probed: stopping the container fails the suite with an actionable
+      message; restarted. Config/env/turbo/baseConfig four-place change landed
+      here (early — the publisher layer needs config; step 4.1 is thereby
+      done). Local `.env` synced by hand.
+- [x] 2026-09-01 16:45 — M4 complete (d6f47d6): error contract
+      (`errors.ts` rewritten to `ErrorBody`; `commandErrorStatus`,
+      `lobbyErrorStatus`, `typedErrorBody`), `setNotFoundHandler`, `run.ts`
+      exit-folding runner, `lobbies.ts`, `games.ts`, runtime wiring
+      (`AppServices`/`AppLayer` widened with Seed/Publisher/RoomRegistry),
+      `GameAdvanced` full-truth doc warning (C6.2). Test wiring: `TestAppLayer`
+      gained fixed-seed `SeedPort`, a recording publisher journal, and
+      `RoomRegistryLive`. Suites: `Lobbies`, `GameCommands`, `DyingActor`,
+      `EndToEndGame` + Config/Auth migrations. Full api suite 93 tests green;
+      API boots on the full layer stack (`/health` ok, no exceptions — the
+      only startup error seen was EADDRINUSE from a stray dev process, not a
+      wiring fault). Deviations logged below.
+- [x] 2026-09-01 16:55 — M5: full gate green
+      (`pnpm turbo build typecheck lint test`); coverage table filled;
+      docs reconciled.
 
 ## Surprises & notes for the root plan
 
@@ -770,3 +812,24 @@ _(anything the root plan's Decision Log or the reviewer must know)_
   them to the contract shape (decision 6) is a planned edit of existing
   tests, not scope creep — flag any suite whose assertions turn out to
   depend on exact wording rather than shape.
+
+### As-built deviations from the advisory sketches (reconciled at close-out)
+
+- **`projectEvents(events)`**, not the sketched `projectEvents(state,
+events)` — the `state` argument was never needed (deck counts come from
+  `GameStarted`/`DeckReshuffled` themselves). `ViewFor.ts` module-layout row
+  stands as written.
+- **`METRICS_JWT_SECRET`** is required by `supabase/realtime:v2.102.3` at
+  boot (not in the researched env set) — added to the compose service,
+  same dev secret as `API_JWT_SECRET`. Recorded in the compose comment.
+- **`typedErrorBody`** (not sketched) sits alongside `errorBody` in
+  `errors.ts`: it renders a typed error's `_tag` + a status-class message,
+  while `errorBody` handles the tagless framework/404/401 cases. Both feed
+  the `contracts` `ErrorBody`.
+- **`publishLobby` event name** on the wire is `"LobbyUpdated"` (the port
+  gave no name); documented in the publisher adapter.
+- The `Error.ts`/`Channel.ts`/`Responses.ts` contracts modules, the three
+  `projection/` modules, and the four new `infra/` modules all landed at
+  their sketched paths. `.env.example` was already complete pre-CAM-6
+  (plan-time verification held); the four new vars were added to it,
+  `config.ts`, `turbo.json`, `baseConfig`, and the local `.env`.

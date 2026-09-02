@@ -213,7 +213,8 @@ describe("temporary-user auth over HTTP (CAM-4)", () => {
     expect(res.statusCode).toBe(400)
     expect(res.cookies).toHaveLength(0)
     const body = res.json() as Record<string, unknown>
-    expect(body).toEqual({ error: "bad request" })
+    // CAM-6 migrated bodies to the contracts ErrorBody shape (decision 6).
+    expect(body).toEqual({ error: { tag: "BadRequest", message: "invalid request" } })
     expect(body).not.toHaveProperty("message")
   })
 })
