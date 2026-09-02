@@ -10,6 +10,26 @@
 # build/typecheck/lint/test. Deliberately NOT matched: `pnpm vitest run …`,
 # `pnpm --filter … migrate`, and other dev-iteration commands — the rule
 # guards the gate, not every pipe.
+#
+# What counts as "piping the gate" — and what deliberately does NOT:
+#   The gate invocation must be the LEFT-hand side of a real shell pipe, in
+#   the same simple-command (no `;`, `&&`, `||`, or newline between them). We
+#   check gate-then-pipe ADJACENCY in one pattern rather than "a gate string
+#   somewhere AND a pipe somewhere" — the latter false-fired on unrelated
+#   commands whose text merely mentioned the gate (a `--body-file` whose
+#   content named it, a `git diff X...HEAD` alongside a `| tail`, etc.).
+#   Specifically NOT blocked:
+#     - `gate && other | tail`   — the pipe feeds `other`; gate's exit stands.
+#     - `cmd | tail` where a heredoc/arg elsewhere merely contains the gate
+#       text (grep stays line-based, so the gate line and the pipe line are
+#       judged separately).
+#     - `grep "a\|b\|pnpm turbo" f` — an ESCAPED `\|` is grep alternation, not
+#       a shell pipe (we require the pipe to be unescaped).
+#     - `pnpm turbo … 2>&1 | tail` IS still blocked — redirections are scrubbed
+#       first so `2>&1` doesn't read as a separator.
+#   Known residual (accepted): `echo "pnpm turbo build" | cat` — a gate string
+#   quoted then piped on ONE line — still trips. Rare; use `set -o pipefail`
+#   or restructure. Regex cannot tell a quoted string from a command.
 set -u
 
 input="$(cat)"
@@ -21,12 +41,16 @@ case "$cmd" in
   *"set -o pipefail"*) exit 0 ;;
 esac
 
-# A lone | (a real pipe — not the || operator).
-printf '%s' "$cmd" | grep -qE '(^|[^|])\|($|[^|])' || exit 0
+# Scrub redirections that contain `&` (`2>&1`, `>&2`, `&>file`) so their `&`
+# is not mistaken for a `&&`/background separator between gate and pipe.
+scrubbed="$(printf '%s' "$cmd" | sed -E 's/[0-9]*[<>]&[0-9-]*//g; s/&>>?/ /g')"
 
-# A gate invocation present in the same command.
-printf '%s' "$cmd" |
-  grep -qE 'pnpm +(turbo\b|(-r +)?(--filter +[^ ]+ +)?(run +)?(build|typecheck|lint|test)\b)|(^|[;&( ])turbo +(run +)?[a-z]' ||
+# A gate invocation immediately followed (args/redirs only, no separator) by a
+# real, unescaped single pipe. The run `[^|;&()\\]*` excludes separators AND
+# backslash, so an escaped `\|` cannot masquerade as a pipe; `([^|]|$)` rules
+# out `||`. grep stays line-based on purpose (see header).
+printf '%s' "$scrubbed" |
+  grep -qE '(pnpm +(turbo\b|(-r +)?(--filter +[^ ]+ +)?(run +)?(build|typecheck|lint|test)\b)|(^|[;&|( ])turbo +(run +)?[a-z])[^|;&()\\]*[|]([^|]|$)' ||
   exit 0
 
 cat <<'JSON'

@@ -46,6 +46,17 @@ yourself: `pnpm turbo build typecheck lint test` plus anything the
 Validation section lists. Reviewer claims about tests are not evidence;
 command output is.
 
+**A turbo cache hit is not a fresh run.** After a passing `/implement`, the
+gate's `test` task is cached, so a plain `pnpm turbo … test` may report green
+without executing anything — which means the container-dependent suites
+(Postgres, and any realtime/broadcast integration tests) did not actually
+run against live infrastructure this cycle. Force those to execute: bring the
+containers up, then `pnpm turbo test --filter=<pkg> --force` (or the package's
+own `vitest run`) for every side whose suite needs infra. Treat a cached
+result as unverified until you have re-run it fresh at least once during the
+review. If the plan's Validation section names knobs (e.g. a raised
+simulation/adversarial count), run at least one pass with the knob raised.
+
 ## 4. Adjudicate and report
 
 Merge findings, deduplicate, and verify each finding yourself before
