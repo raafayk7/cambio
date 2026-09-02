@@ -2,7 +2,6 @@ import { describe, expect, it } from "@effect/vitest"
 import { projectEvents, viewFor } from "@cambio/application"
 import type { PlayerGameView } from "@cambio/contracts"
 import {
-  applyCommand,
   type Command,
   dealGame,
   decodeGameConfig,
@@ -15,7 +14,8 @@ import {
 import { legalCandidates, ts } from "@cambio/domain/testing"
 import { Either, Schema } from "effect"
 
-import { clearPublisherJournal, makeTestApp, publisherJournal, TEST_SEED } from "./support/http.js"
+import { apply, normalize, setupGame, toWire } from "./support/game-driver.js"
+import { makeTestApp, publisherJournal, TEST_SEED } from "./support/http.js"
 import { entitledSlugs, expectNoLeak, slugsIn } from "./support/leaks.js"
 
 /**
@@ -35,62 +35,6 @@ import { entitledSlugs, expectNoLeak, slugsIn } from "./support/leaks.js"
  */
 
 const toUserId = Schema.decodeUnknownSync(UserId)
-
-interface Player {
-  readonly userId: string
-  readonly cookie: string
-}
-
-const makePlayers = async (
-  app: Awaited<ReturnType<typeof makeTestApp>>["app"],
-  names: ReadonlyArray<string>,
-): Promise<ReadonlyArray<Player>> => {
-  const players: Array<Player> = []
-  for (const name of names) {
-    const res = await app.inject({ method: "POST", url: "/users", payload: { name } })
-    expect(res.statusCode).toBe(201)
-    players.push({
-      userId: (res.json() as { userId: string }).userId,
-      cookie: res.cookies.find((c) => c.name === "cambio_session")!.value,
-    })
-  }
-  return players
-}
-
-/** Wire body for a domain command: the issuer field simply does not exist. */
-const toWire = (command: Command): Record<string, unknown> => {
-  switch (command._tag) {
-    case "CallCambio":
-    case "TakeDiscard":
-    case "DrawFromDeck":
-    case "DiscardHeld":
-    case "KeepHeld":
-      return { _tag: command._tag }
-    case "SwapHeld":
-      return { _tag: "SwapHeld", slotIndex: command.slotIndex }
-    case "PowerPeek":
-      return { _tag: "PowerPeek", target: command.target }
-    case "PowerSwap":
-      return { _tag: "PowerSwap", first: command.first, second: command.second }
-    case "Slam":
-      return { _tag: "Slam", target: command.target, giveSlot: command.giveSlot }
-    case "CloseSlamWindow":
-      throw new Error("CloseSlamWindow never goes over the wire")
-    default:
-      return command satisfies never
-  }
-}
-
-const normalize = (view: PlayerGameView): PlayerGameView =>
-  view.phase._tag === "SlamWindow" ? { ...view, phase: { ...view.phase, closesAt: 0 } } : view
-
-const apply = (state: GameState, command: Command, at: number): GameState => {
-  const result = applyCommand(state, command, ts(at))
-  if (Either.isLeft(result)) {
-    throw new Error(`local replay rejected ${command._tag}: ${result.left._tag}`)
-  }
-  return result.right[0]
-}
 
 /** A command a player issues over the wire — never the server-internal close. */
 type IssuedCommand = Exclude<Command, { readonly _tag: "CloseSlamWindow" }>
@@ -145,37 +89,8 @@ describe("end-to-end scripted game (acceptance, C6.1)", () => {
   it("plays a full game over HTTP; every reply and published payload is leak-free", async () => {
     const { app, runtime } = await makeTestApp({ slamWindowMs: 1 })
     try {
-      const [alice, bob] = await makePlayers(app, ["Alice", "Bob"])
-      const byId = new Map([
-        [alice!.userId, alice!],
-        [bob!.userId, bob!],
-      ])
-
-      const created = (
-        await app.inject({
-          method: "POST",
-          url: "/lobbies",
-          cookies: { cambio_session: alice!.cookie },
-        })
-      ).json() as { lobby: { id: string } }
-      const gameId = created.lobby.id
-      expect(
-        (
-          await app.inject({
-            method: "POST",
-            url: `/lobbies/${gameId}/join`,
-            cookies: { cambio_session: bob!.cookie },
-          })
-        ).statusCode,
-      ).toBe(200)
-
-      clearPublisherJournal()
-      const startRes = await app.inject({
-        method: "POST",
-        url: `/lobbies/${gameId}/start`,
-        cookies: { cambio_session: alice!.cookie },
-      })
-      expect(startRes.statusCode).toBe(200)
+      const { gameId, players, byId, startRes } = await setupGame(app, ["Alice", "Bob"])
+      const [alice, bob] = players
 
       // Local replay of the server's deal — pure, same seed, same game.
       const dealt = dealGame(
@@ -279,33 +194,8 @@ describe("a real Slam over HTTP (large window)", () => {
   it("a slam inside an open window round-trips with a leak-free reply", async () => {
     const { app, runtime } = await makeTestApp({ slamWindowMs: 60_000 })
     try {
-      const [alice, bob] = await makePlayers(app, ["Alice", "Bob"])
-      const byId = new Map([
-        [alice!.userId, alice!],
-        [bob!.userId, bob!],
-      ])
-      const created = (
-        await app.inject({
-          method: "POST",
-          url: "/lobbies",
-          cookies: { cambio_session: alice!.cookie },
-        })
-      ).json() as { lobby: { id: string } }
-      const gameId = created.lobby.id
-      await app.inject({
-        method: "POST",
-        url: `/lobbies/${gameId}/join`,
-        cookies: { cambio_session: bob!.cookie },
-      })
-      expect(
-        (
-          await app.inject({
-            method: "POST",
-            url: `/lobbies/${gameId}/start`,
-            cookies: { cambio_session: alice!.cookie },
-          })
-        ).statusCode,
-      ).toBe(200)
+      const { gameId, players, byId } = await setupGame(app, ["Alice", "Bob"])
+      const [alice, bob] = players
 
       const dealt = dealGame(
         [toUserId(alice!.userId), toUserId(bob!.userId)],
