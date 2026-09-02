@@ -26,6 +26,12 @@ table and any module-layout table are the artifacts that must match
 as-built code at close-out. Prefer constraints, test intents, and
 patterns-to-follow over predicted code.
 
+**Cite tests by file + test name, never by line number** — test names are
+the stable identifier (the coverage table keys on them); line refs rot
+with every refactor and burn review findings on documentation drift.
+Line-number citations are for `src/` anchors only, and close-out greps the
+plan docs for `:<digits>` references to files the diff touched.
+
 ## Concrete steps & validation
 
 The exact commands to run at each checkpoint and what output signals

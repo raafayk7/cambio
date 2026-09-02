@@ -125,6 +125,14 @@ mechanically enforced: a PreToolUse hook
 (`.agents/hooks/block-piped-gate.sh`, wired via `.claude/settings.json`)
 denies Bash commands that pipe a gate invocation without `pipefail`.
 
+**Markdown formats itself — but mind one trap.** A PostToolUse hook
+(`.agents/hooks/format-markdown.sh`) auto-formats every `.md` file an
+agent edits, so plan docs and ADRs should never fail the gate's prettier
+check. The one case the formatter cannot fix: an inline code span broken
+across lines inside a list item makes prettier **non-convergent**
+(`--write` output still fails `--check`, forever). Keep inline code spans
+on one line; if a sentence forces a break, rephrase it.
+
 Environment lives in `.env` at the repo root (copy from `.env.example`). Tests
 are vitest + `@effect/vitest`; domain work is test-first (HANDOFF §12).
 

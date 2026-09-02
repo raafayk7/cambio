@@ -1,17 +1,25 @@
 ---
 description: Implement a planned Linear task from its plan documents, keeping them updated as living docs
-argument-hint: CAM-xxx
+argument-hint: CAM-xxx [extra instructions…]
 ---
 
-Implement task **$ARGUMENTS** from its plans. The plans are the authority —
+> **Arguments:** the issue id is `$1` — the first whitespace-delimited token
+> of the invocation. Every `$1` below means that id and nothing else. The
+> full invocation was “$ARGUMENTS”; anything in it beyond the id is the
+> user's accompanying instruction — honor it alongside or after this
+> workflow, and never substitute it into ids, file paths, branch names, or
+> Linear lookups. (A multi-line invocation once expanded into every id slot
+> of this template and produced garbled paths — this rule is the fix.)
+
+Implement task **$1** from its plans. The plans are the authority —
 this command executes them, it does not re-plan.
 
 ## 1. Load
 
-Read `docs/plans/root/$ARGUMENTS.md` and every child plan that exists for
-$ARGUMENTS, plus any ADRs the root plan lists. Fetch the Linear issue for
+Read `docs/plans/root/$1.md` and every child plan that exists for
+$1, plus any ADRs the root plan lists. Fetch the Linear issue for
 late-breaking comments. If no root plan exists, stop: tell the user to run
-`/plan $ARGUMENTS` first.
+`/plan $1` first.
 
 **Branch setup:** find the current release branch in the Linear **["Release
 History"](https://linear.app/raafayk7/document/release-history-932e3ba2f8c1)**
@@ -63,13 +71,17 @@ signatures, or module-layout tables the plans stated before code existed
 must now either match reality or be replaced with links to the real files —
 a Surprises entry noting a deviation does not excuse a stale table two
 sections above it. `/review` grades against the plans, and stale sketches
-burn review findings on documentation drift.
+burn review findings on documentation drift. Two mechanical checks are part of
+this step: cite tests by file + test name, never line number (names are
+stable; line refs rot); and grep every plan doc for `:<digits>` references
+to files this task's diff touched — a refactor in the same diff silently
+invalidates them (it happened twice, CAM-4 and CAM-7).
 
 Update the root plan's Progress to reflect completion, commit the work on
-the task branch (conventional messages, referencing $ARGUMENTS), and push
+the task branch (conventional messages, referencing $1), and push
 it. Do not merge into the release branch — that happens via PR after
-review. Post a Linear comment on $ARGUMENTS (what shipped, deviations,
+review. Post a Linear comment on $1 (what shipped, deviations,
 anything for review to focus on). The issue stays in **In Progress** —
 `/review` moves it forward on a passing verdict. Report to the user: what
 was built, gate results verbatim if anything is non-obvious, and suggest
-`/review $ARGUMENTS` as the next step.
+`/review $1` as the next step.
