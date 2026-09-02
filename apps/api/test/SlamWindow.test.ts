@@ -1,7 +1,14 @@
 import { describe, expect, it } from "@effect/vitest"
 import { projectEvents, viewFor } from "@cambio/application"
 import type { PlayerGameView } from "@cambio/contracts"
-import { type Command, dealGame, decodeGameConfig, type GameState, UserId } from "@cambio/domain"
+import {
+  applyCommand,
+  type Command,
+  dealGame,
+  decodeGameConfig,
+  type GameState,
+  UserId,
+} from "@cambio/domain"
 import { legalCandidates, ts } from "@cambio/domain/testing"
 import { Either, Schema } from "effect"
 
@@ -10,10 +17,11 @@ import {
   clearPublisherJournal,
   makeSettableClock,
   makeTestApp,
+  type PublishedEntry,
   publisherJournal,
   TEST_SEED,
 } from "./support/http.js"
-import { entitledSlugs, expectNoLeak, slugsIn } from "./support/leaks.js"
+import { entitledSlugs, expectNoLeak, rulePublicSlugs, slugsIn } from "./support/leaks.js"
 
 /**
  * CAM-7 — the slam window end-to-end (root plan C1.3/C1.4, C1.6, C2.1/C2.2,
@@ -171,32 +179,35 @@ const slamCandidate = (
   return found
 }
 
-/** Room-stream leak scan: only rule-public card values may appear (§1.5). */
-const expectRoomRevealOnly = (
-  entry: { events: ReadonlyArray<{ _tag: string }>; state: GameState },
-  context: string,
-) => {
-  const projected = projectEvents(entry.events as never)
-  const publicSlugs = new Set<string>()
-  for (const event of entry.events as ReadonlyArray<Record<string, unknown> & { _tag: string }>) {
-    switch (event._tag) {
-      case "GameStarted":
-        publicSlugs.add(event.firstDiscard as string)
-        break
-      case "DiscardTaken":
-      case "HeldDiscarded":
-      case "PowerDiscarded":
-      case "SlamSucceeded":
-      case "SlamFailed":
-        publicSlugs.add(event.card as string)
-        break
-      case "HeldSwapped":
-        publicSlugs.add(event.discarded as string)
-        break
-      default:
-        break
-    }
+type GameEntry = Extract<PublishedEntry, { readonly _tag: "game" }>
+
+/**
+ * The event tags a slam ATTEMPT can persist. Used to assert race-free that a
+ * refused slam left no trace: a due window's close batch may legally land at
+ * any moment (the refused envelope re-arms a zero-duration timer), so
+ * "journal is empty" would race — "no slam outcome anywhere" does not.
+ */
+const SLAM_OUTCOME_TAGS: ReadonlySet<string> = new Set([
+  "SlamSucceeded",
+  "SlamFailed",
+  "PenaltyDrawn",
+  "CardGivenFromHand",
+  "CardGivenFromDeck",
+  "DrawSkipped",
+])
+const expectNoSlamPersisted = (entries: ReadonlyArray<GameEntry>, context: string) => {
+  for (const entry of entries) {
+    expect(
+      entry.events.map((e) => e._tag).filter((t) => SLAM_OUTCOME_TAGS.has(t)),
+      `${context}: refused slam must persist nothing`,
+    ).toEqual([])
   }
+}
+
+/** Room-stream leak scan: only rule-public card values may appear (§1.5). */
+const expectRoomRevealOnly = (entry: GameEntry, context: string) => {
+  const projected = projectEvents(entry.events)
+  const publicSlugs = rulePublicSlugs(entry.events)
   const leaks = slugsIn(projected.room).filter((s) => !publicSlugs.has(s))
   expect(leaks, `published room stream (${context})`).toEqual([])
   // No slam event ever produces a per-player private delivery (C3.2).
@@ -235,13 +246,16 @@ describe("SlamWindow e2e (CAM-7)", () => {
         slotIndex: matching[0]!.slotIndex,
       })
       expect(slam.giveSlot).toBeNull() // own-card slams carry no give
+      const handBefore = world.state.players[1]!.hand.length
       clearPublisherJournal()
       const body = await world.step(slam)
       if (body.view.phase._tag !== "SlamWindow") throw new Error("window should stay open")
       expect(body.view.phase.closesAt).toBe(EPOCH + BIG)
 
-      // Hand shrank; the slammed slot is a hole in the replayed truth.
-      expect(world.state.players[1]!.hand.length).toBe(matching.length === 1 ? 3 : 4 - 1)
+      // Hand shrank by one; the slammed slot is a hole (no shift).
+      const handAfter = world.state.players[1]!.hand
+      expect(handAfter.length).toBe(handBefore - 1)
+      expect(handAfter.some((h) => h.slotIndex === matching[0]!.slotIndex)).toBe(false)
 
       const entries = world.gameEntries()
       expect(entries.length).toBe(1)
@@ -276,7 +290,7 @@ describe("SlamWindow e2e (CAM-7)", () => {
       expectRoomRevealOnly(correctEntry, "opponent/correct")
       // The give is value-free on the room stream: identity follows the slot
       // movement, no card field at all (ADR-0009 discipline).
-      const projectedGive = projectEvents(correctEntry.events as never).room.find(
+      const projectedGive = projectEvents(correctEntry.events).room.find(
         (e) => e._tag === "CardGivenFromHand",
       )
       expect(projectedGive).toMatchObject({ fromSlot: oppCorrect.giveSlot, to: giveTarget })
@@ -295,6 +309,10 @@ describe("SlamWindow e2e (CAM-7)", () => {
       const ownFail = world.gameEntries().at(-1)!
       expect(ownFail.events.map((e) => e._tag)).toEqual(["SlamFailed", "PenaltyDrawn"])
       const projectedOwnFail = expectRoomRevealOnly(ownFail, "own/incorrect")
+      // The failed attempt's reveal also rides the room channel (§1.5 —
+      // "correct or not"; review F3: assert presence, not just leak-freedom).
+      const failReveal = projectedOwnFail.room.find((e) => e._tag === "SlamFailed")
+      expect(failReveal).toMatchObject({ card: aliceOther[0]!.card })
       // PenaltyDrawn is slot-only: unseen by everyone, the slammer included.
       const penalty = projectedOwnFail.room.find((e) => e._tag === "PenaltyDrawn")
       expect(penalty).toBeDefined()
@@ -326,7 +344,7 @@ describe("SlamWindow e2e (CAM-7)", () => {
     }
   }, 30_000)
 
-  it("a late slam is 422 SlamTooLate and closes nothing (C1.3/C1.4)", async () => {
+  it("a late slam is 422 SlamTooLate, persists nothing, and the window closes exactly once (C1.3/C1.4)", async () => {
     const world = await makeWorld(BIG)
     try {
       const phase = await world.driveToWindow()
@@ -336,25 +354,27 @@ describe("SlamWindow e2e (CAM-7)", () => {
       )
       expect(anySlam).toBeDefined()
 
-      // …but the window expires before it arrives.
+      // …but the window expires before it arrives. The slam is judged
+      // against the still-open stored phase (the lazy close is skipped for
+      // Slam), so the refusal is SlamTooLate, never WrongPhase.
       world.setNow(phase.closesAt + 1)
       clearPublisherJournal()
       const res = await world.post(anySlam!)
       expect(res.statusCode).toBe(422)
       expect((res.json() as { error: { tag: string } }).error.tag).toBe("SlamTooLate")
 
-      // A late Slam triggers no close (the actor's exemption): nothing was
-      // persisted or published, and the stored phase is still SlamWindow.
-      expect(world.gameEntries()).toEqual([])
-      const viewRes = await world.app.inject({
-        method: "GET",
-        url: `/games/${world.gameId}/view`,
-        cookies: { cambio_session: world.players[0]!.cookie },
-      })
-      expect(viewRes.statusCode).toBe(200)
-      const view = (viewRes.json() as { view: PlayerGameView }).view
-      expect(view.phase._tag).toBe("SlamWindow")
-      if (view.phase._tag === "SlamWindow") expect(view.phase.closesAt).toBe(phase.closesAt)
+      // The refused envelope re-arms the close timer with a ZERO duration
+      // (the window is past due), so the actor may close the window at any
+      // moment now — timer or the next command's lazy path, equivalently
+      // (ADR-0020). Only race-free claims follow: the window closes exactly
+      // once, before the next command's events, and the refusal itself
+      // persisted no slam outcome.
+      world.state = apply(world.state, { _tag: "CloseSlamWindow" }, world.now)
+      await world.step(choose(world.state, world.now))
+      const entries = world.gameEntries()
+      expect(entries.length).toBe(2)
+      expect(entries[0]!.events.map((e) => e._tag)).toEqual(["SlamWindowClosed", "TurnAdvanced"])
+      expectNoSlamPersisted(entries, "late slam over HTTP")
     } finally {
       await world.close()
     }
@@ -383,9 +403,15 @@ describe("SlamWindow e2e (CAM-7)", () => {
       // carry the slammerId).
       const entries = world.gameEntries()
       expect(entries.length).toBeGreaterThan(0)
-      const orderIds = entries.map(
-        (e) => (e.events[0] as { slammerId?: string }).slammerId ?? "unknown",
-      )
+      const orderIds = entries.map((e) => {
+        const head = e.events[0]
+        if (head === undefined || !("slammerId" in head)) {
+          throw new Error(
+            `journal batch without a slammer head: ${JSON.stringify(e.events.map((ev) => ev._tag))}`,
+          )
+        }
+        return head.slammerId as string
+      })
       const ordered = orderIds[0] === alice ? ([slamA, slamB] as const) : ([slamB, slamA] as const)
       const responseFor = (slam: SlamCommand) => (slam === slamA ? resA : resB)
 
@@ -401,38 +427,37 @@ describe("SlamWindow e2e (CAM-7)", () => {
       expect(firstBody.view).toEqual(viewFor(toUserId(first.playerId), world.state))
       expect(firstBody.version).toBe(versionBefore + 1)
 
-      const secondPure = legalCandidates(world.state, ts(world.now)).some(
-        (c) =>
-          c._tag === "Slam" &&
-          c.playerId === second.playerId &&
-          c.target.playerId === second.target.playerId &&
-          c.target.slotIndex === second.target.slotIndex &&
-          c.giveSlot === second.giveSlot,
-      )
+      // The engine's own answer for the loser: judged against the
+      // post-winner state, whatever it says.
+      const pureSecond = applyCommand(world.state, second, ts(world.now))
       const secondRes = responseFor(second)
-      if (secondPure) {
-        world.state = apply(world.state, second, world.now)
+      if (Either.isRight(pureSecond)) {
+        world.state = pureSecond.right[0]
         expect(secondRes.statusCode).toBe(200)
         const secondBody = secondRes.json() as { view: PlayerGameView; version: number }
         expect(secondBody.view).toEqual(viewFor(toUserId(second.playerId), world.state))
         expect(secondBody.version).toBe(versionBefore + 2)
         expect(entries.length).toBe(2)
       } else {
-        // The loser's refusal is the engine's typed answer for the post-winner
-        // state, surfaced as an illegal-move 422.
+        // The loser's refusal is the engine's typed answer for the
+        // post-winner state, surfaced with its exact tag as an illegal-move
+        // 422 (review F6: not just any 422).
         expect(secondRes.statusCode).toBe(422)
+        expect((secondRes.json() as { error: { tag: string } }).error.tag).toBe(
+          pureSecond.left._tag,
+        )
         expect(entries.length).toBe(1)
       }
 
-      // The persisted truth matches the replay.
+      // The persisted truth matches the replay — and leaks nothing.
       const viewRes = await world.app.inject({
         method: "GET",
         url: `/games/${world.gameId}/view`,
         cookies: { cambio_session: world.players[0]!.cookie },
       })
-      expect((viewRes.json() as { view: PlayerGameView }).view).toEqual(
-        viewFor(toUserId(alice), world.state),
-      )
+      const viewBody = viewRes.json() as { view: PlayerGameView; version: number }
+      expect(viewBody.view).toEqual(viewFor(toUserId(alice), world.state))
+      expectNoLeak(viewBody, entitledSlugs(world.state, toUserId(alice)), "post-race view")
     } finally {
       await world.close()
     }
@@ -498,8 +523,12 @@ describe("SlamWindow e2e (CAM-7)", () => {
         url: `/games/${world.gameId}/view`,
         cookies: { cambio_session: world.players[0]!.cookie },
       })
-      expect((viewRes.json() as { view: PlayerGameView }).view).toEqual(
-        viewFor(toUserId(world.players[0]!.userId), world.state),
+      const viewBody = viewRes.json() as { view: PlayerGameView; version: number }
+      expect(viewBody.view).toEqual(viewFor(toUserId(world.players[0]!.userId), world.state))
+      expectNoLeak(
+        viewBody,
+        entitledSlugs(world.state, toUserId(world.players[0]!.userId)),
+        "post-timer-close view",
       )
       await world.step(choose(world.state, world.now))
       expect(world.gameEntries().length).toBe(2) // close batch + command batch, nothing extra
@@ -508,7 +537,7 @@ describe("SlamWindow e2e (CAM-7)", () => {
     }
   }, 30_000)
 
-  it("restart mid-window over the same rows: late slam 422, then a lazy close on the next command (C4.2)", async () => {
+  it("restart mid-window over the same rows: late slam 422, window closed exactly once before the next command (C4.2)", async () => {
     const worldOne = await makeWorld(BIG)
     let phase: Extract<GameState["phase"], { _tag: "SlamWindow" }>
     let frozen: GameState
@@ -526,14 +555,17 @@ describe("SlamWindow e2e (CAM-7)", () => {
     const clockTwo = makeSettableClock(phase.closesAt + 1)
     const { app, runtime } = await makeTestApp({ slamWindowMs: BIG }, { clock: clockTwo.layer })
     try {
-      const alice = worldOne.players[0]!
       const lateSlam = legalCandidates(frozen, ts(EPOCH)).find(
         (c): c is SlamCommand => c._tag === "Slam",
       )
       expect(lateSlam).toBeDefined()
 
-      // (a) The rebuilt actor loads the persisted SlamWindow, arms no timer,
-      // and judges the slam against the stored closesAt: too late.
+      // (a) The rebuilt actor loads the persisted SlamWindow (its bootstrap
+      // arms nothing) and judges the slam against the stored closesAt: too
+      // late. The refused envelope then re-arms a zero-duration timer, so
+      // the close below may arrive via that timer or via (b)'s lazy path —
+      // ADR-0020 pins their equivalence and the journal reads the same
+      // either way.
       clearPublisherJournal()
       const lateRes = await app.inject({
         method: "POST",
@@ -543,11 +575,11 @@ describe("SlamWindow e2e (CAM-7)", () => {
       })
       expect(lateRes.statusCode).toBe(422)
       expect((lateRes.json() as { error: { tag: string } }).error.tag).toBe("SlamTooLate")
-      expect(publisherJournal.filter((e) => e._tag === "game")).toEqual([])
 
-      // (b) The first legal post-close command lazily closes, then runs.
+      // (b) The first legal post-close command runs against the closed window.
       let state = apply(frozen, { _tag: "CloseSlamWindow" }, phase.closesAt + 1)
       const command = choose(state, phase.closesAt + 1)
+      const issuer = toUserId((command as { playerId: string }).playerId)
       const res = await app.inject({
         method: "POST",
         url: `/games/${worldOne.gameId}/commands`,
@@ -559,16 +591,17 @@ describe("SlamWindow e2e (CAM-7)", () => {
       expect(res.statusCode).toBe(200)
       state = apply(state, command, phase.closesAt + 1)
       const body = res.json() as { view: PlayerGameView; version: number }
-      expect(body.view).toEqual(
-        viewFor(toUserId((command as { playerId: string }).playerId), state),
-      )
+      expect(body.view).toEqual(viewFor(issuer, state))
+      expectNoLeak(body, entitledSlugs(state, issuer), "restart command reply")
 
+      // Exactly one close batch, before the command's; the refusal itself
+      // persisted no slam outcome.
       const entries = publisherJournal.filter(
-        (e): e is Extract<(typeof publisherJournal)[number], { _tag: "game" }> => e._tag === "game",
+        (e): e is GameEntry => e._tag === "game" && e.gameId === worldOne.gameId,
       )
       expect(entries.length).toBe(2)
       expect(entries[0]!.events.map((e) => e._tag)).toEqual(["SlamWindowClosed", "TurnAdvanced"])
-      void alice
+      expectNoSlamPersisted(entries, "restart late slam")
     } finally {
       await app.close()
       await runtime.dispose()

@@ -16,7 +16,7 @@ import { Either, Schema } from "effect"
 
 import { apply, normalize, setupGame, toWire } from "./support/game-driver.js"
 import { makeTestApp, publisherJournal, TEST_SEED } from "./support/http.js"
-import { entitledSlugs, expectNoLeak, slugsIn } from "./support/leaks.js"
+import { entitledSlugs, expectNoLeak, rulePublicSlugs, slugsIn } from "./support/leaks.js"
 
 /**
  * The scripted full game over HTTP (root acceptance + C6.1): every command
@@ -160,26 +160,7 @@ describe("end-to-end scripted game (acceptance, C6.1)", () => {
       expect(gameEntries.length).toBeGreaterThan(0)
       for (const entry of gameEntries) {
         const projected = projectEvents(entry.events)
-        const publicSlugs = new Set<string>()
-        for (const event of entry.events) {
-          switch (event._tag) {
-            case "GameStarted":
-              publicSlugs.add(event.firstDiscard)
-              break
-            case "DiscardTaken":
-            case "HeldDiscarded":
-            case "PowerDiscarded":
-            case "SlamSucceeded":
-            case "SlamFailed":
-              publicSlugs.add(event.card)
-              break
-            case "HeldSwapped":
-              publicSlugs.add(event.discarded)
-              break
-            default:
-              break
-          }
-        }
+        const publicSlugs = rulePublicSlugs(entry.events)
         const leaks = slugsIn(projected.room).filter((s) => !publicSlugs.has(s))
         expect(leaks, "published room stream").toEqual([])
       }

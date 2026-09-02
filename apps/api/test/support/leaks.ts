@@ -1,5 +1,5 @@
 import { expect } from "@effect/vitest"
-import { ALL_CARD_SLUGS, type GameState, type UserId } from "@cambio/domain"
+import { ALL_CARD_SLUGS, type GameEvent, type GameState, type UserId } from "@cambio/domain"
 
 /**
  * API-side no-leak toolkit (root C6.1, C1.5) — the twin of
@@ -36,6 +36,38 @@ export const entitledSlugs = (state: GameState, viewerId: UserId): ReadonlySet<s
       phase satisfies never
   }
   return entitled
+}
+
+/**
+ * The card values the RULES make public in an event batch: face-up discards
+ * and the §1.5 slam reveal. This is the single whitelist the room-stream
+ * leak scans compare against (CAM-7 review F7 centralized it here) — typed
+ * over the real `GameEvent` union so a renamed field is a compile error,
+ * not a silently-empty scan. `PenaltyDrawn` and the give events are
+ * deliberately absent (ADR-0009/0022: those values are never public).
+ */
+export const rulePublicSlugs = (events: ReadonlyArray<GameEvent>): ReadonlySet<string> => {
+  const publicSlugs = new Set<string>()
+  for (const event of events) {
+    switch (event._tag) {
+      case "GameStarted":
+        publicSlugs.add(event.firstDiscard)
+        break
+      case "DiscardTaken":
+      case "HeldDiscarded":
+      case "PowerDiscarded":
+      case "SlamSucceeded":
+      case "SlamFailed":
+        publicSlugs.add(event.card)
+        break
+      case "HeldSwapped":
+        publicSlugs.add(event.discarded)
+        break
+      default:
+        break
+    }
+  }
+  return publicSlugs
 }
 
 const walk = (value: unknown, strings: Array<string>, keys: Array<string>): void => {
