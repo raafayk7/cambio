@@ -396,4 +396,54 @@ broadcast` is just Kong routing to it). Tenant resolution is by Host
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+**Review verdict (2026-09-02): SHIP.** No contract violations, no
+hidden-information leaks, no architecture violations, no unlogged
+deviations.
+
+**What was verified.** Independent gate run green —
+`pnpm turbo build typecheck lint test`, 22/22 tasks (config 13, domain 190,
+application 80, api 93 = 376 tests); the container-dependent api suite was
+force-re-run fresh (not cached) against live Postgres + Realtime and passed
+18 files / 93 tests; the adversarial projection sweep was run at
+`VIEW_GAMES=40` and passed. Two read-only reviewers (contract + architecture)
+plus direct spot-checks.
+
+**Contract.** All clauses C1.1–C6.2 SATISFIED, each pinned by a test whose
+body genuinely asserts the clause (verified, not grepped from titles). The
+three adversarial suites do real negative-space work: `AdversarialProjection`
+scans every player's `viewFor` at every simulated step against an
+independently-computed entitled-slug set plus forbidden-key rejection
+(`deck`/`prng`/`seed`), which mirrors C2.4 and would catch over-entitlement.
+
+**Architecture.** Clean against all five governing skills. Highlights:
+contracts import `effect` only (brands re-declared as unbranded wire shapes);
+projections are pure; the `RoomGameEvent` union **structurally cannot**
+represent a private card value (private values live in a separate
+`PlayerGameEvent` union) — the "split, don't send mostly-public" rule holds
+by construction; the publisher routes everything through
+`projectEvents`/`lobbyView`; compose Realtime is Broadcast-only (no Postgres
+Changes config); secrets are `Redacted` from config and never logged.
+
+**Advisory notes (non-blocking, no fix required to ship).**
+
+- `CommandMapping.ts:15-16` uses `Schema.decodeUnknownSync` for the
+  wire→domain re-brand. It cannot throw in practice — inputs are already
+  validated by `decodeWireCommandEither` at `games.ts:44` before
+  `toDomainCommand` runs — but it is the one spot in the pure layer that
+  raises rather than returning `Either`. Fine as the standard re-brand idiom.
+- `realtime-publisher.ts:73` logs `String(defect)` in the defect branch. No
+  code path routes a topic/secret into a defect today; a constant message
+  would be marginally more defensive.
+- C1.7's unauthenticated-401 path is dedicated-tested for the command route
+  and all lobby routes, but not for `GET /games/:gameId/view` specifically
+  (identical `makeRequireSession` guard, `games.ts:64`). Behavior is sound;
+  a one-line negative test would close the gap.
+
+None of the three warrant blocking the PR; capture them as follow-ups if
+desired.
+
+**Carry-forward.** CAM-7 (slam window end-to-end) inherits the exposed
+`Slam` route and the exit-folding route runner; the actor's dying-race
+teardown paths (`RoomRegistry.ts:252-310`) remain correct-by-inspection with
+the HTTP edge now mapping them to 500 (tested via a stub registry, not the
+real teardown race — that race is CAM-7's to exercise).
