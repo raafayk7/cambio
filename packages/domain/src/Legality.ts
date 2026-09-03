@@ -40,7 +40,8 @@ import { type Timestamp, type UserId } from "./Ids.js"
 const occupied = (state: GameState, ref: SlotRef): boolean => Option.isSome(slotCard(state, ref))
 
 /** Can this player draw at all — deck card, or a reshufflable discard (§1.7)? */
-const drawable = (state: GameState): boolean => state.deck.length > 0 || state.discard.length > 1
+export const drawable = (state: GameState): boolean =>
+  state.deck.length > 0 || state.discard.length > 1
 
 /** Does a drawn power have any valid target right now (ADR-0010)? */
 export const powerHasValidTarget = (

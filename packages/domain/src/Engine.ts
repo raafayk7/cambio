@@ -13,7 +13,7 @@ import {
 } from "./GameState.js"
 import { Timestamp, type UserId } from "./Ids.js"
 import { shuffle } from "./Prng.js"
-import { checkCommand, powerHasValidTarget } from "./Legality.js"
+import { checkCommand, drawable, powerHasValidTarget } from "./Legality.js"
 import { gameScores, winnersOf } from "./Scoring.js"
 
 /**
@@ -66,7 +66,7 @@ const openWindowOrAdvance = (state: GameState, turnPlayerId: UserId, now: Timest
 
 /** Reshuffle the pile minus its top into a new deck when empty (§1.7). */
 const reshuffleIfEmpty = (state: GameState): Step => {
-  if (state.deck.length > 0 || state.discard.length <= 1) return [state, []]
+  if (state.deck.length > 0 || !drawable(state)) return [state, []]
   const [deck, prng] = shuffle(state.discard.slice(1), state.prng)
   return [
     { ...state, deck, discard: [state.discard[0]!], prng },

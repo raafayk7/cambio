@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { CardSlug, Rank } from "./Card.js"
+import { CardSlug, isPowerRank, Rank, rank } from "./Card.js"
 import { Timestamp, UserId } from "./Ids.js"
 
 /**
@@ -26,7 +26,13 @@ export const HoldingCard = Schema.TaggedStruct("HoldingCard", {
   playerId: UserId,
   card: CardSlug,
   source: HeldCardSource,
-})
+}).pipe(
+  Schema.filter(
+    (holding) =>
+      !isPowerRank(rank(holding.card)) ||
+      "a power-rank card must be resolved through ResolvingPower, never held (§1.3)",
+  ),
+)
 
 /**
  * A drawn power card awaiting its (first) target command. The power kind is

@@ -36,28 +36,29 @@ already wraps every `GameState` decode failure via
 `Effect.mapError(storage("games.load.decode"))`).
 
 - `packages/domain/src/Phase.ts` — the `HoldingCard` `Schema.TaggedStruct`
-  (lines 25–29) currently accepts any `CardSlug`, power ranks included. Every
-  legitimate constructor of `HoldingCard` was confirmed during planning to
-  already guarantee a non-power card: `Engine.ts`'s `takeDiscard` (line 112,
-  guarded by `checkCommand`'s `TakeDiscard` branch rejecting a power-rank top
-  discard) and `drawFromDeck` (line 126, guarded by `!isPowerRank(cardRank)`
-  at line 124), and `Fold.ts`'s `CardDrawn` case (lines 101–115, which
-  branches to `ResolvingPower` for power ranks). The one existing test
-  fixture that is itself illegal under the new rule —
-  `packages/domain/test/Phase.test.ts:12`, which builds a `HoldingCard` from
-  `card("7H")` (rank `7` is a power rank) — must be fixed to a non-power card
-  as part of this change, or the round-trip test in that same file breaks.
-- `packages/domain/src/Legality.ts:43` — `drawable(state)`, today
-  file-private, is "the" answer to "can this player draw at all" (deck has a
-  card, or the discard pile has more than its top to reshuffle from). Used at
-  lines 103 and 251.
-- `packages/domain/src/Engine.ts:68-69` — `reshuffleIfEmpty` independently
-  reimplements the inverse of the same fact (`state.deck.length > 0 ||
-state.discard.length <= 1` as its skip condition) to decide whether a
-  reshuffle is needed before a draw. Proven during planning (case analysis on
-  `deck.length > 0` vs. `=== 0`) that this skip condition is exactly
-  equivalent to `state.deck.length > 0 || !drawable(state)` — so the fix is a
-  substitution, not a behavior change.
+  (lines 25–35, as built) now carries a `Schema.filter` refinement rejecting
+  a power-rank `card`. Every legitimate constructor of `HoldingCard` was
+  confirmed during planning to already guarantee a non-power card:
+  `Engine.ts`'s `takeDiscard` (line 112, guarded by `checkCommand`'s
+  `TakeDiscard` branch rejecting a power-rank top discard) and `drawFromDeck`
+  (line 126, guarded by `!isPowerRank(cardRank)` at line 124), and
+  `Fold.ts`'s `CardDrawn` case (lines 101–115, which branches to
+  `ResolvingPower` for power ranks) — none needed a change. The one existing
+  test fixture that was illegal under the new rule —
+  `packages/domain/test/Phase.test.ts:12`, which built a `HoldingCard` from
+  `card("7H")` (rank `7` is a power rank) — is now `card("2H")`.
+- `packages/domain/src/Legality.ts:43-44` — `drawable(state)` is now
+  exported and remains "the" answer to "can this player draw at all" (deck
+  has a card, or the discard pile has more than its top to reshuffle from).
+  Used at lines 104 and 252 (unchanged call sites).
+- `packages/domain/src/Engine.ts:68-69` — `reshuffleIfEmpty` now calls the
+  exported `drawable` (`if (state.deck.length > 0 || !drawable(state))
+return [state, []]`) instead of independently reimplementing the same fact.
+  Proven during planning (case analysis on `deck.length > 0` vs. `=== 0`)
+  that this skip condition is exactly equivalent to the prior inline
+  `state.deck.length > 0 || state.discard.length <= 1` — a substitution, not
+  a behavior change, confirmed by the full domain suite (194/194) staying
+  green with zero other test changes.
 
 Governing docs: HANDOFF §1.3 (powers must always be played, never held) and
 §1.7 (reshuffle-when-empty) via the `cambio-rules` skill; `Legality.ts`'s own
@@ -115,13 +116,13 @@ integrity becomes a real concern.
 
 ### Acceptance criteria
 
-- [ ] `HoldingCard` rejects a power-rank `card` at decode time; a new test
+- [x] `HoldingCard` rejects a power-rank `card` at decode time; a new test
       pins this (and the existing `Phase.test.ts:12` fixture no longer uses a
       power-rank card).
-- [ ] `drawable` is exported from `Legality.ts` and is `Engine.ts`'s only
+- [x] `drawable` is exported from `Legality.ts` and is `Engine.ts`'s only
       source for the reshuffle-needed decision; no inline duplicate remains.
-- [ ] ADR-0026 written and indexed.
-- [ ] `pnpm turbo build typecheck lint test` passes.
+- [x] ADR-0026 written and indexed.
+- [x] `pnpm turbo build typecheck lint test` passes.
 
 ## Plan of work
 
@@ -154,7 +155,16 @@ no `contracts` package changes and no frontend side.
 
 ## Progress
 
-- [ ] 2026-09-03 — plan written and signed off
+- [x] 2026-09-03 — plan written and signed off
+- [x] 2026-09-03 13:32 — C1 implemented: `HoldingCard` `Schema.filter` in
+      `Phase.ts`, `Phase.test.ts` fixture fixed and rejection test added;
+      `pnpm turbo test --filter @cambio/domain` green (191/191)
+- [x] 2026-09-03 13:33 — C2 implemented: `drawable` exported from
+      `Legality.ts`, `Engine.ts`'s `reshuffleIfEmpty` now calls it, new
+      `Legality.test.ts` `drawable` block added; `pnpm turbo test --filter
+@cambio/domain` green (194/194)
+- [x] 2026-09-03 13:35 — full gate `pnpm turbo build typecheck lint test`
+      green (22/22 tasks, run bare)
 
 ## Decision log
 
@@ -181,8 +191,61 @@ no `contracts` package changes and no frontend side.
 
 ## Surprises & discoveries
 
-_(none yet — filled during implementation)_
+None — implementation matched the plan exactly, including the advisory
+`Schema.filter` sketch (verified against `effect@3.22.1`'s `Schema.d.ts`
+during planning, and it typechecked and worked unmodified) and the
+`reshuffleIfEmpty` equivalence proof (zero behavior change confirmed by the
+full domain suite, including the CAM-2 simulation and fuzz harnesses,
+staying green with only the two additive test files touched).
 
 ## Outcomes & retrospective
 
-_(filled at close-out by `/review`)_
+**Verdict: ship.** Reviewed 2026-09-03 against `git diff origin/release-v0...HEAD`
+(7 files: `Phase.ts`, `Legality.ts`, `Engine.ts`, `Phase.test.ts`,
+`Legality.test.ts`, plus this task's own plan docs — no `apps/api`/`apps/web`/
+`contracts` files touched, matching the backend-only, domain-only scope).
+
+**Contract review** (independent, file:line verified, not table-trusting):
+all of C1.1–C1.4 and C2.1–C2.3 satisfied. Notably re-derived the
+`reshuffleIfEmpty`/`drawable` boolean equivalence from scratch rather than
+trusting the plan's proof, and confirmed it independently: with
+`A = deck.length > 0`, `D = discard.length > 1`, the original skip condition
+`A || !D` and the new `A || !(A || D)` agree in both cases of `A`. Also
+independently re-verified C1.4's planning-time claim that no legitimate
+`Engine.ts`/`Fold.ts` code path ever constructs an illegal `HoldingCard` — it
+holds. Contract coverage table's claimed test names all exist verbatim and
+assert what they claim; no inaccuracies found. No unrequested behavior.
+
+**Architecture review** (`architecture` + `effect-domain-modeling` skills):
+all 9 checklist items pass — import boundary, domain purity, the
+structural-vs-legality distinction ADR-0026 draws (independently validated
+against `GameState.ts`'s `SlotRef` docstring precedent, which draws the same
+line in the opposite direction), typed-error channeling through
+`apps/api`'s existing decode-error wrapping, and docstring accuracy. Two
+non-blocking advisory notes, neither rising to a finding:
+(1) `Legality.ts`'s "no rule check may exist anywhere else" docstring is
+technically still accurate (bounded by the surrounding "is this move legal
+right now" / `(phase, playerId, gameState)` framing) but a skimming reader
+could misread the final clause in isolation as contradicted by the new
+`Phase.ts` filter — a one-line clarification would remove the ambiguity but
+isn't required; (2) `HoldingCard` has no doc comment above its definition
+(pre-existing gap predating this diff, not introduced by it) — the filter's
+inline `(§1.3)`-citing message string satisfies the letter of the
+handoff-citation convention, but a short docstring would have been a fitting
+addition given new logic landed on this struct. Deferred, not required.
+
+**Verification run independently** (not reviewer-claimed): full gate forced
+fresh with `pnpm turbo build typecheck lint test --force` (bypassing turbo's
+cache, since a cached `test` task would not have re-executed the
+Postgres-backed `apps/api` suite) — Postgres and Realtime containers
+confirmed up first. Result: **22/22 tasks green** — `@cambio/domain` 194/194
+(including `sim/Simulation.test.ts`, `sim/Fuzz.test.ts`,
+`sim/Invariants.test.ts`), `@cambio/application` 83/83, `@cambio/api` 112/112
+(fresh Postgres-backed run, including `GameRepository.test.ts`'s decode-path
+coverage). No timing/concurrency code changed in this diff, so no probe was
+needed per the review process's timing-claim rule.
+
+**Nothing deferred, nothing carried forward** beyond what ADR-0026 already
+documents as an accepted, explicitly out-of-scope gap (the corrupted
+`game_events`/`DiscardTaken` path — separate from the `games.phase` jsonb
+path this task closes).
