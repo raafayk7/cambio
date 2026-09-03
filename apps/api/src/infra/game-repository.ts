@@ -178,6 +178,7 @@ export const GameRepositoryLive = Layer.effect(
                   ON CONFLICT (game_id, user_id) DO UPDATE
                   SET seat_index = EXCLUDED.seat_index,
                       final_score = COALESCE(EXCLUDED.final_score, game_players.final_score),
+                      deleted_at = NULL,
                       updated_at = now()
                 `
               }
@@ -187,7 +188,7 @@ export const GameRepositoryLive = Layer.effect(
                 INSERT INTO decks (game_id, cards)
                 VALUES (${input.gameId}, ${textArray(encoded.deck)})
                 ON CONFLICT (game_id) DO UPDATE
-                SET cards = EXCLUDED.cards, updated_at = now()
+                SET cards = EXCLUDED.cards, deleted_at = NULL, updated_at = now()
               `
 
               // 4. user_cards — rewrite as exactly the occupied slots, holes
@@ -195,7 +196,7 @@ export const GameRepositoryLive = Layer.effect(
               // hard-deletes" uniform and exercises the partial uniques on
               // every save; CAM-8 sweeps the tombstones.
               yield* sql`
-                UPDATE user_cards SET deleted_at = now()
+                UPDATE user_cards SET deleted_at = now(), updated_at = now()
                 WHERE game_id = ${input.gameId} AND deleted_at IS NULL
               `
               for (const player of encoded.players) {

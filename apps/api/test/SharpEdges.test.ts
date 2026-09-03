@@ -161,4 +161,68 @@ describe("sharp edges (C5.4)", () => {
     if (saveResult.left._tag !== "VersionConflict") throw new Error("wrong error tag")
     expect(saveResult.left.actual).toBeNull()
   })
+
+  it("save() resurrects tombstoned game_players/decks rows and keeps tombstone bookkeeping consistent (CAM-8 C8)", async () => {
+    const gameId = gid(4)
+    const outcome = await runtime.runPromise(
+      Effect.gen(function* () {
+        const games = yield* GameRepository
+        const sql = yield* SqlClient.SqlClient
+        yield* games.save({
+          gameId,
+          state: run.finalState,
+          expectedVersion: v(0),
+          newEvents: run.events,
+          at: ts(1_000),
+        })
+        const before = yield* games.load(gameId)
+
+        // Tombstone one seat and the deck out from under the game — the
+        // shape CAM-8's sweeper could produce, and the CAM-3 carry-forward
+        // trap: pre-fix, the save() upserts updated these rows in place
+        // without clearing deleted_at, so load() silently lost them.
+        const victim = run.finalState.players[0]!.id
+        yield* sql`
+          UPDATE game_players SET deleted_at = now()
+          WHERE game_id = ${gameId} AND user_id = ${victim}
+        `
+        yield* sql`UPDATE decks SET deleted_at = now() WHERE game_id = ${gameId}`
+
+        yield* games.save({
+          gameId,
+          state: run.finalState,
+          expectedVersion: v(1),
+          newEvents: [],
+          at: ts(2_000),
+        })
+
+        const liveRows = yield* sql<{ seats: string; decks: string }>`
+          SELECT
+            (SELECT COUNT(*) FROM game_players
+             WHERE game_id = ${gameId} AND deleted_at IS NULL) AS seats,
+            (SELECT COUNT(*) FROM decks
+             WHERE game_id = ${gameId} AND deleted_at IS NULL) AS decks
+        `
+        // Consistency half (root Decision Log): the user_cards tombstones
+        // this save wrote must carry updated_at alongside deleted_at.
+        const staleTombstones = yield* sql<{ n: string }>`
+          SELECT COUNT(*) AS n FROM user_cards
+          WHERE game_id = ${gameId} AND deleted_at IS NOT NULL
+            AND updated_at < deleted_at
+        `
+        const after = yield* games.load(gameId)
+        return {
+          seats: Number(liveRows[0]!.seats),
+          decks: Number(liveRows[0]!.decks),
+          staleTombstones: Number(staleTombstones[0]!.n),
+          before,
+          after,
+        }
+      }),
+    )
+    expect(outcome.seats).toBe(run.finalState.players.length)
+    expect(outcome.decks).toBe(1)
+    expect(outcome.staleTombstones).toBe(0)
+    expect(outcome.after.state).toStrictEqual(outcome.before.state)
+  })
 })

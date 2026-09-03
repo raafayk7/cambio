@@ -362,6 +362,12 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       functions verified callable by hand (`\df` + ancient-cutoff calls
       all returning 0); Migrations suite updated (applied list + two new
       0004 tests) — 19 files / 103 tests green.
+- [x] 2026-09-03 12:42 — M2 done test-first: C8 regression added to the
+      SharpEdges suite (red at 1 live seat pre-fix), then the three
+      one-line repository edits (upserts gain `deleted_at = NULL`, the
+      user_cards tombstoning UPDATE gains `updated_at = now()`); suite
+      green. The regression also pins the tombstone-bookkeeping
+      consistency (no tombstone with `updated_at < deleted_at`).
 
 ## Surprises & notes for the root plan
 
