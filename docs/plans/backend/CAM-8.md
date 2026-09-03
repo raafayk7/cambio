@@ -303,7 +303,7 @@ whose global-setup migrates `cambio_test`):
 ```bash
 pnpm --filter @cambio/api migrate
 docker exec -i cambio-postgres psql -U cambio -d cambio -c '\df lifecycle_*'
-pnpm --filter @cambio/api test
+pnpm turbo test --filter @cambio/api
 ```
 
 Success: migrate logs `applied 0004_data_lifecycle.sql` (idempotent on
@@ -315,7 +315,7 @@ container name if `docker ps` shows a different one.)
 **M2 / M3** — after each step:
 
 ```bash
-pnpm --filter @cambio/api test
+pnpm turbo test --filter @cambio/api
 ```
 
 Success: all api suites pass — including the untouched GameRepository,
@@ -357,7 +357,24 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [x] 2026-09-03 — plan authored (planning session; no implementation
       started).
+- [x] 2026-09-03 12:40 — M1 done: `0004_data_lifecycle.sql` (8 indexes,
+      3 functions, guarded DO block) applies on pg_cron-less Docker;
+      functions verified callable by hand (`\df` + ancient-cutoff calls
+      all returning 0); Migrations suite updated (applied list + two new
+      0004 tests) — 19 files / 103 tests green.
 
 ## Surprises & notes for the root plan
 
-_(anything the root plan's Decision Log or the reviewer must know)_
+- 2026-09-03 (M1) — the per-step checkpoint command must be
+  `pnpm turbo test --filter @cambio/api`, not the bare package script:
+  `pnpm --filter @cambio/api test` skips building workspace deps and
+  fails with import-shaped errors (`.pipe` of undefined) when dist is
+  stale. The Concrete-steps section has been corrected accordingly.
+- 2026-09-03 (M1) — final index set (plan's advisory list, confirmed):
+  `games_lifecycle_sweep_idx` on games (status, updated_at) partial on
+  live rows; `user_cards_tombstone_idx` on deleted_at partial on
+  tombstones; full FK-side indexes `game_players_user_idx`,
+  `user_cards_user_idx`, `card_peeks_viewer_idx`, `user_cards_game_idx`,
+  `card_peeks_game_idx`, `game_events_game_idx`. Tombstone-scan partials
+  on the other six tables were skipped (their tombstones only arrive via
+  the game sweep and age out in one batch).
