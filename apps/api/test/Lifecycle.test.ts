@@ -166,59 +166,89 @@ describe("lifecycle sweeps (CAM-8)", () => {
     expect(outcome.status).toBe("abandoned")
   })
 
-  it("soft-delete tombstones an old ended game and every dependent row at one shared timestamp (C3)", async () => {
+  it("soft-delete tombstones an old ended game — rows it tombstones share the sweep stamp, earlier tombstones keep theirs (C3)", async () => {
     const gameId = gid(30)
     const outcome = await runFx(
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
+        // Saved TWICE: the realistic shape. The second save rewrites
+        // user_cards, so the game enters the sweep already carrying
+        // tombstones at an earlier stamp — review F1's point: the sweep
+        // must stamp only what it tombstones, never rewrite history.
         yield* saveGame(gameId, 0, run.events)
+        yield* saveGame(gameId, 1, [])
+        const pre = yield* sql<{ live: string; dead: string }>`
+          SELECT COUNT(*) FILTER (WHERE deleted_at IS NULL) AS live,
+                 COUNT(*) FILTER (WHERE deleted_at IS NOT NULL) AS dead
+          FROM user_cards WHERE game_id = ${gameId}
+        `
         yield* sql`
           UPDATE games SET updated_at = now() - interval '31 days'
           WHERE game_id = ${gameId}
         `
         const swept = yield* softDelete
-        const stamps = yield* sql<{ src: string; live: string; stamps: number | string }>`
+        // The sweep stamp is whatever the games row got.
+        const perTable = yield* sql<{ src: string; live: string; at_stamp: string; total: string }>`
+          WITH stamp AS (SELECT deleted_at AS ts FROM games WHERE game_id = ${gameId})
           SELECT 'games' AS src,
                  COUNT(*) FILTER (WHERE deleted_at IS NULL) AS live,
-                 COUNT(DISTINCT deleted_at) AS stamps
+                 COUNT(*) FILTER (WHERE deleted_at = (SELECT ts FROM stamp)) AS at_stamp,
+                 COUNT(*) AS total
           FROM games WHERE game_id = ${gameId}
           UNION ALL
-          SELECT 'game_players', COUNT(*) FILTER (WHERE deleted_at IS NULL), COUNT(DISTINCT deleted_at)
+          SELECT 'game_players', COUNT(*) FILTER (WHERE deleted_at IS NULL),
+                 COUNT(*) FILTER (WHERE deleted_at = (SELECT ts FROM stamp)), COUNT(*)
           FROM game_players WHERE game_id = ${gameId}
           UNION ALL
-          SELECT 'decks', COUNT(*) FILTER (WHERE deleted_at IS NULL), COUNT(DISTINCT deleted_at)
+          SELECT 'decks', COUNT(*) FILTER (WHERE deleted_at IS NULL),
+                 COUNT(*) FILTER (WHERE deleted_at = (SELECT ts FROM stamp)), COUNT(*)
           FROM decks WHERE game_id = ${gameId}
           UNION ALL
-          SELECT 'user_cards', COUNT(*) FILTER (WHERE deleted_at IS NULL), COUNT(DISTINCT deleted_at)
-          FROM user_cards WHERE game_id = ${gameId}
-          UNION ALL
-          SELECT 'game_events', COUNT(*) FILTER (WHERE deleted_at IS NULL), COUNT(DISTINCT deleted_at)
+          SELECT 'game_events', COUNT(*) FILTER (WHERE deleted_at IS NULL),
+                 COUNT(*) FILTER (WHERE deleted_at = (SELECT ts FROM stamp)), COUNT(*)
           FROM game_events WHERE game_id = ${gameId}
           UNION ALL
-          SELECT 'card_peeks', COUNT(*) FILTER (WHERE deleted_at IS NULL), COUNT(DISTINCT deleted_at)
+          SELECT 'card_peeks', COUNT(*) FILTER (WHERE deleted_at IS NULL),
+                 COUNT(*) FILTER (WHERE deleted_at = (SELECT ts FROM stamp)), COUNT(*)
           FROM card_peeks WHERE game_id = ${gameId}
         `
-        const distinctAcross = yield* sql<{ n: number | string }>`
-          SELECT COUNT(DISTINCT deleted_at) AS n FROM (
-            SELECT deleted_at FROM games WHERE game_id = ${gameId}
-            UNION ALL SELECT deleted_at FROM game_players WHERE game_id = ${gameId}
-            UNION ALL SELECT deleted_at FROM decks WHERE game_id = ${gameId}
-            UNION ALL SELECT deleted_at FROM user_cards WHERE game_id = ${gameId}
-            UNION ALL SELECT deleted_at FROM game_events WHERE game_id = ${gameId}
-            UNION ALL SELECT deleted_at FROM card_peeks WHERE game_id = ${gameId}
-          ) all_rows
+        const cards = yield* sql<{ live: string; at_stamp: string; earlier: string }>`
+          WITH stamp AS (SELECT deleted_at AS ts FROM games WHERE game_id = ${gameId})
+          SELECT COUNT(*) FILTER (WHERE deleted_at IS NULL) AS live,
+                 COUNT(*) FILTER (WHERE deleted_at = (SELECT ts FROM stamp)) AS at_stamp,
+                 COUNT(*) FILTER (WHERE deleted_at IS NOT NULL
+                                    AND deleted_at < (SELECT ts FROM stamp)) AS earlier
+          FROM user_cards WHERE game_id = ${gameId}
         `
-        return { swept, stamps, distinctAcross: Number(distinctAcross[0]!.n) }
+        return {
+          swept,
+          perTable,
+          preLive: Number(pre[0]!.live),
+          preDead: Number(pre[0]!.dead),
+          cards: {
+            live: Number(cards[0]!.live),
+            atStamp: Number(cards[0]!.at_stamp),
+            earlier: Number(cards[0]!.earlier),
+          },
+        }
       }),
     )
     expect(outcome.swept.games).toBe(1)
-    for (const row of outcome.stamps) {
+    // The fixture genuinely has pre-existing tombstones going in.
+    expect(outcome.preDead).toBeGreaterThan(0)
+    // Tables with no prior tombstones: every row was tombstoned by the
+    // call, so every row carries the sweep stamp (card_peeks may have
+    // zero rows for this run — total == at_stamp holds either way).
+    for (const row of outcome.perTable) {
       expect(Number(row.live), row.src).toBe(0)
-      // Present tables carry exactly the one shared stamp; card_peeks may
-      // legitimately have zero rows for this simulated run.
-      if (row.src !== "card_peeks") expect(Number(row.stamps), row.src).toBe(1)
+      expect(Number(row.at_stamp), row.src).toBe(Number(row.total))
     }
-    expect(outcome.distinctAcross).toBeLessThanOrEqual(1)
+    // user_cards: the rows the call tombstoned (the pre-sweep live set)
+    // all share the sweep stamp; the earlier tombstones keep their own
+    // stamps — the sweep did not rewrite them.
+    expect(outcome.cards.live).toBe(0)
+    expect(outcome.cards.atStamp).toBe(outcome.preLive)
+    expect(outcome.cards.earlier).toBe(outcome.preDead)
   })
 
   it("soft-delete leaves in-progress games, lobbies, and fresh ended games byte-identical (C4)", async () => {
@@ -368,6 +398,7 @@ describe("lifecycle sweeps (CAM-8)", () => {
           WHERE user_id IN (${gatedUser}, ${freeUser})
         `
 
+        const freshBefore = yield* remaining(freshGame)
         const deleted = yield* hardDelete
         const users = yield* sql<{ user_id: string }>`
           SELECT user_id FROM users WHERE user_id IN (${gatedUser}, ${freeUser})
@@ -375,14 +406,18 @@ describe("lifecycle sweeps (CAM-8)", () => {
         return {
           deleted,
           sweptRemaining: yield* remaining(sweptGame),
-          freshRemaining: yield* remaining(freshGame),
+          freshBefore,
+          freshAfter: yield* remaining(freshGame),
           survivors: users.map((u) => u.user_id),
         }
       }),
     )
     expect(outcome.deleted).toBeGreaterThan(0)
     expect(outcome.sweptRemaining).toBe(0)
-    expect(outcome.freshRemaining).toBeGreaterThan(0)
+    // The fresh (1-day) tombstoned game keeps every row — exact count,
+    // not merely non-empty (review F2).
+    expect(outcome.freshBefore).toBeGreaterThan(0)
+    expect(outcome.freshAfter).toBe(outcome.freshBefore)
     expect(outcome.survivors).toStrictEqual([gatedUser])
   })
 

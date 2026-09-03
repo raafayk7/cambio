@@ -80,9 +80,14 @@ C1 is what makes the guard fire here.)
 (sets `deleted_at`) every `games` row with
 `status IN ('completed','abandoned')`, `deleted_at IS NULL`, and
 `updated_at` older than the game cutoff (default 30 days), together with
-**all** dependent rows of those games across `game_players`, `decks`,
-`user_cards`, `card_peeks`, and `game_events` — a game and its dependents
-carry the same tombstone timestamp from a single call.
+**all still-live** dependent rows of those games across `game_players`,
+`decks`, `user_cards`, `card_peeks`, and `game_events`. Every row the
+call tombstones carries the same timestamp; rows already tombstoned
+earlier (e.g. a game's accumulated `user_cards` rewrite tombstones) are
+not modified and keep their original stamps. _(Amended in the review fix
+cycle — the original "a game and its dependents carry the same tombstone
+timestamp" overstated: it holds only for games with no prior tombstones;
+review F1.)_
 
 **C4 — Soft-delete touches nothing else.** `in_progress` games,
 `'lobby'` rows, and ended games newer than the cutoff are not modified by
@@ -200,6 +205,9 @@ timestamp each entry)_
       C1–C7 + C9 under the backdating isolation discipline.
 - [x] 2026-09-03 12:50 — M4: full gate green (22/22 turbo tasks);
       coverage table reconciled; acceptance criteria checked off.
+- [x] 2026-09-03 13:10 — review fix cycle closed: F1 (C3 amended
+      everywhere + saved-twice test) and F2 (exact C6 assertion) fixed;
+      re-review verified the claim sweep and mutant-kills; gate green.
 
 ## Decision log
 
@@ -240,6 +248,14 @@ skill's bar.)_
   belt-and-braces `NOT EXISTS` gates on the `games` delete as well as
   the mandatory `users` gates: under the shared-tombstone invariant the
   games gate never blocks, but it makes the function safe standalone.
+- 2026-09-03 (review fix cycle) — **standing correction to the applied
+  `0004_data_lifecycle.sql` header** (per the infrastructure-persistence
+  rule, applied files are never edited — the next migration's header
+  must carry this): its line "ended games idle 30d are tombstoned with
+  every dependent row at one shared timestamp" overstates. Correct
+  reading: every row the call tombstones shares one timestamp;
+  dependent rows already tombstoned earlier keep their original stamps
+  (the sweep only targets `deleted_at IS NULL` rows). Review F1.
 
 ## Surprises & discoveries
 
@@ -265,7 +281,16 @@ followed (0004's header discharges 0002's forward-reference), repository
 conventions and the domain-never-sees-soft-delete invariant intact,
 append-only carve-out respected, ADR-0025 conformance exact.
 
-**Findings (fix cycle):**
+**Findings — both RESOLVED in the 2026-09-03 fix cycle** (F1: clause
+amended in all instances — including a sixth, the backend plan's M3
+test-intent bullet, caught by re-review — and the test reworked to a
+saved-twice fixture with sweep-stamp-scoped assertions; F2: the test was
+strengthened to exact before/after count equality, keeping the "keeps
+all rows" row true rather than weakening it. Re-review verified the
+sweep, the mutant-kills — a tombstone-rewriting sweep fails two
+assertions, a per-statement `clock_timestamp()` sweep fails the
+per-table stamp check — and that the applied migration stayed
+untouched). Original findings as reported:
 
 - **F1 — C3 is overstated, and its test is pinned by the fixture, not
   the assertion.** The sweep only tombstones `deleted_at IS NULL` rows,
