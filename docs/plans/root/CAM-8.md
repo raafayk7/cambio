@@ -254,5 +254,53 @@ skill's bar.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+**Review 2026-09-03 — verdict: fix-then-ship.** Two reviewers (contract,
+architecture) plus independent verification: full gate green; api suite
+force-rerun fresh against live containers (20 files / 112 tests, zero
+cache); virgin-database migration probe (0001→0004 applies clean); a
+hand-run psql probe of the full expire→soft→hard chain on a pristine
+database behaved exactly per contract. Architecture review: **zero
+violations** — applied migrations untouched, correction discipline
+followed (0004's header discharges 0002's forward-reference), repository
+conventions and the domain-never-sees-soft-delete invariant intact,
+append-only carve-out respected, ADR-0025 conformance exact.
+
+**Findings (fix cycle):**
+
+- **F1 — C3 is overstated, and its test is pinned by the fixture, not
+  the assertion.** The sweep only tombstones `deleted_at IS NULL` rows,
+  so a production ended game (saved many times, carrying `user_cards`
+  tombstones at many earlier stamps) does NOT end up with all rows at
+  one timestamp — only the rows tombstoned **by the call** share the
+  stamp. The C3 test passes only because its fixture saves once (zero
+  pre-existing tombstones); saving twice would fail it. The correct
+  claim: "every row tombstoned by the call shares one timestamp."
+  Instances to fix (claim sweep, all phrasings): root plan Functional
+  Contract C3 ("carry the same tombstone timestamp from a single
+  call"); backend plan M1 step 3 ("carry the identical tombstone");
+  backend plan coverage-table C3 row ("at most one distinct deleted_at
+  value across every row of the game"); `Lifecycle.test.ts` C3 test
+  title and its distinct-stamp assertions (must scope to rows
+  tombstoned at sweep time, ideally with a saved-twice fixture); the
+  `0004_data_lifecycle.sql` header ("every dependent row at one shared
+  timestamp") — that file is applied and must NOT be edited; correct it
+  in the next migration's header or note it here per the skill rule.
+- **F2 — coverage-table C6 row overclaims.** Row says the 1-day
+  tombstoned game "keeps all rows"; the landed assertion is a six-table
+  sum `> 0`. Either strengthen the test (before/after count comparison)
+  or weaken the row to what is asserted.
+
+**Advisory (recorded, not blocking):** deploy checklist for C10's manual
+half should include (a) schema-qualifying the cron command strings via a
+follow-up migration if the deploy role's search_path is narrowed
+(`SELECT public.lifecycle_*()`), and (b) awareness that
+`pg_available_extensions` proves availability, not loadability — fine on
+Supabase, a latent hazard on self-hosted images without
+shared_preload_libraries. Untested edge cases worth future tests: C1
+boundary at exactly the cutoff; soft-deleted lobby row excluded from
+expiry; C5 user whose only refs are tombstoned (should sweep — the
+inverse of C6's unfiltered gate); C4 dependent-row snapshots; C6
+lobby-leave `game_players` tombstone reaped under a live game. The
+`save()` upsert resurrection widens the (pre-existing) theoretical
+seat-index collision surface of the `saveLobby` path; unreachable via
+current code paths.
