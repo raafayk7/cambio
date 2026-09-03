@@ -116,6 +116,15 @@ The `lint` task also runs a repo-wide `prettier --check` (a root turbo
 task) — formatting is enforced, not aspirational. `pnpm format` fixes
 violations.
 
+**Run per-package suites through turbo.** The canonical command for one
+package's tests is `pnpm turbo test --filter <pkg>` — turbo builds
+workspace dependencies first. The bare package script
+(`pnpm --filter <pkg> test`) runs vitest against whatever dist is on
+disk and fails with import-shaped errors (`.pipe` of undefined) when
+it's stale; a comment in `apps/api/test/support/db.ts` used to claim
+otherwise (learned in CAM-8). Bare `vitest run <file>` is fine for
+iterating on a single suite after a build.
+
 **Never pipe the gate.** `pnpm turbo … | tail` (or any pipe) replaces the
 gate's exit code with the filter's, and a broken build has been committed
 that way. Run the gate bare and check its exit status directly; if output

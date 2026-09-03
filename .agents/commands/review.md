@@ -82,11 +82,13 @@ violations, then deviations-not-logged, then advisory notes.
 
 When a finding is "a document claims X falsely", report the **claim**, not
 the citation: grep every plan doc and ADR the task touches for all
-phrasings of X and list each instance in the finding. A later fix cycle
-fixes cited lines and misses the rest (CAM-4's fix cycle missed a fourth
-instance of a three-instance finding); whoever fixes it must re-run the
-same sweep before closing, and a re-review verifies the sweep, not the
-spot-fix.
+phrasings of X and list each instance in the finding. Sweep every section,
+including plan-of-work milestones and test-intent bullets — those restate
+contract clauses in different words and are where instances hide (CAM-8's
+five-instance sweep missed a sixth in an M3 test-intent bullet; CAM-4's fix
+cycle missed a fourth instance of a three-instance finding). Whoever fixes
+it must re-run the same sweep before closing, and a re-review verifies the
+sweep, not the spot-fix.
 
 **Skill staleness sweep:** if any finding revealed a skill or command
 stating something the code now contradicts, fix that sentence in this
@@ -102,3 +104,35 @@ cycle. Then report to the user: overall verdict first
 (ship / fix-then-ship / re-plan), findings with evidence, and what you ran.
 Do not fix findings in this command — the user decides what gets addressed.
 On a ship verdict, suggest `/ship $1` as the next step.
+
+## 5. The fix cycle (on a fix-then-ship verdict)
+
+The fix cycle is part of this command's contract even though it starts
+only on the user's go-ahead — possibly in a fresh session that has none of
+the review's context beyond the retrospective. Rules of the cycle:
+
+- **Load from the retrospective, not memory.** The root plan's Outcomes &
+  Retrospective is the finding list of record; fix what it says, not a
+  paraphrase.
+- **Multi-instance claim findings close by sweep, not by checklist.**
+  Re-run the finding's grep across all phrasings and all docs (including
+  plan-of-work and test-intent bullets) before declaring it closed — the
+  finding's own instance list may be incomplete, and inheriting its miss
+  is still a miss.
+- **Prefer strengthening the test over weakening the claim** when either
+  would close a doc/test mismatch — unless the claim itself is what's
+  wrong (then amend it everywhere, with an inline amendment note at the
+  contract clause).
+- **Applied migrations stay untouched** even when a finding is about their
+  comments; record a standing forward-correction in the root plan's
+  Decision Log for the next migration's header.
+- **Living-doc duties:** append timestamped Progress entries for the fix
+  cycle to every plan touched, and mark each finding RESOLVED in the
+  retrospective, stating which branch was taken (test strengthened vs
+  claim amended).
+- **Re-review before flipping the verdict:** a focused pass that verifies
+  the sweep (not the spot-fix), re-runs the affected suites fresh plus the
+  full gate, and — for hardened tests — reasons through the concrete
+  mutants the new assertions kill. Then commit, push, update the Linear
+  comment, move the issue to **Development Done**, and suggest
+  `/ship $1`.
