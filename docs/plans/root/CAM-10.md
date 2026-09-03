@@ -200,4 +200,52 @@ staying green with only the two additive test files touched).
 
 ## Outcomes & retrospective
 
-_(filled at close-out by `/review`)_
+**Verdict: ship.** Reviewed 2026-09-03 against `git diff origin/release-v0...HEAD`
+(7 files: `Phase.ts`, `Legality.ts`, `Engine.ts`, `Phase.test.ts`,
+`Legality.test.ts`, plus this task's own plan docs — no `apps/api`/`apps/web`/
+`contracts` files touched, matching the backend-only, domain-only scope).
+
+**Contract review** (independent, file:line verified, not table-trusting):
+all of C1.1–C1.4 and C2.1–C2.3 satisfied. Notably re-derived the
+`reshuffleIfEmpty`/`drawable` boolean equivalence from scratch rather than
+trusting the plan's proof, and confirmed it independently: with
+`A = deck.length > 0`, `D = discard.length > 1`, the original skip condition
+`A || !D` and the new `A || !(A || D)` agree in both cases of `A`. Also
+independently re-verified C1.4's planning-time claim that no legitimate
+`Engine.ts`/`Fold.ts` code path ever constructs an illegal `HoldingCard` — it
+holds. Contract coverage table's claimed test names all exist verbatim and
+assert what they claim; no inaccuracies found. No unrequested behavior.
+
+**Architecture review** (`architecture` + `effect-domain-modeling` skills):
+all 9 checklist items pass — import boundary, domain purity, the
+structural-vs-legality distinction ADR-0026 draws (independently validated
+against `GameState.ts`'s `SlotRef` docstring precedent, which draws the same
+line in the opposite direction), typed-error channeling through
+`apps/api`'s existing decode-error wrapping, and docstring accuracy. Two
+non-blocking advisory notes, neither rising to a finding:
+(1) `Legality.ts`'s "no rule check may exist anywhere else" docstring is
+technically still accurate (bounded by the surrounding "is this move legal
+right now" / `(phase, playerId, gameState)` framing) but a skimming reader
+could misread the final clause in isolation as contradicted by the new
+`Phase.ts` filter — a one-line clarification would remove the ambiguity but
+isn't required; (2) `HoldingCard` has no doc comment above its definition
+(pre-existing gap predating this diff, not introduced by it) — the filter's
+inline `(§1.3)`-citing message string satisfies the letter of the
+handoff-citation convention, but a short docstring would have been a fitting
+addition given new logic landed on this struct. Deferred, not required.
+
+**Verification run independently** (not reviewer-claimed): full gate forced
+fresh with `pnpm turbo build typecheck lint test --force` (bypassing turbo's
+cache, since a cached `test` task would not have re-executed the
+Postgres-backed `apps/api` suite) — Postgres and Realtime containers
+confirmed up first. Result: **22/22 tasks green** — `@cambio/domain` 194/194
+(including `sim/Simulation.test.ts`, `sim/Fuzz.test.ts`,
+`sim/Invariants.test.ts`), `@cambio/application` 83/83, `@cambio/api` 112/112
+(fresh Postgres-backed run, including `GameRepository.test.ts`'s decode-path
+coverage). No timing/concurrency code changed in this diff, so no probe was
+needed per the review process's timing-claim rule.
+
+**Nothing deferred, nothing carried forward** beyond what ADR-0026 already
+documents as an accepted, explicitly out-of-scope gap (the corrupted
+`game_events`/`DiscardTaken` path — separate from the `games.phase` jsonb
+path this task closes).
