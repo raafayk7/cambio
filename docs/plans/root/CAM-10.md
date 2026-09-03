@@ -36,28 +36,29 @@ already wraps every `GameState` decode failure via
 `Effect.mapError(storage("games.load.decode"))`).
 
 - `packages/domain/src/Phase.ts` — the `HoldingCard` `Schema.TaggedStruct`
-  (lines 25–29) currently accepts any `CardSlug`, power ranks included. Every
-  legitimate constructor of `HoldingCard` was confirmed during planning to
-  already guarantee a non-power card: `Engine.ts`'s `takeDiscard` (line 112,
-  guarded by `checkCommand`'s `TakeDiscard` branch rejecting a power-rank top
-  discard) and `drawFromDeck` (line 126, guarded by `!isPowerRank(cardRank)`
-  at line 124), and `Fold.ts`'s `CardDrawn` case (lines 101–115, which
-  branches to `ResolvingPower` for power ranks). The one existing test
-  fixture that is itself illegal under the new rule —
-  `packages/domain/test/Phase.test.ts:12`, which builds a `HoldingCard` from
-  `card("7H")` (rank `7` is a power rank) — must be fixed to a non-power card
-  as part of this change, or the round-trip test in that same file breaks.
-- `packages/domain/src/Legality.ts:43` — `drawable(state)`, today
-  file-private, is "the" answer to "can this player draw at all" (deck has a
-  card, or the discard pile has more than its top to reshuffle from). Used at
-  lines 103 and 251.
-- `packages/domain/src/Engine.ts:68-69` — `reshuffleIfEmpty` independently
-  reimplements the inverse of the same fact (`state.deck.length > 0 ||
-state.discard.length <= 1` as its skip condition) to decide whether a
-  reshuffle is needed before a draw. Proven during planning (case analysis on
-  `deck.length > 0` vs. `=== 0`) that this skip condition is exactly
-  equivalent to `state.deck.length > 0 || !drawable(state)` — so the fix is a
-  substitution, not a behavior change.
+  (lines 25–35, as built) now carries a `Schema.filter` refinement rejecting
+  a power-rank `card`. Every legitimate constructor of `HoldingCard` was
+  confirmed during planning to already guarantee a non-power card:
+  `Engine.ts`'s `takeDiscard` (line 112, guarded by `checkCommand`'s
+  `TakeDiscard` branch rejecting a power-rank top discard) and `drawFromDeck`
+  (line 126, guarded by `!isPowerRank(cardRank)` at line 124), and
+  `Fold.ts`'s `CardDrawn` case (lines 101–115, which branches to
+  `ResolvingPower` for power ranks) — none needed a change. The one existing
+  test fixture that was illegal under the new rule —
+  `packages/domain/test/Phase.test.ts:12`, which built a `HoldingCard` from
+  `card("7H")` (rank `7` is a power rank) — is now `card("2H")`.
+- `packages/domain/src/Legality.ts:43-44` — `drawable(state)` is now
+  exported and remains "the" answer to "can this player draw at all" (deck
+  has a card, or the discard pile has more than its top to reshuffle from).
+  Used at lines 104 and 252 (unchanged call sites).
+- `packages/domain/src/Engine.ts:68-69` — `reshuffleIfEmpty` now calls the
+  exported `drawable` (`if (state.deck.length > 0 || !drawable(state))
+return [state, []]`) instead of independently reimplementing the same fact.
+  Proven during planning (case analysis on `deck.length > 0` vs. `=== 0`)
+  that this skip condition is exactly equivalent to the prior inline
+  `state.deck.length > 0 || state.discard.length <= 1` — a substitution, not
+  a behavior change, confirmed by the full domain suite (194/194) staying
+  green with zero other test changes.
 
 Governing docs: HANDOFF §1.3 (powers must always be played, never held) and
 §1.7 (reshuffle-when-empty) via the `cambio-rules` skill; `Legality.ts`'s own
@@ -115,13 +116,13 @@ integrity becomes a real concern.
 
 ### Acceptance criteria
 
-- [ ] `HoldingCard` rejects a power-rank `card` at decode time; a new test
+- [x] `HoldingCard` rejects a power-rank `card` at decode time; a new test
       pins this (and the existing `Phase.test.ts:12` fixture no longer uses a
       power-rank card).
-- [ ] `drawable` is exported from `Legality.ts` and is `Engine.ts`'s only
+- [x] `drawable` is exported from `Legality.ts` and is `Engine.ts`'s only
       source for the reshuffle-needed decision; no inline duplicate remains.
-- [ ] ADR-0026 written and indexed.
-- [ ] `pnpm turbo build typecheck lint test` passes.
+- [x] ADR-0026 written and indexed.
+- [x] `pnpm turbo build typecheck lint test` passes.
 
 ## Plan of work
 
@@ -154,7 +155,16 @@ no `contracts` package changes and no frontend side.
 
 ## Progress
 
-- [ ] 2026-09-03 — plan written and signed off
+- [x] 2026-09-03 — plan written and signed off
+- [x] 2026-09-03 13:32 — C1 implemented: `HoldingCard` `Schema.filter` in
+      `Phase.ts`, `Phase.test.ts` fixture fixed and rejection test added;
+      `pnpm turbo test --filter @cambio/domain` green (191/191)
+- [x] 2026-09-03 13:33 — C2 implemented: `drawable` exported from
+      `Legality.ts`, `Engine.ts`'s `reshuffleIfEmpty` now calls it, new
+      `Legality.test.ts` `drawable` block added; `pnpm turbo test --filter
+@cambio/domain` green (194/194)
+- [x] 2026-09-03 13:35 — full gate `pnpm turbo build typecheck lint test`
+      green (22/22 tasks, run bare)
 
 ## Decision log
 
@@ -181,7 +191,12 @@ no `contracts` package changes and no frontend side.
 
 ## Surprises & discoveries
 
-_(none yet — filled during implementation)_
+None — implementation matched the plan exactly, including the advisory
+`Schema.filter` sketch (verified against `effect@3.22.1`'s `Schema.d.ts`
+during planning, and it typechecked and worked unmodified) and the
+`reshuffleIfEmpty` equivalence proof (zero behavior change confirmed by the
+full domain suite, including the CAM-2 simulation and fuzz harnesses,
+staying green with only the two additive test files touched).
 
 ## Outcomes & retrospective
 

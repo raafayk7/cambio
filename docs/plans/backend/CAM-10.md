@@ -15,32 +15,31 @@ Both items live entirely in `packages/domain/src`, which per the
 `architecture` skill's import table may depend on `effect` only — no new
 imports from outside `effect` are introduced by either change.
 
-- **`packages/domain/src/Phase.ts`** — `HoldingCard` (currently a plain
-  `Schema.TaggedStruct`, lines 25–29) needs a `Schema.filter` refinement so
-  decode rejects a power-rank `card`. Current imports at the top of the file
-  are `import { CardSlug, Rank } from "./Card.js"` — `isPowerRank` and `rank`
-  join that import list. Per the `effect-domain-modeling` skill, this file's
-  own docstring reserves "is this move legal right now" for `Legality.ts`
-  and explicitly says "do not add transition functions to this module" —
-  the filter added here is a **structural** fact ("is this the right shape
-  for this tagged case"), not a legality check, so it does not violate that
-  boundary; ADR-0026 makes exactly this distinction in its "Alternative
-  considered" section.
-- **`packages/domain/src/Legality.ts`** — `drawable` (line 43) is today
-  file-private. Per this file's own docstring ("the single source of
-  legality... no rule check may exist anywhere else"), exporting it and
-  having `Engine.ts` call it instead of re-deriving the same fact is the
-  only conforming shape — there is no real alternative to weigh here (also
-  recorded in the root plan's Decision Log).
-- **`packages/domain/src/Engine.ts`** — `reshuffleIfEmpty` (lines 68–69)
-  currently spells out its own `state.discard.length <= 1` half instead of
-  calling `drawable`. `Engine.ts:16` already imports `checkCommand,
-powerHasValidTarget` from `./Legality.js`; `drawable` joins that import.
-- **Test fixtures affected:** `packages/domain/test/Phase.test.ts:12` builds
+- **`packages/domain/src/Phase.ts`** — `HoldingCard` (`Schema.TaggedStruct`,
+  now lines 25–35 with its `.pipe(Schema.filter(...))` refinement) rejects a
+  power-rank `card` at decode time. Imports at the top of the file are now
+  `import { CardSlug, isPowerRank, Rank, rank } from "./Card.js"`. Per the
+  `effect-domain-modeling` skill, this file's own docstring reserves "is
+  this move legal right now" for `Legality.ts` and explicitly says "do not
+  add transition functions to this module" — the filter added here is a
+  **structural** fact ("is this the right shape for this tagged case"), not
+  a legality check, so it does not violate that boundary; ADR-0026 makes
+  exactly this distinction in its "Alternative considered" section.
+- **`packages/domain/src/Legality.ts`** — `drawable` (lines 43–44, now
+  exported) was previously file-private. Per this file's own docstring ("the
+  single source of legality... no rule check may exist anywhere else"),
+  exporting it and having `Engine.ts` call it instead of re-deriving the
+  same fact is the only conforming shape — there was no real alternative to
+  weigh (also recorded in the root plan's Decision Log).
+- **`packages/domain/src/Engine.ts`** — `reshuffleIfEmpty` (lines 68–69) now
+  calls `drawable` instead of spelling out its own `state.discard.length <=
+1` half. `Engine.ts:16` now reads `import { checkCommand, drawable,
+powerHasValidTarget } from "./Legality.js"`.
+- **Test fixtures affected:** `packages/domain/test/Phase.test.ts:12` built
   a `HoldingCard` from `card("7H")` (rank `7`, a power rank) inside the
-  round-trip test `"round-trips each member of the union"` — this becomes an
-  illegal fixture the moment the filter lands and must be changed to a
-  non-power card before that test can pass again.
+  round-trip test `"round-trips each member of the union"` — now
+  `card("2H")`, keeping meaningful variety against the other `HoldingCard`
+  fixture on line 13 (`card("5C")`).
 
 No other package is touched: `apps/web/src` has zero imports of
 `@cambio/domain` (confirmed in the root plan's Context section), and
@@ -76,13 +75,11 @@ playerId: p0, card: card("7H"), source: "deck" })).toThrow()` (or any
    - Add `isPowerRank` and `rank` to the existing `import { CardSlug, Rank }
 from "./Card.js"` line.
    - Add a `.pipe(Schema.filter(...))` refinement to the `HoldingCard`
-     `Schema.TaggedStruct` definition (lines 25–29). **Advisory sketch only**
-     — the implementer confirms the exact call shape against the installed
-     `effect` package's type defs before committing to it (this repo has no
-     existing `Schema.filter` call to copy; the closest local precedent is
-     `packages/contracts`' generated `.d.ts` output, which shows
-     `Schema.filter<typeof Schema.Int>` results from `Schema.Int.pipe(...)`
-     — i.e. `filter` composes via `.pipe`, not as a wrapping call):
+     `Schema.TaggedStruct` definition (originally lines 25–29; as built,
+     lines 25–35 once the `.pipe(...)` chain is added). **As implemented**
+     (the advisory sketch below matched exactly — no `Schema.filter` call
+     existed elsewhere in the repo to copy at plan time; confirmed against
+     `effect@3.22.1`'s `Schema.d.ts` and it typechecked unmodified):
      ```ts
      export const HoldingCard = Schema.TaggedStruct("HoldingCard", {
        playerId: UserId,
@@ -96,17 +93,16 @@ from "./Card.js"` line.
        ),
      )
      ```
-     Confirm at implementation time whether `Schema.filter`'s predicate
-     signature (checked against
-     `node_modules/.pnpm/effect@3.22.1/node_modules/effect/dist/dts/Schema.d.ts`
-     during planning) accepts the `boolean | string` return used above
-     without an explicit type parameter, or needs one spelled out.
+     Confirmed at implementation time: `Schema.filter`'s general overload
+     (`Schema.d.ts:1909`) accepts a predicate returning
+     `undefined | boolean | string | ParseIssue | FilterIssue` with no
+     explicit type parameter needed — `Types.NoInfer<Schema.Type<S>>` is
+     inferred from `self` in the `.pipe(...)` chain.
    - `HoldingCard`'s exported `type HoldingCard = typeof HoldingCard.Type`
-     (line 79) is derived from the schema, so it does not need a separate
-     edit — confirm at implementation time that the `.pipe(...)` chain
-     doesn't change the inferred `Type` shape (it shouldn't; `Schema.filter`
-     narrows what decode accepts, not the TS type, per ADR-0026's
-     Consequences section).
+     (originally line 79, now line 85 as built) is derived from the schema
+     and needed no edit — confirmed the `.pipe(...)` chain does not change
+     the inferred `Type` shape (`Schema.filter` narrows what decode accepts,
+     not the TS type, per ADR-0026's Consequences section).
 3. Run `pnpm turbo test --filter @cambio/domain` and confirm
    `Phase.test.ts` passes with the new fixture and new test, and that no
    other domain test regresses (per the root plan's C1.4, no other
@@ -189,24 +185,30 @@ dependencies first and the bare script can run against a stale `dist`.
 
 ## Contract coverage
 
-_(Plan-time: Clause + planned-approach only. `/implement` fills in the
-actual test file, test name, and assertion phrase when each test lands —
-inventing test titles here would be an overclaim per the template's
-explicit rule.)_
+_(As built — filled in once each test landed.)_
 
-| Clause                                                                             | Planned approach                                                                                                                                                                                                                                                                                                                                       |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C1.1 — decode rejects a power-rank `HoldingCard.card`                              | New `it` in `Phase.test.ts`'s `describe("Phase", ...)` block, patterned on the existing ADR-0010 rejection test (lines 34–38); asserts `decodePhase(...)` throws for a power-rank card                                                                                                                                                                 |
-| C1.2 — decode still accepts a non-power-rank `HoldingCard.card`                    | Covered by the existing (fixture-corrected) round-trip test `"round-trips each member of the union"` in the same file — a positive-case regression guard, not a new test                                                                                                                                                                               |
-| C1.3 — `GameRepository.load` inherits the rejection with no repository code change | Not a new `apps/api` test per the confirmed test-scope decision (root plan Decision Log) — proven by C1.1 plus inspection of the existing `Effect.mapError(storage("games.load.decode"))` wrapping at `apps/api/src/infra/game-repository.ts:285–287`, unchanged by this task                                                                          |
-| C1.4 — no legitimate engine/fold code path regresses                               | Full `pnpm turbo test --filter @cambio/domain` run staying green (no dedicated new test; this is a non-regression clause)                                                                                                                                                                                                                              |
-| C2.1 — `drawable` exported, remains sole "can draw" definition                     | Add `export` to `Legality.ts:43`; new `describe("drawable", ...)` block in `Legality.test.ts` directly pinning the boundary (deck empty + discard length ≤1 vs. >1)                                                                                                                                                                                    |
-| C2.2 — `reshuffleIfEmpty` derives from `drawable`, zero behavior change            | `Engine.ts:68–69` substitution; regression cover already exists at `TurnActions.test.ts` (`"reshuffles the pile (keeping its top) when the deck is empty (C6.1)"`) and `Slam.test.ts`'s `"exhaustion during slams (C4.5, ADR-0011)"` block (both boundary sides) — all three expected to stay green unchanged, plus the new `drawable` unit test above |
-| C2.3 — full suite incl. CAM-2 sim harness stays green, zero behavior change        | `pnpm turbo test --filter @cambio/domain` run after Step 2, and again as part of the final gate                                                                                                                                                                                                                                                        |
+| Clause                                                                             | Test (file + name)                                                                                                                                                                                                                                                                                                                                             | What is asserted                                                                                                                                                                                                                                                                                |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1.1 — decode rejects a power-rank `HoldingCard.card`                              | `Phase.test.ts` › `Phase` › `"rejects a power-rank card held in HoldingCard (§1.3, CAM-10)"`                                                                                                                                                                                                                                                                   | `decodePhase({ _tag: "HoldingCard", ..., card: card("7H"), ... })` throws                                                                                                                                                                                                                       |
+| C1.2 — decode still accepts a non-power-rank `HoldingCard.card`                    | `Phase.test.ts` › `Phase` › `"round-trips each member of the union"` (fixture corrected to `card("2H")`)                                                                                                                                                                                                                                                       | `decodePhase(encodePhase(phase))` round-trips a non-power `HoldingCard` unchanged                                                                                                                                                                                                               |
+| C1.3 — `GameRepository.load` inherits the rejection with no repository code change | No new `apps/api` test, per the confirmed test-scope decision (root plan Decision Log)                                                                                                                                                                                                                                                                         | Proven by C1.1 plus inspection: `apps/api/src/infra/game-repository.ts:285-287`'s `Schema.decodeUnknown(GameState).pipe(Effect.mapError(storage("games.load.decode")))` is unchanged, and `apps/api`'s existing `GameRepository.test.ts` (9 tests, unmodified) stayed green under the full gate |
+| C1.4 — no legitimate engine/fold code path regresses                               | Full `pnpm turbo test --filter @cambio/domain` run (194/194) plus the full gate's `apps/api` suite (112/112)                                                                                                                                                                                                                                                   | No production file outside `Phase.ts` needed a change; zero regressions                                                                                                                                                                                                                         |
+| C2.1 — `drawable` exported, remains sole "can draw" definition                     | `Legality.test.ts` › `"drawable (§1.7, CAM-10 — single source for Engine.ts's reshuffleIfEmpty)"` › all 3 `it`s (`"is true when the deck has a card, regardless of discard length"`, `"is true when the deck is empty but the discard has more than its top card"`, `"is false when the deck is empty and the discard has at most its top card"`)              | Direct boundary pin: `drawable` is `true`/`false` exactly per `deck.length > 0 \|\| discard.length > 1`, independent of `reshuffleIfEmpty`/`drawOne`                                                                                                                                            |
+| C2.2 — `reshuffleIfEmpty` derives from `drawable`, zero behavior change            | Pre-existing, unmodified: `TurnActions.test.ts` › `"DrawFromDeck (C2.4–5)"` › `"reshuffles the pile (keeping its top) when the deck is empty (C6.1)"`; `Slam.test.ts` › `"exhaustion during slams (C4.5, ADR-0011)"` › `"penalty draws reshuffle the pile (minus top) first"` and `"skips the penalty when no card exists anywhere (dedicated ADR-0011 test)"` | All three stayed green unchanged after the `Engine.ts:69` substitution — the two `Slam.test.ts` tests straddle the exact `discard.length ≤1` vs. `>1` boundary the refactor touches                                                                                                             |
+| C2.3 — full suite incl. CAM-2 sim harness stays green, zero behavior change        | `pnpm turbo test --filter @cambio/domain` (194/194, incl. `sim/Simulation.test.ts`, `sim/Fuzz.test.ts`, `sim/Invariants.test.ts`) and the full gate (`pnpm turbo build typecheck lint test`, 22/22 tasks)                                                                                                                                                      | Zero test changes beyond the additive ones above; CAM-2 harness green                                                                                                                                                                                                                           |
 
 ## Progress
 
-- [ ] 2026-09-03 — backend child plan written
+- [x] 2026-09-03 — backend child plan written
+- [x] 2026-09-03 13:32 — Step 1 (C1) implemented and green: `Phase.test.ts`
+      fixture fixed + rejection test added, `Phase.ts` `Schema.filter`
+      added; `pnpm turbo test --filter @cambio/domain` 191/191
+- [x] 2026-09-03 13:33 — Step 2 (C2) implemented and green: `drawable`
+      exported, `Engine.ts`'s `reshuffleIfEmpty` substitution, new
+      `Legality.test.ts` `drawable` block added; `pnpm turbo test --filter
+@cambio/domain` 194/194
+- [x] 2026-09-03 13:35 — final gate `pnpm turbo build typecheck lint test`
+      green, 22/22 tasks (7 cached, 15 executed), run bare
 
 ## Surprises & notes for the root plan
 
