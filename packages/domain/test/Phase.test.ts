@@ -9,7 +9,7 @@ describe("Phase", () => {
   it("round-trips each member of the union", () => {
     const phases: ReadonlyArray<Phase> = [
       { _tag: "AwaitingDraw", playerId: p0 },
-      { _tag: "HoldingCard", playerId: p0, card: card("7H"), source: "deck" },
+      { _tag: "HoldingCard", playerId: p0, card: card("2H"), source: "deck" },
       { _tag: "HoldingCard", playerId: p0, card: card("5C"), source: "discard" },
       { _tag: "ResolvingPower", playerId: p0, card: card("QS") },
       { _tag: "ResolvingQueenSwap", playerId: p0, card: card("QS") },
@@ -34,6 +34,12 @@ describe("Phase", () => {
   it("rejects the deleted provisional ResolvingPower shape (ADR-0010)", () => {
     expect(() =>
       decodePhase({ _tag: "ResolvingPower", playerId: p0, power: "Q", chosen: [] }),
+    ).toThrow()
+  })
+
+  it("rejects a power-rank card held in HoldingCard (§1.3, CAM-10)", () => {
+    expect(() =>
+      decodePhase({ _tag: "HoldingCard", playerId: p0, card: card("7H"), source: "deck" }),
     ).toThrow()
   })
 })
