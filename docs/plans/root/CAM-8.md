@@ -36,18 +36,18 @@ Current state, established by exploration (2026-09-03):
   precondition. Migration `0003` made lobby rows representable.
 - **No triggers maintain `updated_at`** — it is hand-written in
   `apps/api/src/infra/game-repository.ts` only. Every game/lobby mutation
-  bumps `games.updated_at` (save UPDATE at `:154`, saveLobby UPDATE at
-  `:336`), so it is a faithful last-activity timestamp for games.
-  **`users.updated_at` is dead**: `users` is INSERT-only
-  (`user-repository.ts:36-39` is the sole write; session verification is
-  a pure SELECT), hence ADR-0025's user criterion uses `created_at` plus
-  the live-reference check.
-- CAM-3 carry-forwards aimed at this task (root plan CAM-3, Outcomes):
-  the `game_players`/`decks` upserts in `save()`
-  (`game-repository.ts:174-182`, `:186-191`) never reset `deleted_at`
-  (the `saveLobby` upsert at `:396-402` is the correct reference); and
-  `save()` tombstones every `user_cards` row on every save
-  (`:197-208`), so hard-delete reaping is load-bearing housekeeping.
+  bumps `games.updated_at` (the `save` and `saveLobby` UPDATE branches
+  both set it), so it is a faithful last-activity timestamp for games.
+  **`users.updated_at` is dead**: `users` is INSERT-only (the single
+  INSERT in `user-repository.ts` is the sole write; session verification
+  is a pure SELECT), hence ADR-0025's user criterion uses `created_at`
+  plus the live-reference check.
+- CAM-3 carry-forwards aimed at this task (root plan CAM-3, Outcomes),
+  **both closed by this task's M2**: the `game_players`/`decks` upserts
+  in `save()` never reset `deleted_at` pre-fix (they now do, mirroring
+  the `saveLobby` member upsert that always did); and `save()` tombstones
+  every `user_cards` row on every save (the rewrite step in `save()`), so
+  hard-delete reaping is load-bearing housekeeping.
 - The migration runner (`src/infra/migrate.ts`) applies each file in one
   transaction, no error tolerance — the pg_cron scheduling must be
   guarded (ADR-0025) or it aborts migration on Docker.
@@ -80,9 +80,14 @@ C1 is what makes the guard fire here.)
 (sets `deleted_at`) every `games` row with
 `status IN ('completed','abandoned')`, `deleted_at IS NULL`, and
 `updated_at` older than the game cutoff (default 30 days), together with
-**all** dependent rows of those games across `game_players`, `decks`,
-`user_cards`, `card_peeks`, and `game_events` — a game and its dependents
-carry the same tombstone timestamp from a single call.
+**all still-live** dependent rows of those games across `game_players`,
+`decks`, `user_cards`, `card_peeks`, and `game_events`. Every row the
+call tombstones carries the same timestamp; rows already tombstoned
+earlier (e.g. a game's accumulated `user_cards` rewrite tombstones) are
+not modified and keep their original stamps. _(Amended in the review fix
+cycle — the original "a game and its dependents carry the same tombstone
+timestamp" overstated: it holds only for games with no prior tombstones;
+review F1.)_
 
 **C4 — Soft-delete touches nothing else.** `in_progress` games,
 `'lobby'` rows, and ended games newer than the cutoff are not modified by
@@ -135,13 +140,15 @@ suite; the local half is tested.
 
 ### Acceptance criteria
 
-- [ ] All contract clauses C1–C10 hold, each new-behavior clause covered
-      by the backend child plan's coverage table.
-- [ ] `apps/api/test/Migrations.test.ts` updated: applied list includes
+- [x] All contract clauses C1–C10 hold, each new-behavior clause covered
+      by the backend child plan's coverage table (C10's Supabase half
+      deferred to deploy-time manual verification as specified).
+- [x] `apps/api/test/Migrations.test.ts` updated: applied list includes
       `0004`; table-list assertion unchanged (no new tables).
-- [ ] No changes outside `apps/api` (import boundaries trivially hold).
-- [ ] The quality gate passes: `pnpm turbo build typecheck lint test`
-      (run bare, never piped).
+- [x] No changes outside `apps/api` + plan docs (import boundaries
+      trivially hold).
+- [x] The quality gate passes: `pnpm turbo build typecheck lint test`
+      (run bare — 22/22 tasks, 2026-09-03).
 
 ## Plan of work
 
@@ -189,6 +196,18 @@ timestamp each entry)_
 
 - [x] 2026-09-03 — planning: interview rounds 1–2 done, exploration done,
       ADR-0025 written, plans authored.
+- [x] 2026-09-03 12:40 — M1: migration `0004_data_lifecycle.sql` +
+      Migrations-suite update; applies cleanly on Docker, functions
+      verified callable.
+- [x] 2026-09-03 12:42 — M2: repository upsert/consistency fixes,
+      test-first (C8 regression red → green in the SharpEdges suite).
+- [x] 2026-09-03 12:46 — M3: `test/Lifecycle.test.ts`, 8 tests covering
+      C1–C7 + C9 under the backdating isolation discipline.
+- [x] 2026-09-03 12:50 — M4: full gate green (22/22 turbo tasks);
+      coverage table reconciled; acceptance criteria checked off.
+- [x] 2026-09-03 13:10 — review fix cycle closed: F1 (C3 amended
+      everywhere + saved-twice test) and F2 (exact C6 assertion) fixed;
+      re-review verified the claim sweep and mutant-kills; gate green.
 
 ## Decision log
 
@@ -219,6 +238,24 @@ skill's bar.)_
 - 2026-09-03 — New index names must not end in `_key`
   (`Migrations.test.ts` asserts over the `%_key` pattern for the partial
   uniques; lifecycle indexes stay out of that namespace).
+- 2026-09-03 (implementation) — the sweep functions set
+  `updated_at = ts` alongside `deleted_at` when tombstoning (and the
+  expiry bump sets it with the version bump), keeping the bookkeeping
+  convention uniform with the repository's `saveLobby` soft-delete; the
+  M2 consistency fix brings the `user_cards` tombstoning UPDATE in
+  `save()` in line with the same convention.
+- 2026-09-03 (implementation) — `lifecycle_hard_delete` carries
+  belt-and-braces `NOT EXISTS` gates on the `games` delete as well as
+  the mandatory `users` gates: under the shared-tombstone invariant the
+  games gate never blocks, but it makes the function safe standalone.
+- 2026-09-03 (review fix cycle) — **standing correction to the applied
+  `0004_data_lifecycle.sql` header** (per the infrastructure-persistence
+  rule, applied files are never edited — the next migration's header
+  must carry this): its line "ended games idle 30d are tombstoned with
+  every dependent row at one shared timestamp" overstates. Correct
+  reading: every row the call tombstones shares one timestamp;
+  dependent rows already tombstoned earlier keep their original stamps
+  (the sweep only targets `deleted_at IS NULL` rows). Review F1.
 
 ## Surprises & discoveries
 
@@ -233,5 +270,62 @@ skill's bar.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+**Review 2026-09-03 — verdict: fix-then-ship.** Two reviewers (contract,
+architecture) plus independent verification: full gate green; api suite
+force-rerun fresh against live containers (20 files / 112 tests, zero
+cache); virgin-database migration probe (0001→0004 applies clean); a
+hand-run psql probe of the full expire→soft→hard chain on a pristine
+database behaved exactly per contract. Architecture review: **zero
+violations** — applied migrations untouched, correction discipline
+followed (0004's header discharges 0002's forward-reference), repository
+conventions and the domain-never-sees-soft-delete invariant intact,
+append-only carve-out respected, ADR-0025 conformance exact.
+
+**Findings — both RESOLVED in the 2026-09-03 fix cycle** (F1: clause
+amended in all instances — including a sixth, the backend plan's M3
+test-intent bullet, caught by re-review — and the test reworked to a
+saved-twice fixture with sweep-stamp-scoped assertions; F2: the test was
+strengthened to exact before/after count equality, keeping the "keeps
+all rows" row true rather than weakening it. Re-review verified the
+sweep, the mutant-kills — a tombstone-rewriting sweep fails two
+assertions, a per-statement `clock_timestamp()` sweep fails the
+per-table stamp check — and that the applied migration stayed
+untouched). Original findings as reported:
+
+- **F1 — C3 is overstated, and its test is pinned by the fixture, not
+  the assertion.** The sweep only tombstones `deleted_at IS NULL` rows,
+  so a production ended game (saved many times, carrying `user_cards`
+  tombstones at many earlier stamps) does NOT end up with all rows at
+  one timestamp — only the rows tombstoned **by the call** share the
+  stamp. The C3 test passes only because its fixture saves once (zero
+  pre-existing tombstones); saving twice would fail it. The correct
+  claim: "every row tombstoned by the call shares one timestamp."
+  Instances to fix (claim sweep, all phrasings): root plan Functional
+  Contract C3 ("carry the same tombstone timestamp from a single
+  call"); backend plan M1 step 3 ("carry the identical tombstone");
+  backend plan coverage-table C3 row ("at most one distinct deleted_at
+  value across every row of the game"); `Lifecycle.test.ts` C3 test
+  title and its distinct-stamp assertions (must scope to rows
+  tombstoned at sweep time, ideally with a saved-twice fixture); the
+  `0004_data_lifecycle.sql` header ("every dependent row at one shared
+  timestamp") — that file is applied and must NOT be edited; correct it
+  in the next migration's header or note it here per the skill rule.
+- **F2 — coverage-table C6 row overclaims.** Row says the 1-day
+  tombstoned game "keeps all rows"; the landed assertion is a six-table
+  sum `> 0`. Either strengthen the test (before/after count comparison)
+  or weaken the row to what is asserted.
+
+**Advisory (recorded, not blocking):** deploy checklist for C10's manual
+half should include (a) schema-qualifying the cron command strings via a
+follow-up migration if the deploy role's search_path is narrowed
+(`SELECT public.lifecycle_*()`), and (b) awareness that
+`pg_available_extensions` proves availability, not loadability — fine on
+Supabase, a latent hazard on self-hosted images without
+shared_preload_libraries. Untested edge cases worth future tests: C1
+boundary at exactly the cutoff; soft-deleted lobby row excluded from
+expiry; C5 user whose only refs are tombstoned (should sweep — the
+inverse of C6's unfiltered gate); C4 dependent-row snapshots; C6
+lobby-leave `game_players` tombstone reaped under a live game. The
+`save()` upsert resurrection widens the (pre-existing) theoretical
+seat-index collision surface of the `saveLobby` path; unreachable via
+current code paths.

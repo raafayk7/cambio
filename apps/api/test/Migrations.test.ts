@@ -64,6 +64,7 @@ describe("0002_cambio_schema (C1)", () => {
       "0001_init.sql",
       "0002_cambio_schema.sql",
       "0003_lobby_rows.sql",
+      "0004_data_lifecycle.sql",
     ])
     await runtime.runPromise(migrate)
     const after = await sqlRows<{ id: string }>(
@@ -202,5 +203,57 @@ describe("0002_cambio_schema (C1)", () => {
       expect(def, name).toBeDefined()
       expect(def!).toContain("WHERE (deleted_at IS NULL)")
     }
+  })
+})
+
+describe("0004_data_lifecycle (root plan C10, local half)", () => {
+  it("the three lifecycle functions exist and are callable on pg_cron-less Postgres (C10)", async () => {
+    const fns = await sqlRows<{ proname: string }>(
+      (sql) => sql`
+        SELECT proname FROM pg_proc
+        WHERE pronamespace = 'public'::regnamespace AND proname LIKE 'lifecycle_%'
+      `,
+    )
+    expect(fns.map((f) => f.proname).sort()).toStrictEqual([
+      "lifecycle_expire_lobbies",
+      "lifecycle_hard_delete",
+      "lifecycle_soft_delete",
+    ])
+
+    // Callable with an ancient cutoff no real row can precede — proves the
+    // bodies execute locally without touching other suites' data.
+    const calls = await sqlRows<{ n: number | string }>(
+      (sql) => sql`
+        SELECT lifecycle_expire_lobbies(timestamptz '1970-01-01') AS n
+        UNION ALL
+        SELECT lifecycle_hard_delete(timestamptz '1970-01-01') AS n
+        UNION ALL
+        SELECT swept_games + swept_users AS n
+        FROM lifecycle_soft_delete(timestamptz '1970-01-01', timestamptz '1970-01-01')
+      `,
+    )
+    expect(calls.map((c) => Number(c.n))).toStrictEqual([0, 0, 0])
+  })
+
+  it("lifecycle index names stay out of the _key namespace (C10)", async () => {
+    const indexes = await sqlRows<{ indexname: string }>(
+      (sql) => sql`
+        SELECT indexname FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND (indexname LIKE '%lifecycle%' OR indexname LIKE '%_idx')
+      `,
+    )
+    const names = indexes.map((i) => i.indexname).sort()
+    expect(names).toStrictEqual([
+      "card_peeks_game_idx",
+      "card_peeks_viewer_idx",
+      "game_events_game_idx",
+      "game_players_user_idx",
+      "games_lifecycle_sweep_idx",
+      "user_cards_game_idx",
+      "user_cards_tombstone_idx",
+      "user_cards_user_idx",
+    ])
+    for (const name of names) expect(name).not.toMatch(/_key$/)
   })
 })
