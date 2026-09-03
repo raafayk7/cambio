@@ -36,18 +36,18 @@ Current state, established by exploration (2026-09-03):
   precondition. Migration `0003` made lobby rows representable.
 - **No triggers maintain `updated_at`** — it is hand-written in
   `apps/api/src/infra/game-repository.ts` only. Every game/lobby mutation
-  bumps `games.updated_at` (save UPDATE at `:154`, saveLobby UPDATE at
-  `:336`), so it is a faithful last-activity timestamp for games.
-  **`users.updated_at` is dead**: `users` is INSERT-only
-  (`user-repository.ts:36-39` is the sole write; session verification is
-  a pure SELECT), hence ADR-0025's user criterion uses `created_at` plus
-  the live-reference check.
-- CAM-3 carry-forwards aimed at this task (root plan CAM-3, Outcomes):
-  the `game_players`/`decks` upserts in `save()`
-  (`game-repository.ts:174-182`, `:186-191`) never reset `deleted_at`
-  (the `saveLobby` upsert at `:396-402` is the correct reference); and
-  `save()` tombstones every `user_cards` row on every save
-  (`:197-208`), so hard-delete reaping is load-bearing housekeeping.
+  bumps `games.updated_at` (the `save` and `saveLobby` UPDATE branches
+  both set it), so it is a faithful last-activity timestamp for games.
+  **`users.updated_at` is dead**: `users` is INSERT-only (the single
+  INSERT in `user-repository.ts` is the sole write; session verification
+  is a pure SELECT), hence ADR-0025's user criterion uses `created_at`
+  plus the live-reference check.
+- CAM-3 carry-forwards aimed at this task (root plan CAM-3, Outcomes),
+  **both closed by this task's M2**: the `game_players`/`decks` upserts
+  in `save()` never reset `deleted_at` pre-fix (they now do, mirroring
+  the `saveLobby` member upsert that always did); and `save()` tombstones
+  every `user_cards` row on every save (the rewrite step in `save()`), so
+  hard-delete reaping is load-bearing housekeeping.
 - The migration runner (`src/infra/migrate.ts`) applies each file in one
   transaction, no error tolerance — the pg_cron scheduling must be
   guarded (ADR-0025) or it aborts migration on Docker.
@@ -135,13 +135,15 @@ suite; the local half is tested.
 
 ### Acceptance criteria
 
-- [ ] All contract clauses C1–C10 hold, each new-behavior clause covered
-      by the backend child plan's coverage table.
-- [ ] `apps/api/test/Migrations.test.ts` updated: applied list includes
+- [x] All contract clauses C1–C10 hold, each new-behavior clause covered
+      by the backend child plan's coverage table (C10's Supabase half
+      deferred to deploy-time manual verification as specified).
+- [x] `apps/api/test/Migrations.test.ts` updated: applied list includes
       `0004`; table-list assertion unchanged (no new tables).
-- [ ] No changes outside `apps/api` (import boundaries trivially hold).
-- [ ] The quality gate passes: `pnpm turbo build typecheck lint test`
-      (run bare, never piped).
+- [x] No changes outside `apps/api` + plan docs (import boundaries
+      trivially hold).
+- [x] The quality gate passes: `pnpm turbo build typecheck lint test`
+      (run bare — 22/22 tasks, 2026-09-03).
 
 ## Plan of work
 
@@ -189,6 +191,15 @@ timestamp each entry)_
 
 - [x] 2026-09-03 — planning: interview rounds 1–2 done, exploration done,
       ADR-0025 written, plans authored.
+- [x] 2026-09-03 12:40 — M1: migration `0004_data_lifecycle.sql` +
+      Migrations-suite update; applies cleanly on Docker, functions
+      verified callable.
+- [x] 2026-09-03 12:42 — M2: repository upsert/consistency fixes,
+      test-first (C8 regression red → green in the SharpEdges suite).
+- [x] 2026-09-03 12:46 — M3: `test/Lifecycle.test.ts`, 8 tests covering
+      C1–C7 + C9 under the backdating isolation discipline.
+- [x] 2026-09-03 12:50 — M4: full gate green (22/22 turbo tasks);
+      coverage table reconciled; acceptance criteria checked off.
 
 ## Decision log
 
@@ -219,6 +230,16 @@ skill's bar.)_
 - 2026-09-03 — New index names must not end in `_key`
   (`Migrations.test.ts` asserts over the `%_key` pattern for the partial
   uniques; lifecycle indexes stay out of that namespace).
+- 2026-09-03 (implementation) — the sweep functions set
+  `updated_at = ts` alongside `deleted_at` when tombstoning (and the
+  expiry bump sets it with the version bump), keeping the bookkeeping
+  convention uniform with the repository's `saveLobby` soft-delete; the
+  M2 consistency fix brings the `user_cards` tombstoning UPDATE in
+  `save()` in line with the same convention.
+- 2026-09-03 (implementation) — `lifecycle_hard_delete` carries
+  belt-and-braces `NOT EXISTS` gates on the `games` delete as well as
+  the mandatory `users` gates: under the shared-tombstone invariant the
+  games gate never blocks, but it makes the function safe standalone.
 
 ## Surprises & discoveries
 

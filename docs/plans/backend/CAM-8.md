@@ -52,21 +52,22 @@ release-v0 tip, 2026-09-03):
 - **Repository** (`apps/api/src/infra/game-repository.ts`): every read
   path filters `deleted_at IS NULL` (verified exhaustively across this
   file and `user-repository.ts` in root-plan exploration — C9's standing
-  half). The CAM-3 carry-forward bugs this task fixes: the `game_players`
-  upsert in `save()` (`:174-182`) and the `decks` upsert (`:186-191`)
-  never reset `deleted_at`; the `saveLobby` member upsert (`:396-402`) is
-  the correct reference — its `DO UPDATE` sets `deleted_at = NULL`. The
-  `user_cards` tombstoning UPDATE (`:197-200`) sets only `deleted_at`;
-  root Decision Log adds `updated_at = now()` there for consistency.
-  `saveLobby`'s version guard (`:334-341`) is what C2 leans on: the expiry
-  function bumps `games.version`, so a stale `saveLobby` misses the
-  `version = expectedVersion` predicate and surfaces the typed
+  half). The CAM-3 carry-forward bugs, **fixed in M2 (as built)**: the
+  `game_players` and `decks` upserts in `save()` now set
+  `deleted_at = NULL` in their `DO UPDATE` clauses, mirroring the
+  `saveLobby` member upsert that was always correct; the `user_cards`
+  tombstoning UPDATE in `save()` now sets `updated_at = now()` alongside
+  `deleted_at` (root Decision Log consistency call). `saveLobby`'s
+  version guard (`WHERE version = expectedVersion` in its UPDATE branch)
+  is what C2 leans on: the expiry function bumps `games.version`, so a
+  stale `saveLobby` misses the predicate and surfaces the typed
   `VersionConflict` (mechanism pinned by `LobbyRepository.test.ts` — "a
   stale expectedVersion is a typed VersionConflict and the row is
   untouched (13b)").
-- **`users` semantics**: `user-repository.ts:35-39` is the only write —
-  INSERT, never UPDATE — so `users.updated_at` is dead and ADR-0025's user
-  criterion is `created_at` age plus no live `game_players` references.
+- **`users` semantics**: the single INSERT in `user-repository.ts` is the
+  only write — never an UPDATE — so `users.updated_at` is dead and
+  ADR-0025's user criterion is `created_at` age plus no live
+  `game_players` references.
 - **Existing test discipline** (`apps/api/vitest.config.ts`:
   `fileParallelism: false`, 30s timeout; `test/global-setup.ts` migrates
   and truncates `cambio_test` once per run): suites share one database and
@@ -197,14 +198,15 @@ Checkpoint: migration applies to both databases, api suite green.
 ### M2 — Repository fixes + C8 regression tests
 
 Three one-line edits in `apps/api/src/infra/game-repository.ts`, all
-mirroring the `saveLobby` reference upsert (`:396-402`):
+mirroring the `saveLobby` reference member upsert (as built — line refs
+dropped at close-out because this diff moved them):
 
-- `game_players` upsert in `save()` (`:178-181`): add
-  `deleted_at = NULL` to the `DO UPDATE` set list.
-- `decks` upsert (`:189-190`): same.
-- `user_cards` tombstoning UPDATE (`:197-200`): add
-  `updated_at = now()` (consistency with the `saveLobby` tombstone at
-  `:389`; root Decision Log).
+- `game_players` upsert in `save()`: `deleted_at = NULL` added to the
+  `DO UPDATE` set list.
+- `decks` upsert in `save()`: same.
+- `user_cards` tombstoning UPDATE in `save()`: `updated_at = now()`
+  added (consistency with the `saveLobby` member soft-delete, which
+  already set it; root Decision Log).
 
 Regression tests for C8 go in `apps/api/test/SharpEdges.test.ts` (it owns
 the §7 soft-delete edges and already has the simulated-run fixtures; new
@@ -338,18 +340,18 @@ assertion phrase are written by `/implement` as each test lands — a
 plan-time row that invents a test title is an overclaim waiting to become
 a review finding.)_
 
-| Clause | Test (file + name)                                                                                                                                                                                                                                                                        | What is asserted |
-| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| C1     | _planned: Lifecycle suite — backdated lobby expires (status/version/updated_at); fresh lobby, dealt game, abandoned row untouched_                                                                                                                                                        | _(/implement)_   |
-| C2     | _planned: Lifecycle suite — stale `saveLobby` after expiry is typed `VersionConflict`; row stays abandoned_                                                                                                                                                                               | _(/implement)_   |
-| C3     | _planned: Lifecycle suite — swept game + all five dependent tables share one tombstone timestamp_                                                                                                                                                                                         | _(/implement)_   |
-| C4     | _planned: Lifecycle suite — full-row snapshots of in_progress/lobby/recent-ended rows unchanged by soft-delete_                                                                                                                                                                           | _(/implement)_   |
-| C5     | _planned: Lifecycle suite — old ref-free user tombstoned; old referenced user and young user survive_                                                                                                                                                                                     | _(/implement)_   |
-| C6     | _planned: Lifecycle suite — 8-day tombstones physically gone across seven tables, no FK error; recent/NULL remain; gated user survives_                                                                                                                                                   | _(/implement)_   |
-| C7     | _planned: Lifecycle suite — live game `load` deep-equal across hard-delete; its old `user_cards` tombstones gone_                                                                                                                                                                         | _(/implement)_   |
-| C8     | _planned: SharpEdges — tombstoned `game_players`/`decks` rows resurrected by the fixed `save()` upserts; `load` returns full roster + deck_                                                                                                                                               | _(/implement)_   |
-| C9     | _planned: Lifecycle suite — lifecycle-swept game is `GameNotFound` on load/getEvents, `VersionConflict` on save_                                                                                                                                                                          | _(/implement)_   |
-| C10    | _planned: Migrations suite — applied list includes 0004, functions exist and are callable on pg_cron-less Docker, index names avoid `%_key`, table list unchanged. **Supabase half is manually verified at deploy time** (root plan Validation) — no local test claims cron registration_ | _(/implement)_   |
+| Clause | Test (file + name)                                                                                                                                                                                                                              | What is asserted                                                                                                                                                                                                                                                                   |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1     | `test/Lifecycle.test.ts` — "expiry abandons exactly the idle lobbies — version bumped, everything else untouched (C1)"                                                                                                                          | return count is exactly 1; the idle lobby's status is `abandoned`, version bumped 1→2, `updated_at` fresh; full-row `to_jsonb` snapshots of the fresh lobby, backdated in-progress game, and backdated abandoned row are strict-equal before/after                                 |
+| C2     | `test/Lifecycle.test.ts` — "a saveLobby holding the pre-expiry version is a VersionConflict; the row stays abandoned (C2)"                                                                                                                      | `saveLobby` at the pre-expiry version fails with typed `VersionConflict` (expected 1, actual 2) and the row's status remains `abandoned`                                                                                                                                           |
+| C3     | `test/Lifecycle.test.ts` — "soft-delete tombstones an old ended game and every dependent row at one shared timestamp (C3)"                                                                                                                      | `swept_games` is 1; zero live rows remain across all six game-keyed tables; at most one distinct `deleted_at` value across every row of the game                                                                                                                                   |
+| C4     | `test/Lifecycle.test.ts` — "soft-delete leaves in-progress games, lobbies, and fresh ended games byte-identical (C4)"                                                                                                                           | sweep returns `{games: 0, users: 0}` and the three control rows' full-row `to_jsonb` snapshots are strict-equal before/after                                                                                                                                                       |
+| C5     | `test/Lifecycle.test.ts` — "soft-delete sweeps only old users with no live game_players reference (C5)"                                                                                                                                         | `swept_users` is 1; the 31-day ref-free user is tombstoned; the 31-day referenced user and the fresh user keep `deleted_at IS NULL`                                                                                                                                                |
+| C6     | `test/Lifecycle.test.ts` — "hard-delete removes old tombstones children-first, keeps fresh ones, and FK-gates users (C6)"                                                                                                                       | the 8-day-tombstoned game has zero physical rows across all six tables; the 1-day-tombstoned game keeps all rows; the FK-referenced user survives, the ref-free one is gone; call raises no error                                                                                  |
+| C7     | `test/Lifecycle.test.ts` — "hard-delete reaps a live game's old user_cards tombstones without disturbing the game (C7)"                                                                                                                         | backdated tombstone count goes >0 → 0, live-row count unchanged, and `load().state` is deep-equal before/after the sweep                                                                                                                                                           |
+| C8     | `test/SharpEdges.test.ts` — "save() resurrects tombstoned game_players/decks rows and keeps tombstone bookkeeping consistent (CAM-8 C8)"                                                                                                        | after tombstoning a seat + the deck and re-saving, live seat count equals the roster and the deck row is live; no `user_cards` tombstone has `updated_at < deleted_at`; `load().state` unchanged                                                                                   |
+| C9     | `test/Lifecycle.test.ts` — "a lifecycle-swept game behaves per the pinned soft-delete semantics (C9)"                                                                                                                                           | after `lifecycle_soft_delete`, `load` and `getEvents` fail `GameNotFound` and `save` fails `VersionConflict` with `actual: null` — the SharpEdges C3.6 shape via the lifecycle function                                                                                            |
+| C10    | `test/Migrations.test.ts` — "the three lifecycle functions exist and are callable on pg_cron-less Postgres (C10)", "lifecycle index names stay out of the \_key namespace (C10)", plus the updated "re-running migrate is a no-op (C1.1, C6.1)" | all three functions in `pg_proc` and callable with ancient cutoffs returning 0; index-name set exact, none ending `_key`; applied list includes `0004_data_lifecycle.sql`. **Supabase half (cron job registration) is manually verified at deploy time** — no local test claims it |
 
 ## Progress
 
@@ -368,6 +370,15 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       user_cards tombstoning UPDATE gains `updated_at = now()`); suite
       green. The regression also pins the tombstone-bookkeeping
       consistency (no tombstone with `updated_at < deleted_at`).
+- [x] 2026-09-03 12:46 — M3 done: `test/Lifecycle.test.ts` (8 tests,
+      prefix `e000`, backdating discipline throughout, default cutoffs
+      only) covering C1–C7 and C9; full api suite green (20 files / 112
+      tests) — the untouched suites' continued green is the isolation
+      evidence.
+- [x] 2026-09-03 12:50 — M4 done: full bare gate green (22/22 turbo
+      tasks); coverage table filled with as-landed test names; line-ref
+      sweep done (game-repository.ts citations converted to descriptive
+      anchors — this diff shifted them).
 
 ## Surprises & notes for the root plan
 
