@@ -3,7 +3,7 @@ import { Either, Option } from "effect"
 import { applyCommand } from "../src/Engine.js"
 import { decodeGameConfig } from "../src/GameConfig.js"
 import { type GameState } from "../src/GameState.js"
-import { checkCommand, legalCommandKinds, powerHasValidTarget } from "../src/Legality.js"
+import { checkCommand, drawable, legalCommandKinds, powerHasValidTarget } from "../src/Legality.js"
 import { prngStateFromSeed } from "../src/Prng.js"
 import { card, slot, ts, uid } from "./fixtures.js"
 
@@ -156,6 +156,22 @@ describe("powerHasValidTarget (ADR-0010)", () => {
     }
     expect(powerHasValidTarget("Q", oneSlot, p0)).toBe(false)
     expect(powerHasValidTarget("J", oneSlot, p0)).toBe(false)
+  })
+})
+
+describe("drawable (§1.7, CAM-10 — single source for Engine.ts's reshuffleIfEmpty)", () => {
+  it("is true when the deck has a card, regardless of discard length", () => {
+    expect(drawable({ ...base, deck: [card("2S")], discard: [] })).toBe(true)
+    expect(drawable({ ...base, deck: [card("2S")], discard: [card("4S")] })).toBe(true)
+  })
+
+  it("is true when the deck is empty but the discard has more than its top card", () => {
+    expect(drawable({ ...base, deck: [], discard: [card("4S"), card("5S")] })).toBe(true)
+  })
+
+  it("is false when the deck is empty and the discard has at most its top card", () => {
+    expect(drawable({ ...base, deck: [], discard: [card("4S")] })).toBe(false)
+    expect(drawable({ ...base, deck: [], discard: [] })).toBe(false)
   })
 })
 
