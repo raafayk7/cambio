@@ -9,9 +9,11 @@ import { UserRepositoryLive } from "../../src/infra/user-repository.js"
 
 /**
  * Shared plumbing for the apps/api integration suites. The literal default
- * keeps `pnpm --filter @cambio/api test` working with nothing but Docker up
- * (vitest does not run through `node --env-file`, so `.env` is not
- * auto-loaded); TEST_DATABASE_URL overrides it. The database is provisioned
+ * keeps `pnpm turbo test --filter @cambio/api` working with nothing but
+ * Docker up (vitest does not run through `node --env-file`, so `.env` is
+ * not auto-loaded); TEST_DATABASE_URL overrides it. Run the suite through
+ * turbo, not the bare package script — turbo builds workspace deps first,
+ * while bare vitest fails on stale dist (AGENTS.md, learned in CAM-8). The database is provisioned
  * and truncated by `test/global-setup.ts` — never point this at data you
  * care about.
  */
