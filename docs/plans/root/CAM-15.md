@@ -414,4 +414,102 @@ timestamp each entry)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+**Review 2026-09-04 — verdict: FIX-THEN-SHIP.** Two read-only reviewers
+(contract, architecture) + independent verification: forced fresh test
+runs (`--force`; config 16 / ui 14 / web 24 / api 112 against live
+Postgres — all green; full-repo total **443**, not the 429 claimed), all
+five grep sweeps re-run clean, and 4 executed timer probes on SlamTimer
+edges (zero-duration, past window, resolving-after-close, mid-drain
+unmount — all pass; probe file deleted after). No hidden-information leak
+found; no test-title fraud — every coverage-table test exists with its
+exact name and asserts what its row claims. Import boundaries clean;
+game components presentational; useEffect discipline clean; router
+safeguard untouched; `design-system/` untouched.
+
+### Findings (fix cycle works from this list)
+
+- **R1 (contract, F5.1 — violated in part).** The gallery does not mount
+  every game-object floor state: hand `inert` (prop exists, never
+  mounted), hand `growing`/`shrinking` (HandProps cannot express per-slot
+  flight), draw-deck `empty→reshuffling`/`draw`, discard-pile
+  `receiving`, score-sheet `revealing`. The acceptance box "the gallery
+  renders all of them" and F5.1's "every MVS state" overclaim. Branches:
+  mount/extend (inert is trivial; per-slot flight props for hand;
+  transitional states as toggle/looping demos) or amend F5.1 with an
+  explicit carve-out for CAM-16 flight choreography (the CSS-only
+  Decision Log entry gestures at this but the clause was never amended) —
+  user's call which states go which way. RESOLVED: pending.
+- **R2 (contract, F3.8 — partial).** Reduced motion: the card flip gets
+  `motion-reduce:transition-none` (instant swap), not the cross-fade
+  playing-card.md specifies; selected-lift/leaving-rotate transforms have
+  no motion-reduce branch; the accent.focus origin/destination highlight
+  is deferred to CAM-16's moving container (defensible — it needs slot
+  choreography — but unstated in the contract). Fix: cross-fade the flip
+  under motion-reduce; note the highlight deferral at the clause.
+  RESOLVED: pending.
+- **R3 (contract, F2.1 spec drifts).** (a) playing-card `selected` omits
+  the spec'd `accent.focus` ring (has lift + shadow-float only —
+  playing-card.md state 4 says "same visual language as keyboard focus");
+  (b) field-scaffold has no `read-only` mode ("label + value text only").
+  RESOLVED: pending.
+- **R4 (violation, repo hygiene).** `packages/ui/src/components/toast.tsx`
+  contains a literal NUL byte (0x00, byte 3625) in the effect-dep
+  separator `join("\x00")` — meant to be a plain separator. Git treats
+  the file as **binary** (undiffable) and grep skips it, which quietly
+  excluded it from every F1.5 sweep. Fix the byte, then re-run all
+  sweeps including this file. RESOLVED: pending.
+- **R5 (doc claims false — close by sweep, not spot-fix).**
+  (a) "**429 tests**": instances = root plan Acceptance criteria
+  (this file) and the 2026-09-04 implementation Linear comment; true
+  count 443 (194+83+112+16+14+24). (b) "**no `radius.full` token
+  minted**": instances = root Decision Log (round-3 pill entry) and the
+  child plan's Surprises resolution — but styles.css does define
+  `--radius-full` in `@theme` (required to keep `rounded-full` alive
+  after the wipe); amend wording to "no tokens.md entry; the CSS carries
+  `--radius-full` as the wipe-survival mechanism". Fixer must re-grep
+  all phrasings across every plan doc + ADRs before closing.
+  RESOLVED: pending.
+- **R6 (deviation-not-logged).**
+  `.agents/scripts/design-gate/package-lock.json` was modified on the
+  task branch (M0 `npm install` side effect; removes `hasInstallScript`)
+  — `.agents/` routes to `main` per ADR-0028. Revert the file on this
+  branch. RESOLVED: pending.
+- **R7 (deviation-not-logged).** `.claude/launch.json` is a new real file
+  in `.claude/` on the task branch; the AGENTS.md convention makes
+  `.claude/` symlinks-from-`.agents/`, and ADR-0028 routes harness config
+  to `main`. Counter-reading: it launches `@cambio/web`, release-branch
+  content (same logic as `hardcheck-tokens.json`). Needs an explicit
+  routing decision recorded either way. RESOLVED: pending.
+- **R8 (ADR-0027 gap).** The `@theme` wipe omits `--ease-*` — stock
+  `ease-in`/`ease-out`/`ease-in-out` utilities still exist to be reached
+  for, against the two-easing-token vocabulary. Add `--ease-*: initial`.
+  Also log that `--container-*` is deliberately kept (layout measure
+  scale used by modal/gallery/demo widths; not visual-identity
+  vocabulary). RESOLVED: pending.
+- **R9 (advisories — fix optional, user's call).**
+  (a) AppShell hardcodes the "Cambio" wordmark + `state: "game"` naming
+  inside `packages/ui` — spec-carried (app-shell.md), surfaced as the
+  known tension with the zero-app-knowledge rule; a `wordmark` prop
+  would resolve it. (b) Gallery peek demo: un-cleaned `setTimeout` +
+  local state named `window` shadowing the global (dev-only).
+  (c) SlamTimer with `durationMs: 0` produces `NaN%` width — masked by
+  the closed state's `opacity-0`; a guard would harden it (probe-backed).
+  (d) score-sheet **test** fixture gives a lone `KS` hand a total of 13 —
+  rule-inconsistent flavor (black king is −1); ScoreSheet never computes,
+  but fixture data shouldn't contradict the rules. (e) A stale turbo
+  cache entry existed for a working-tree web state (28 tests incl. a
+  since-deleted probe file); forced fresh runs were used for all review
+  evidence — no repo change needed, noted for cache hygiene.
+- **R10 (skill staleness).** `frontend-architecture` SKILL.md states "No
+  test suite runs in `apps/web` yet" — now false (24-test suite landed).
+  Harness fix routed to `main` per ADR-0028: correct that sentence (and
+  scan the same skill for the MAY_IMPORT-pin phrasing, which this task
+  also extended with ui-row pins). RESOLVED: pending.
+
+### What passed
+
+Token layer (F1.1–F1.6) exact against ADR-0027 + tokens.md (with R8 as
+the one wipe gap); entitlement structure (F3.3/F3.4) leak-proof incl.
+spread-abuse check; seat-arc geometry verified mathematically; F2.3 pins
+real; F5.2 prod gating real; audits corroborated by their fix artifacts.
+Coverage table: no test-name or assertion discrepancies.
