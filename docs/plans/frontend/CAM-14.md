@@ -594,7 +594,18 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       under `node --test`. Vendored files prettier-formatted (we own the
       fork; upstream diffs go against the pristine zip). Gate green,
       convergent.
-- [ ] M6 — impeccable install/relocate + PRODUCT.md
+- [x] 2026-09-04 18:45 — M6 — impeccable installed
+      (`--providers=claude --scope=project`), clobber repaired exactly as
+      planned: `.claude/skills` symlink had been replaced by a real dir
+      (impeccable relocated to `.agents/skills/impeccable/`, symlink
+      restored); agents wrote through the surviving `agents` symlink;
+      hooks arrived in `settings.local.json` → lifted into
+      `.agents/settings.json` (PostToolUse + Stop, guarded), local file
+      deleted. Hook path resolves through the symlink
+      (`realpath` → `.agents/`). PRODUCT.md authored from HANDOFF §1 +
+      design direction. `npx impeccable detect` exits 0 (clean).
+      Impeccable payload prettier-ignored (upstream-refreshed wholesale;
+      unlike the owned design-gate fork). Gate green, convergent.
 - [ ] M7 — Emil's skills + attribution ledger
 - [ ] M8 — verification on main (incl. ADR-0007 roster amendment)
 - [ ] M9 — merge-down + release smoke + close-out

@@ -7,3 +7,8 @@ coverage/
 pnpm-lock.yaml
 *.gen.ts
 docs/HANDOFF.md
+# impeccable is upstream-vendored wholesale and refreshed by `npx impeccable
+# update` — formatting it would churn every refresh (unlike the dissolved
+# design-gate fork, which we own and format). See ADR-0029.
+.agents/skills/impeccable/
+.agents/agents/impeccable-*.md

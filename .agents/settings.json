@@ -28,6 +28,24 @@
             "command": "node \"$CLAUDE_PROJECT_DIR\"/.agents/scripts/design-gate/auto-gate.mjs",
             "timeout": 15,
             "statusMessage": "Design-gate nudge check"
+          },
+          {
+            "type": "command",
+            "command": "[ ! -f \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/hook.mjs\" ] || node \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/hook.mjs\"",
+            "timeout": 5,
+            "statusMessage": "Impeccable immediate checks"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ ! -f \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/hook.mjs\" ] || node \"${CLAUDE_PROJECT_DIR}/.claude/skills/impeccable/scripts/hook.mjs\"",
+            "timeout": 30,
+            "statusMessage": "Impeccable design deep pass"
           }
         ]
       }
