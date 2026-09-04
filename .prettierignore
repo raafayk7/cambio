@@ -7,8 +7,14 @@ coverage/
 pnpm-lock.yaml
 *.gen.ts
 docs/HANDOFF.md
-# impeccable is upstream-vendored wholesale and refreshed by `npx impeccable
-# update` — formatting it would churn every refresh (unlike the dissolved
-# design-gate fork, which we own and format). See ADR-0029.
+# Upstream-vendored payloads refreshed wholesale (impeccable via `npx
+# impeccable update`; Emil's animation skills by re-copy from the pinned
+# commit) — formatting them would churn every refresh, unlike the dissolved
+# design-gate fork, which we own and format. See ADR-0029 +
+# .agents/skills/VENDORED.md.
 .agents/skills/impeccable/
 .agents/agents/impeccable-*.md
+.agents/skills/animate/
+.agents/skills/review-animations/
+.agents/skills/find-animation-opportunities/
+.agents/skills/animation-vocabulary/

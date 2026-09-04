@@ -606,7 +606,13 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       design direction. `npx impeccable detect` exits 0 (clean).
       Impeccable payload prettier-ignored (upstream-refreshed wholesale;
       unlike the owned design-gate fork). Gate green, convergent.
-- [ ] M7 — Emil's skills + attribution ledger
+- [x] 2026-09-04 19:00 — M7 — animate, review-animations,
+      find-animation-opportunities, animation-vocabulary copied verbatim
+      from emilkowalski/skills @ `d23d7f8` (MIT); excluded eight confirmed
+      absent; `.agents/skills/VENDORED.md` ledger written (all three
+      third-party payloads). Emil payload prettier-ignored alongside
+      impeccable (byte-identical to upstream). All four live-detected.
+      Gate green, convergent.
 - [ ] M8 — verification on main (incl. ADR-0007 roster amendment)
 - [ ] M9 — merge-down + release smoke + close-out
 
