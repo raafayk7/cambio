@@ -523,6 +523,22 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       four grep sweeps clean; build/typecheck/lint green; rendered check
       via design-gate renderer confirms cream page + both faces serving
       locally (dev server on WEB_PORT=3100 from root .env).
+- [x] 2026-09-04 14:55 — M2 complete: gallery route
+      `apps/web/src/routes/dev/components.tsx` (DEV-gated via beforeLoad
+      notFound) + section files under `apps/web/src/components/gallery/`
+      (helpers.tsx, generic.tsx — module-layout table amended at
+      close-out); all 17 generic components implemented in
+      `packages/ui/src/components/` per their spec files. Test-first
+      suites landed and green: field-scaffold (5 tests — label
+      association, helper/error wiring, required word, caller id), modal
+      (5 tests — Esc/scrim/✕/confirm-lockout/inside-click), toast (3
+      tests — 4s dwell, hover pause, overflow collapse); 14 ui tests + 1
+      web smoke green. Deps added: @radix-ui/react-select (Decision Log).
+      styles.css grew spec-cited utilities: ground-* hover-darken family,
+      press-raised, card-back-mark, scene-paving, safe-area-shell,
+      --tracking-wide, card-wobble/pulse-soft animations. Bug caught by
+      rendered check: a bare `flex` on <dialog> overrode the UA's
+      closed-dialog display:none — fixed with `hidden open:flex`.
 
 ## Surprises & notes for the root plan
 
