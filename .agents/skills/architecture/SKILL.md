@@ -76,6 +76,8 @@ are not obvious from the code:
 - `hidden-information` — for anything touching realtime, payloads to clients,
   or per-player views (security-critical; read it even for "small" changes)
 - `cambio-rules` — for anything implementing or interpreting game rules
+- `frontend-architecture` — for anything in `apps/web` or `packages/ui`
+- `design-system` — for anything visual (components, tokens, motion, copy)
 
 ## Verifying a boundary
 

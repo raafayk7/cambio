@@ -567,7 +567,12 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       `WEB_PORT` note, `## Frontend` section, ADR-0028 pointer in
       Branching) + rosters in implement.md/review.md/child-plan template.
       Gate green.
-- [ ] M3 — frontend-architecture + design-system skills
+- [x] 2026-09-04 17:35 — M3 — frontend-architecture (105 lines) +
+      design-system router (56 lines, short per plan); architecture skill
+      routes to both. Enforcement probe run live on main (illegal
+      `import "@cambio/domain"` in apps/web fails eslint with the
+      boundaries rationale). Both skills live-detected mid-session. Gate
+      green.
 - [ ] M4 — ai-tells adaptation
 - [ ] M5 — design-gate dissolution + hook verified
 - [ ] M6 — impeccable install/relocate + PRODUCT.md
@@ -597,3 +602,11 @@ _(anything the root plan's Decision Log or the reviewer must know)_
 - Plan-time scoping: vendored gate skills keep upstream prose/frontmatter
   (functional fixes only); house format applies to first-party skills and
   the ai-tells adaptation.
+- M3: **`packages/config/test/eslint.base.test.ts` exists only on
+  `release-v0`**, not on `main` — the boundary claims in
+  `frontend-architecture` were pinned by a live probe here instead of a
+  test citation, and the skill cites `MAY_IMPORT` by symbol (not line)
+  because `eslint.base.js` itself diverged on the release side.
+- M3: skills are **confirmed live-detected mid-session** (the harness
+  listed both new skills immediately after their SKILL.md was written) —
+  first half of the issue's live-detection claim verified empirically.
