@@ -22,6 +22,12 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR\"/.agents/hooks/format-markdown.sh",
             "timeout": 30,
             "statusMessage": "Formatting edited Markdown"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.agents/scripts/design-gate/auto-gate.mjs",
+            "timeout": 15,
+            "statusMessage": "Design-gate nudge check"
           }
         ]
       }

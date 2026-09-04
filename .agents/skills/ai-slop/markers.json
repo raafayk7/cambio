@@ -1,0 +1,292 @@
+{
+  "_note": "SINGLE SOURCE OF TRUTH for slop markers. Pointed two directions: (1) DETECTION — read by the ai-slop skill at evaluate time (Decompose); (2) PREVENTION — the `ban` + `instead` fields become the intent-prep negative-constraint list at generate time. Never fork this file. Sources: claude-default (ai-tells catalog), cartoon-slop (ai-tells 'NOT from me', but PRIMARY slop for this corpus), corpus (Eman's verbatim exemplar captions). A single marker is NEVER a flag — the Judge flags only on CONVERGENCE (multiple co-occurring).",
+  "convergence_rule": "Report every marker found as an observation. Slop becomes a Judge flag only when >=3 markers co-occur OR >=2 high-weight markers co-occur. State which markers drove it so a human can sanity-check. Minimalism/restraint with ONE marker is not slop.",
+  "markers": [
+    {
+      "id": "gradient-text",
+      "label": "Gradient fill on text",
+      "weight": "high",
+      "sources": ["cartoon-slop", "corpus"],
+      "code_cues": [
+        "bg-clip-text",
+        "text-transparent",
+        "background-clip: text",
+        "linear-gradient(.*) on color/text"
+      ],
+      "visual_cues": ["headline or label letters filled with a color gradient"],
+      "ban": "No gradient-filled text.",
+      "instead": "Solid ink color; create emphasis with weight, size, or a single accent color."
+    },
+    {
+      "id": "gradient-buttons",
+      "label": "Gradient-filled buttons / CTAs",
+      "weight": "high",
+      "sources": ["corpus"],
+      "code_cues": [
+        "bg-gradient-to",
+        "linear-gradient(.*)\\)[^;]*; *} on button",
+        "from-.*-500 to-.*-500 on button/a"
+      ],
+      "visual_cues": ["primary buttons with a two-color gradient fill"],
+      "ban": "No gradient-filled buttons.",
+      "instead": "Solid fill in one brand/accent color; differentiate primary vs secondary by fill vs outline, not by gradient."
+    },
+    {
+      "id": "purple-blue-gradient-bg",
+      "label": "Purple/blue (or hot-pink) gradient background",
+      "weight": "high",
+      "sources": ["cartoon-slop", "corpus"],
+      "code_cues": [
+        "from-purple",
+        "via-pink",
+        "to-blue",
+        "from-indigo.*to-purple",
+        "#a855f7|#8b5cf6|#6366f1 gradients"
+      ],
+      "visual_cues": ["large purple→blue or pink gradient wash, often behind a dark hero"],
+      "ban": "No default purple/blue/pink gradient backgrounds.",
+      "instead": "A considered palette tied to the brand; flat surfaces or a subtle single-hue treatment with real intent."
+    },
+    {
+      "id": "light-on-dark-glow",
+      "label": "Default dark mode with light/glow effect",
+      "weight": "medium",
+      "sources": ["claude-default", "corpus"],
+      "code_cues": [
+        "radial-gradient.*opacity behind hero",
+        "blur-3xl opacity-",
+        "drop-shadow-[0_0_.*]"
+      ],
+      "visual_cues": [
+        "dark background with a soft glow/light bloom behind the hero — 'AI forward'"
+      ],
+      "ban": "No reflexive dark-mode-with-glow hero.",
+      "instead": "Choose light or dark for a reason; if dark, carry structure with surfaces/typography, not a glow."
+    },
+    {
+      "id": "poor-glassmorphism",
+      "label": "Poorly-executed glass / frosted panels",
+      "weight": "high",
+      "sources": ["cartoon-slop", "corpus"],
+      "code_cues": ["backdrop-blur", "bg-white/", "border-white/", "rgba(255,255,255,0."],
+      "visual_cues": [
+        "semi-transparent frosted panels that feel shabby / borders that don't match the theme"
+      ],
+      "ban": "No glassmorphism unless it is executed with real craft and matches the theme.",
+      "instead": "Solid surfaces with deliberate elevation (shadow or border) consistent with the rest of the UI."
+    },
+    {
+      "id": "ai-generated-imagery",
+      "label": "AI-generated imagery that looks AI-made",
+      "weight": "high",
+      "sources": ["corpus"],
+      "code_cues": ["(not statically detectable — visual only)"],
+      "visual_cues": ["images too perfect / uncanny, no human touch, generic stock-AI look"],
+      "ban": "No imagery that reads as generic AI output.",
+      "instead": "Imagery with intent and human touch (texture, real photography, illustration, or AI art styled so it doesn't read as AI — e.g. anime/pixel/editorial treatment)."
+    },
+    {
+      "id": "too-many-fonts",
+      "label": "Too many typefaces (>3)",
+      "weight": "high",
+      "sources": ["corpus"],
+      "code_cues": ["(computed by hard-check: fonts.length > 3)"],
+      "visual_cues": ["4+ distinct typefaces competing on one screen"],
+      "ban": "No more than ~2–3 typefaces.",
+      "instead": "One or two families; create variety with weight and size, not new fonts."
+    },
+    {
+      "id": "generic-pill-badge",
+      "label": "Generic pill badge with leading dot",
+      "weight": "medium",
+      "sources": ["claude-default", "corpus"],
+      "code_cues": [
+        "size-1.5 rounded-full",
+        "size-2 rounded-full",
+        "inline-flex.*rounded-full.*text-xs"
+      ],
+      "visual_cues": [
+        "small rounded pill ('New'/'Beta'/'Live') with a colored dot at the top of the hero"
+      ],
+      "ban": "No default pill-badge-with-dot eyebrow.",
+      "instead": "If you need a label, set it typographically in the brand voice — or drop it."
+    },
+    {
+      "id": "three-up-card-grid",
+      "label": "Three-equal-card feature grid",
+      "weight": "medium",
+      "sources": ["claude-default", "corpus"],
+      "code_cues": ["grid-cols-3", "grid md:grid-cols-3", "repeated card blocks x3"],
+      "visual_cues": ["three identical-weight cards in a row, icon + heading + 2 lines"],
+      "ban": "No default three-equal-card layout.",
+      "instead": "Vary card weight/size to express hierarchy, or use a layout that fits the actual content."
+    },
+    {
+      "id": "tinted-icon-square",
+      "label": "Lucide icon in a tinted rounded square",
+      "weight": "medium",
+      "sources": ["claude-default"],
+      "code_cues": [
+        "size-(8|10|12).*rounded-(lg|xl).*bg-(stone|neutral|zinc|emerald|amber|indigo)-(50|100)",
+        "lucide-react"
+      ],
+      "visual_cues": ["row of small tinted squares each holding a thin line icon"],
+      "ban": "No lucide-icon-in-a-tinted-square pattern.",
+      "instead": "Icons that carry brand character, or no icons; let typography and layout do the work."
+    },
+    {
+      "id": "editorial-minimalism-trifecta",
+      "label": "Cream bg + italic serif accent + tracked-uppercase eyebrow",
+      "weight": "high",
+      "sources": ["claude-default"],
+      "code_cues": [
+        "bg-stone-50|bg-neutral-50|#faf7f2|#f8f5f0",
+        "italic.*font-serif",
+        "uppercase.*tracking-(wider|widest|\\[0\\.[12])"
+      ],
+      "visual_cues": [
+        "warm off-white page, one italic serif 'feeling' word in a sans headline, tiny tracked-uppercase label above headings"
+      ],
+      "ban": "Not the cream + italic-serif + eyebrow editorial-minimalism reflex repeated across sections.",
+      "instead": "Pick a distinctive type system and palette tied to the brand; one italic accent once is fine, the repeated trifecta is the tell."
+    },
+    {
+      "id": "generic-template-feel",
+      "label": "Generic / template feel — no personality",
+      "weight": "high",
+      "sources": ["corpus"],
+      "code_cues": ["(holistic — supported by other markers co-occurring)"],
+      "visual_cues": [
+        "nothing brand-specific; could be any product; 'no character', static, un-imaginative"
+      ],
+      "ban": "No generic, characterless, template-shaped output.",
+      "instead": "Inject brand personality — distinctive type, color, layout move, or motif that could only belong to this product."
+    },
+    {
+      "id": "inconsistent-buttons",
+      "label": "Inconsistent / too-many button styles",
+      "weight": "medium",
+      "sources": ["corpus"],
+      "code_cues": ["(many distinct button class signatures)"],
+      "visual_cues": ["several different button shapes/styles on one screen"],
+      "ban": "No inconsistent button styles.",
+      "instead": "One primary, one secondary, one tertiary — a single consistent button system."
+    },
+    {
+      "id": "weak-cta-hierarchy",
+      "label": "Heading and CTA text the same size",
+      "weight": "medium",
+      "sources": ["corpus"],
+      "code_cues": ["(computed: heading font-size ≈ CTA font-size)"],
+      "visual_cues": ["no size contrast between the headline and the button/CTA text"],
+      "ban": "Don't size the CTA the same as the heading.",
+      "instead": "Establish clear type hierarchy — headline dominant, CTA sized for action, body subordinate."
+    },
+    {
+      "id": "low-contrast-text",
+      "label": "Low-visibility / low-contrast text",
+      "weight": "high",
+      "sources": ["corpus"],
+      "code_cues": ["(computed by hard-check WCAG contrast)"],
+      "visual_cues": ["text that's hard to read — light gray on white, text lost over an image"],
+      "ban": "No low-contrast text.",
+      "instead": "Meet WCAG AA (4.5:1 / 3:1 large); over images use an overlay/scrim so text stays legible."
+    },
+    {
+      "id": "poor-padding",
+      "label": "Poor / unbalanced padding",
+      "weight": "medium",
+      "sources": ["corpus"],
+      "code_cues": ["(computed: off-grid spacing drift)"],
+      "visual_cues": ["cramped or unbalanced padding inside cards/buttons; text touching edges"],
+      "ban": "No cramped or unbalanced padding.",
+      "instead": "Consistent spacing on a clear scale; give content breathing room on all sides."
+    },
+    {
+      "id": "emoji-as-icons",
+      "label": "Emoji used as UI icons",
+      "weight": "high",
+      "sources": ["corpus"],
+      "code_cues": [
+        "unicode emoji characters in markup, esp. in icon slots (⛅ 📊 🔁 ✨ 🚀 ✅ etc.)"
+      ],
+      "visual_cues": ["emoji standing in for icons in feature cards / lists / buttons"],
+      "ban": "No emoji used as UI icons.",
+      "instead": "A single consistent custom or line-icon set with brand character; if you can't make icons, use none."
+    },
+    {
+      "id": "eyebrow-label",
+      "label": "Tracked-uppercase eyebrow label above headings",
+      "weight": "medium",
+      "sources": ["claude-default", "corpus"],
+      "code_cues": [
+        "text-transform:uppercase + letter-spacing on a small label directly above a heading",
+        "uppercase tracking-wider/widest/[0.1-0.3em]",
+        "class~='eyebrow'|'kicker'|'overline'"
+      ],
+      "visual_cues": [
+        "small tracked-uppercase label (often accent-colored) sitting above section headings, repeated section after section"
+      ],
+      "ban": "No tracked-uppercase eyebrow/kicker label above every heading.",
+      "instead": "Let the headline carry the section; if you need a label, set it in the brand voice and use it sparingly, not as a per-section reflex."
+    },
+    {
+      "id": "em-dash-copy-tic",
+      "label": "Em-dash used as a rhythmic copy tic",
+      "weight": "medium",
+      "sources": ["claude-default", "corpus"],
+      "code_cues": [
+        "repeated '—' (em-dash) in headline/body copy used for cadence rather than clause separation"
+      ],
+      "visual_cues": [
+        "multiple em-dashes across hero/section copy giving the templated AI-marketing cadence"
+      ],
+      "ban": "No em-dashes as decorative rhythmic cadence in copy.",
+      "instead": "Write in plain sentences; use a period or a comma. Reserve the em-dash for genuine parenthetical breaks, not as a tic."
+    },
+    {
+      "id": "generic-marketing-copy",
+      "label": "Generic AI marketing copy (triplet taglines / soft over-promises)",
+      "weight": "medium",
+      "sources": ["claude-default", "corpus"],
+      "code_cues": [
+        "triplet parallel-verb taglines ('Build faster. Ship smarter. Sleep better.')",
+        "soft over-promise words: effortless, seamless, delightful, thoughtful, reimagined, crafted, calm",
+        "'The X for Y who Z' subhead formula"
+      ],
+      "visual_cues": ["copy that could belong to any product; no specific, concrete claims"],
+      "ban": "No generic triplet taglines or soft over-promise vocabulary.",
+      "instead": "Write specific, concrete copy about what this product actually does and for whom."
+    },
+    {
+      "id": "centered-hero-over-dark-mesh",
+      "label": "Centered hero over a dark mesh / aurora background",
+      "weight": "high",
+      "sources": ["claude-default", "cartoon-slop"],
+      "code_cues": [
+        "centered hero text-align:center over a dark bg with radial/mesh/aurora gradients or blurred blobs",
+        "absolute blur-3xl opacity- behind a centered hero"
+      ],
+      "visual_cues": [
+        "a centered headline+subhead+CTA pair floating over a dark mesh/aurora/blob background — the canonical AI hero"
+      ],
+      "ban": "No centered hero floating over a dark mesh/aurora background.",
+      "instead": "Compose the hero deliberately (asymmetry, a real product visual, a brand motif); if dark, carry it with structure, not a mesh wash."
+    },
+    {
+      "id": "default-modern-stack-look",
+      "label": "Reflexive Inter + slate-900 + default-component look",
+      "weight": "medium",
+      "sources": ["claude-default"],
+      "code_cues": [
+        "Inter (or Geist) as the only font + slate/zinc/neutral-900 text + untouched shadcn/Tailwind defaults",
+        "bg-background/text-foreground/border-border with no brand customization"
+      ],
+      "visual_cues": [
+        "the unmistakable 'default modern SaaS template' look — nothing brand-specific, could be any Vercel starter"
+      ],
+      "ban": "No reflexive Inter+slate-900 default-component look with zero brand customization.",
+      "instead": "Choose type and color that carry the brand; if using a component library, restyle it so it doesn't read as the default."
+    }
+  ]
+}

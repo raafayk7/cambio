@@ -581,7 +581,19 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       to tokens.md/voice.md with the pattern-only-on-main fallback). Grep
       for Next.js-isms clean except the deliberate foreign-stack row.
       Live-detected. Gate green.
-- [ ] M5 — design-gate dissolution + hook verified
+- [x] 2026-09-04 18:20 — M5 — design-gate dissolved: 7 skills +
+      decompose/map/judge agents + 5 scripts/pkg files vendored;
+      baseline.md/eval.js/setup.mjs/hooks.json dropped per plan;
+      CLAUDE_PLUGIN_ROOT grep clean; `design-gate:gate` renamed `gate` in
+      auto-gate; intent-prep Step 0 precedence + real impeccable commands;
+      gate advisory/Playwright notes; ai-slop gate-internal note;
+      `.claude/agents` symlink added; hook lifted into settings.json in
+      single-string format. Unit probe matrix passed (nudge/.tsx, silence
+      others); **live probe passed mid-session** (hook fired on scratch
+      .tsx immediately after the settings edit); hardcheck.test.js passes
+      under `node --test`. Vendored files prettier-formatted (we own the
+      fork; upstream diffs go against the pristine zip). Gate green,
+      convergent.
 - [ ] M6 — impeccable install/relocate + PRODUCT.md
 - [ ] M7 — Emil's skills + attribution ledger
 - [ ] M8 — verification on main (incl. ADR-0007 roster amendment)
