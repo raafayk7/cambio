@@ -221,6 +221,14 @@ timestamp each entry)_
       (commits `ff45c23`…`427f638` on main, merge `7d92a60` on
       release-v0). Milestone detail in the child plan's Progress; all
       branches pushed. Awaiting `/review CAM-14`.
+- [x] 2026-09-04 20:30 — Review: fix-then-ship, 8 findings (retrospective
+      `6efa3cc`). Fix cycle: all eight resolved — F1/F2/F4/F5/F6/F8 by
+      claim amendment (the claims were wrong), F3 by code fix
+      (postinstall stripped, paths corrected, test:hardcheck 25/25),
+      F7 by four-instance sweep. Gate green + convergent post-fix;
+      frontend-architecture grew to 130 lines (over the 80–120 band,
+      accepted for the restored security clauses). Merged down and
+      re-verified; issue → Development Done.
 
 ## Decision log
 
@@ -290,5 +298,103 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+**Review verdict (2026-09-04): fix-then-ship.** All 12 contract clauses
+**satisfied** (contract reviewer, re-verified probes) and independent
+verification passed: forced full gate exit 0 on `main` (0 cached), forced
+test run on `release-v0` against live Postgres + Realtime — 402 tests /
+58 files, all green. ADR discipline clean (same-commit index updates,
+amendments header-only). Branch state clean: every CAM-14 file
+byte-identical on main/development/release-v0. The findings are
+skill/doc-accuracy defects in the harness content itself — exactly the
+class this repo treats as load-bearing, since future sessions trust
+skills blindly.
+
+### Findings (ranked; fix cycle 2026-09-04 resolved all eight — per-finding
+
+status and branch taken noted inline)
+
+- **F1 (RESOLVED — clauses restored verbatim + both prohibitions added; design-system verb fixed) — `frontend-architecture` narrows the hidden-information
+  prime rule.** The "prime rule, restated" section drops the verbatim
+  clauses "not hidden by CSS, not present-but-unrendered, not
+  sent-then-filtered client-side" and omits both client-relevant hard
+  prohibitions (no Postgres Changes replication to clients; no Supabase
+  anon-key/browser DB access) despite naming realtime wiring in scope. A
+  future session reading only this skill gets a weaker rule. Fix:
+  restore the clauses verbatim and add the two prohibitions. Related
+  A3-lite: `design-system` skill says "hint at" where the canonical
+  router says "display or hint at".
+- **F2 (RESOLVED — claim amended: four-tier re-attributed to the Carbonteq reference, @theme sentence restates ADR-0027s split and defers to the ADR) — `frontend-architecture` styling paragraph contradicts
+  canon.** It attributes a "four-tier model raw → primitive → semantic →
+  component" to `tokens.md` (which has exactly two layers; the four-tier
+  vocabulary is the Carbonteq portal's) and says "every design token is
+  a CSS variable in the `@theme` block", flattening ADR-0027's split
+  (primitives as plain custom properties; only roles promoted via
+  `@theme inline`). CAM-15 implements the mapping and will read one of
+  these. Fix: re-attribute the four-tier model; restate the ADR's split.
+- **F3 (RESOLVED — postinstall stripped + script paths fixed; npm run test:hardcheck green post-fix; VENDORED.md ledgered) — vendored design-gate `package.json` defects.**
+  `"postinstall": "playwright install chromium"` re-introduces the auto
+  Chromium download ADR-0029 rejected — the documented step 1
+  (`npm install --omit=dev` in AGENTS.md, gate skill, ADR-0029) silently
+  triggers step 2's download. And its three npm scripts point at
+  `scripts/*.js` while the vendored layout is flat, so all three fail
+  (`test:hardcheck` has no other npm path). Fix: strip `postinstall`
+  (we own the fork; ledger the fix in VENDORED.md) and correct the
+  paths.
+- **F4 (RESOLVED — claim amended branch-accurately; regression test now cited by file + name; fourth-instance scar recorded here, not in the branch-shared skill file) — enforcement claim false on `main`.** `frontend-
+architecture`: "the effect-only policy covers backend layers only" —
+  `main`'s `eslint.base.js` has no such policy (it lands with CAM-11/12
+  on release-v0); probe-verified false where the skill lives. Fourth
+  instance of the unverified-enforcement-claim scar. Fix: branch-
+  accurate rewording; also cite the release-v0 regression test by
+  file + name for the boundary claim (E4).
+- **F5 (RESOLVED — frontmatter delegation reworded to impeccable + animation skills; enforce-the-floor line now states the advisory model) — `intent-prep` stale delegations.** Frontmatter
+  description (the string the skill listing surfaces) still says
+  "awesome-design for brand references" — rejected per ADR-0029 and
+  contradicted by the skill's own body; and ":83 the gate → verify,
+  measure, and enforce the floor" contradicts the advisory model stated
+  in gate/AGENTS.md/ADR-0029. Fix: reword both.
+- **F6 (RESOLVED — formatting claim qualified with the carve-out pointer; symlink-convention sentence now lists the full set incl. agents) — AGENTS.md staleness.** "formatting is enforced, not
+  aspirational" is unqualified now that `.prettierignore` exempts ~70k
+  vendored lines; and the symlink-convention sentences (:9 "skills and
+  commands", :66) predate the `agents`/`scripts` additions. Fix: qualify
+  with a pointer to `.prettierignore`/VENDORED.md; extend the
+  convention sentences.
+- **F7 (RESOLVED by sweep — FOUR instances found and re-scoped: plan-of-work probe text, concrete-steps command, coverage row, M5 Progress entry; one more than the finding listed) — false probe claim in the child plan.** The coverage
+  table and M5 text claim "`CLAUDE_PLUGIN_ROOT` grep clean" — the grep
+  returns 2 comment hits inside the upstream impeccable payload
+  (`staleness-deep.mjs:279,281`). The true claim is "clean excluding the
+  upstream impeccable payload". Multi-instance claim: close by sweeping
+  every phrasing across both plan docs (table row, M5 plan text, M5
+  Progress entry), not by spot-fix.
+- **F8 (RESOLVED — release-branches caveat added, matching the design-system line) — `PRODUCT.md` cites release-only ADRs without caveat.**
+  Evidence-on-Hand lists "ADRs 0009–0012, 0021–0023" which don't exist
+  on `main`; the neighboring design-system line carries a "(release
+  branches)" caveat, this line doesn't. Fix: same caveat.
+- **Advisory (fixer's discretion):** E3 — "Lint enforces exactly one
+  frontend rule" is literally wrong (Zod ban, type-import rules also
+  apply to web/ui); say "one _architectural_ rule". E2 — the
+  `.claude/`-path vs `.agents/`-path convention split for impeccable's
+  hook entries is undocumented, and the `[ ! -f … ] ||` guards mean a
+  broken symlink no-ops silently; worth a note in VENDORED.md.
+
+### What passed without findings
+
+Dissolution surface consistency (no dangling references to dropped
+pieces; agent names match the gate pipeline), ai-tells adaptation
+(every design-system fact verified against release-v0 sources), ADR
+discipline, PRODUCT.md rule accuracy vs HANDOFF §1 (spot-checks all
+exact), hook behavior (probe matrix re-run independently by the
+reviewer), symlink integrity, precedence rule present at every required
+site.
+
+### Carry into next tasks
+
+- CAM-15 must implement ADR-0027's token mapping from the ADR, not from
+  any skill paraphrase (F2's lesson).
+- The literally-cold fresh-session check happens implicitly the next
+  time a real session opens on either branch — if skills/commands fail
+  to load from cold, treat as a CAM-14 regression.
+- impeccable's hook has not yet fired on a real in-repo UI write; watch
+  during CAM-15.
+- Open item for the user (unresolved by design): commit vs ignore
+  `.impeccable/config.json` once one exists.

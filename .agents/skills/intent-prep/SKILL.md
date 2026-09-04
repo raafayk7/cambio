@@ -4,7 +4,7 @@ description: |
   PREVENTION half of the design gate — now a DELEGATION + calibration layer, not a competing ban-list.
   Triggers when someone signals they're about to produce a UI ("make a dashboard", "build this
   screen", "design a landing page", "build a component"). It hands the actual CRAFT to the proven
-  generation skills (impeccable for craft, awesome-design for brand references), then layers in this
+  generation skills (impeccable for craft; motion goes to the animation skills), then layers in this
   team's calibration (design-context dials + the corpus exemplars) so output matches Carbonteq's bar.
   Generation lift comes from those skills; this skill orchestrates them and points at the gate. No
   auto output-gating here — the /gate (or the auto-gate hook) verifies the result.
@@ -80,5 +80,6 @@ impeccable-built page can still ship).
 - **Generation skills** → make it good (the craft, the visible lift).
 - **design-context** → make it fit the design _kind_ (contextual dials, shared with the gate).
 - **annotated-exemplars** → make it fit _Carbonteq_ (calibration the generic skills lack).
-- **the gate** → verify, measure, and enforce the floor (the part generation skills don't do).
+- **the gate** → verify and measure (the part generation skills don't do) — advisory: it surfaces
+  the verdict and the person decides, per the gate skill's enforcement model.
   Don't duplicate the generation skills here; orchestrate them and own the calibration + verification.

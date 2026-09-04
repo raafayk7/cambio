@@ -6,7 +6,9 @@ Start frontend, Postgres, Supabase Realtime.
 
 This file is the entry point for every AI agent working in this repo.
 `CLAUDE.md` is a stub that points here; tool-specific config under `.claude/` is
-symlinked from `.agents/`, which is the source of truth for skills and commands.
+symlinked from `.agents/`, which is the source of truth for skills, commands,
+subagents, settings (hooks), scripts, and templates. The symlink set is
+`commands`, `skills`, `agents`, and `settings.json`.
 
 ## Sources of truth
 
@@ -149,8 +151,11 @@ pnpm turbo build typecheck lint test                # the full gate
 ```
 
 The `lint` task also runs a repo-wide `prettier --check` (a root turbo
-task) — formatting is enforced, not aspirational. `pnpm format` fixes
-violations.
+task) — formatting is enforced, not aspirational, **with one deliberate
+carve-out**: upstream-vendored payloads refreshed wholesale (impeccable,
+the animation skills) are listed in `.prettierignore` and kept
+byte-identical to upstream (see `.agents/skills/VENDORED.md` and
+ADR-0029). `pnpm format` fixes violations everywhere else.
 
 **Run per-package suites through turbo.** The canonical command for one
 package's tests is `pnpm turbo test --filter <pkg>` — turbo builds

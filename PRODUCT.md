@@ -77,7 +77,8 @@ deadpan; poster caps reserved for the two shout moments (`CAMBIO!`,
   references (LUMS courtyard photos, card stock, posters).
 - `docs/design/moodboard/` — the four reference sets the system was
   extracted from.
-- ADRs 0009–0012, 0021–0023 — playtest-derived rule and
+- ADRs 0009–0012, 0021–0023 (release branches, like `design-system/` —
+  they reach `main` at release merges) — playtest-derived rule and
   hidden-information decisions.
 
 ## Product Principles

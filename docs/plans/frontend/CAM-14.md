@@ -273,8 +273,12 @@ root Decision Log.
 
 **Path rewrites:** every `${CLAUDE_PLUGIN_ROOT}` in vendored skills,
 agents, and scripts becomes `"$CLAUDE_PROJECT_DIR"/.agents/scripts/design-gate`
-(or the matching `.agents/` path). Probe: a repo-wide grep for
-`CLAUDE_PLUGIN_ROOT` under `.agents/` returns zero hits.
+(or the matching `.agents/` path). Probe: a grep for
+`CLAUDE_PLUGIN_ROOT` under `.agents/` **excluding the upstream impeccable
+payload** returns zero hits. (Fix-cycle amendment: impeccable, vendored
+in M6, legitimately carries the string in two upstream comments —
+`skills/impeccable/scripts/lib/staleness-deep.mjs` — so the claim is
+scoped to the design-gate vendoring it was always about.)
 
 **New symlink:** `.claude/agents -> ../.agents/agents` (the convention
 gains an `agents/` member per ADR-0029; M6's installer also needs it in
@@ -452,7 +456,7 @@ is the empirical test of the issue's live-detection claim).
 **Leftover-reference and settings-validity probes (M5+):**
 
 ```bash
-grep -rn "CLAUDE_PLUGIN_ROOT" .agents/ && echo LEFTOVERS || echo clean
+grep -rn "CLAUDE_PLUGIN_ROOT" .agents/ --exclude-dir=impeccable && echo LEFTOVERS || echo clean
 node -e "JSON.parse(require('fs').readFileSync('.agents/settings.json','utf8')); console.log('valid')"
 ```
 
@@ -543,20 +547,20 @@ each verification actually lands. Most clauses here are pinned by
 behavior probes, not vitest suites — the planned approach names the
 probe.)_
 
-| Clause                       | Test (file + name)                                                                                                                                             | What is asserted                                                                                                                                                                  |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 — AGENTS.md frontend       | M2 port probe (`vite.config.ts` default + `.env.example` grep) and M8 smoke check 4 (fresh-context subagent read AGENTS.md)                                    | web default is 3000 with `WEB_PORT` override; `## Frontend` section exists (deferral note gone); sources-of-truth lists `design-system/`; skills roster + hooks narrative present |
-| 2 — frontend-architecture    | M3 live enforcement probe (illegal `import "@cambio/domain"` in `apps/web/src/router.tsx` → eslint boundaries error → reverted) + `wc -l` house-format check   | boundary claim in the skill matches observed lint failure verbatim rationale; body 105 lines (in band); `architecture` Layer-specific rules routes to it                          |
-| 3 — design-system router     | M8 smoke check 3 (main: absent-folder answer) and M9 smoke check 2 (release-v0: decision map routes playing-card → `components/core/playing-card.md`, exists)  | router wraps (no copied tables in the skill); absent-on-main = stop-and-say-so; on release the map resolves to a real file                                                        |
-| 4 — ADRs + amendments        | M9 smoke check 4 (index rows 0001–0029, no gaps/dupes on release-v0) + M8 read-back of 0007/0008 header amendment lines                                        | three CAM-14 ADRs indexed as proposed; 0007/0008 amended by header line only, accepted bodies untouched                                                                           |
-| 5 — ai-tells adapted         | M4 grep (dangling refs + Next.js paths → only the deliberate foreign-stack row) and M9 smoke check 5 (both copies exist; adapted references apps/web/TanStack) | adapted copy has zero dangling skill refs and zero `app/*.tsx` paths; original pristine on release-v0; cn()/@theme rows re-scoped as sanctioned                                   |
-| 6 — design-gate dissolved    | M5 unit probe matrix + live mid-session Write probe + `CLAUDE_PLUGIN_ROOT` grep + `node --test hardcheck.test.js`; M9 smoke check 3 (settings entries)         | nudge fires on `.tsx` naming the `gate` skill, silent on `.test.tsx`/`.md`/`.ts`, exit 0 always; 3 PostToolUse entries on `Edit\|Write`, **no SessionStart hook**; grep clean     |
-| 7 — impeccable               | M6 `readlink`/`realpath` audit + `settings.local.json` lift + `npx impeccable detect` (exit 0)                                                                 | skills symlink restored after clobber; hook path resolves through symlink into `.agents/`; PRODUCT.md carries the 10 schema sections from HANDOFF §1, no boilerplate              |
-| 8 — Emil's four skills       | M7 `ls` + exclusion grep (count 0) + VENDORED.md read-back                                                                                                     | exactly `animate`, `review-animations`, `find-animation-opportunities`, `animation-vocabulary` present with companion files @ pinned commit `d23d7f8`; excluded eight absent      |
-| 9 — precedence written       | M8 smoke check 4 (AGENTS.md precedence sentence) + read-back of design-system SKILL.md, intent-prep Step 0, gate note, ai-slop note                            | "design system outranks" stated in AGENTS.md, design-system, intent-prep, gate; ai-slop marked gate-internal with ai-tells named as the repo-facing audit                         |
-| 10 — workflow plumbing       | M2 read-back of the three roster edits (implement.md, review.md, child-plan template)                                                                          | frontend lanes/reviewers receive `frontend-architecture`, `design-system`, `ai-tells`; template example names frontend skills                                                     |
-| 11 — gate green + convergent | Bare `pnpm turbo build typecheck lint test` after every milestone (exit 0) on main and after the M9 merge on release-v0; `pnpm format:check` convergence pairs | gate exit 0 on both branches; second format:check passes with no intervening write (convergence); vendored-payload prettier policy recorded in `.prettierignore`                  |
-| 12 — merge-down + smoke      | M9 merge (`main`→`development`→`release-v0`, one predicted `docs/adr/README.md` conflict hand-resolved) + release-v0 fresh-context smoke checks 1–5            | both merges pushed; release smoke passed 5/5. Caveat: "fresh sessions" were fresh-context subagents — the sandbox has no `claude` CLI for a literally-cold run (see M8 note)      |
+| Clause                       | Test (file + name)                                                                                                                                             | What is asserted                                                                                                                                                                                                                                                           |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — AGENTS.md frontend       | M2 port probe (`vite.config.ts` default + `.env.example` grep) and M8 smoke check 4 (fresh-context subagent read AGENTS.md)                                    | web default is 3000 with `WEB_PORT` override; `## Frontend` section exists (deferral note gone); sources-of-truth lists `design-system/`; skills roster + hooks narrative present                                                                                          |
+| 2 — frontend-architecture    | M3 live enforcement probe (illegal `import "@cambio/domain"` in `apps/web/src/router.tsx` → eslint boundaries error → reverted) + `wc -l` house-format check   | boundary claim in the skill matches observed lint failure verbatim rationale; body 105 lines (in band); `architecture` Layer-specific rules routes to it                                                                                                                   |
+| 3 — design-system router     | M8 smoke check 3 (main: absent-folder answer) and M9 smoke check 2 (release-v0: decision map routes playing-card → `components/core/playing-card.md`, exists)  | router wraps (no copied tables in the skill); absent-on-main = stop-and-say-so; on release the map resolves to a real file                                                                                                                                                 |
+| 4 — ADRs + amendments        | M9 smoke check 4 (index rows 0001–0029, no gaps/dupes on release-v0) + M8 read-back of 0007/0008 header amendment lines                                        | three CAM-14 ADRs indexed as proposed; 0007/0008 amended by header line only, accepted bodies untouched                                                                                                                                                                    |
+| 5 — ai-tells adapted         | M4 grep (dangling refs + Next.js paths → only the deliberate foreign-stack row) and M9 smoke check 5 (both copies exist; adapted references apps/web/TanStack) | adapted copy has zero dangling skill refs and zero `app/*.tsx` paths; original pristine on release-v0; cn()/@theme rows re-scoped as sanctioned                                                                                                                            |
+| 6 — design-gate dissolved    | M5 unit probe matrix + live mid-session Write probe + `CLAUDE_PLUGIN_ROOT` grep + `node --test hardcheck.test.js`; M9 smoke check 3 (settings entries)         | nudge fires on `.tsx` naming the `gate` skill, silent on `.test.tsx`/`.md`/`.ts`, exit 0 always; 3 PostToolUse entries on `Edit\|Write`, **no SessionStart hook**; grep clean excluding the upstream impeccable payload (2 upstream comment hits — fix-cycle re-scope, F7) |
+| 7 — impeccable               | M6 `readlink`/`realpath` audit + `settings.local.json` lift + `npx impeccable detect` (exit 0)                                                                 | skills symlink restored after clobber; hook path resolves through symlink into `.agents/`; PRODUCT.md carries the 10 schema sections from HANDOFF §1, no boilerplate                                                                                                       |
+| 8 — Emil's four skills       | M7 `ls` + exclusion grep (count 0) + VENDORED.md read-back                                                                                                     | exactly `animate`, `review-animations`, `find-animation-opportunities`, `animation-vocabulary` present with companion files @ pinned commit `d23d7f8`; excluded eight absent                                                                                               |
+| 9 — precedence written       | M8 smoke check 4 (AGENTS.md precedence sentence) + read-back of design-system SKILL.md, intent-prep Step 0, gate note, ai-slop note                            | "design system outranks" stated in AGENTS.md, design-system, intent-prep, gate; ai-slop marked gate-internal with ai-tells named as the repo-facing audit                                                                                                                  |
+| 10 — workflow plumbing       | M2 read-back of the three roster edits (implement.md, review.md, child-plan template)                                                                          | frontend lanes/reviewers receive `frontend-architecture`, `design-system`, `ai-tells`; template example names frontend skills                                                                                                                                              |
+| 11 — gate green + convergent | Bare `pnpm turbo build typecheck lint test` after every milestone (exit 0) on main and after the M9 merge on release-v0; `pnpm format:check` convergence pairs | gate exit 0 on both branches; second format:check passes with no intervening write (convergence); vendored-payload prettier policy recorded in `.prettierignore`                                                                                                           |
+| 12 — merge-down + smoke      | M9 merge (`main`→`development`→`release-v0`, one predicted `docs/adr/README.md` conflict hand-resolved) + release-v0 fresh-context smoke checks 1–5            | both merges pushed; release smoke passed 5/5. Caveat: "fresh sessions" were fresh-context subagents — the sandbox has no `claude` CLI for a literally-cold run (see M8 note)                                                                                               |
 
 ## Progress
 
@@ -584,7 +588,9 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 - [x] 2026-09-04 18:20 — M5 — design-gate dissolved: 7 skills +
       decompose/map/judge agents + 5 scripts/pkg files vendored;
       baseline.md/eval.js/setup.mjs/hooks.json dropped per plan;
-      CLAUDE_PLUGIN_ROOT grep clean; `design-gate:gate` renamed `gate` in
+      CLAUDE_PLUGIN_ROOT grep clean _(at M5 time; after M6 the true
+      claim is "clean excluding the upstream impeccable payload" — F7
+      fix-cycle amendment)_; `design-gate:gate` renamed `gate` in
       auto-gate; intent-prep Step 0 precedence + real impeccable commands;
       gate advisory/Playwright notes; ai-slop gate-internal note;
       `.claude/agents` symlink added; hook lifted into settings.json in
@@ -632,6 +638,17 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       listed; router resolves playing-card to an existing file; 3
       PostToolUse hooks + no SessionStart; index complete; both ai-tells
       copies correct). All three branches pushed. Coverage table filled.
+- [x] 2026-09-04 20:30 — Review fix cycle: F1 (prime-rule clauses +
+      prohibitions restored in frontend-architecture; design-system
+      "display or hint at"), F2 (ADR-0027 split restated, four-tier
+      re-attributed), F3 (design-gate package.json: postinstall
+      stripped, script paths flattened, `npm run test:hardcheck` 25/25),
+      F4+E3+E4 (enforcement paragraph branch-accurate, regression test
+      cited by name), F5 (intent-prep frontmatter + advisory floor line),
+      F6 (AGENTS.md formatting carve-out + symlink set), F7 (this doc:
+      four CLAUDE_PLUGIN_ROOT claim instances re-scoped by sweep), F8
+      (PRODUCT.md caveat), E2 (VENDORED.md path-convention + guard
+      caveat). Gate green + convergent.
 
 ## Surprises & notes for the root plan
 

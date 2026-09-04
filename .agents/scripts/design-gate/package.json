@@ -5,10 +5,9 @@
   "type": "module",
   "description": "A gate that flags weak UI output from non-designers by checking adherence to design principles (not resemblance to exemplars).",
   "scripts": {
-    "render": "node scripts/render.js",
-    "hardcheck": "node scripts/hardcheck.js",
-    "test:hardcheck": "node scripts/hardcheck.test.js",
-    "postinstall": "playwright install chromium"
+    "render": "node render.js",
+    "hardcheck": "node hardcheck.js",
+    "test:hardcheck": "node hardcheck.test.js"
   },
   "dependencies": {
     "playwright": "^1.49.0"
