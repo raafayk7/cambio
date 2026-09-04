@@ -1,0 +1,580 @@
+# CAM-15 — UI core: Minimum Viable Components + game-object extensions (frontend)
+
+- **Root plan:** [root/CAM-15.md](../root/CAM-15.md) — the functional
+  contract lives there; this document is implementation detail for the
+  frontend (the only side this task touches).
+
+> Living document — the implementing agent updates Progress and flags
+> Surprises here as it works. Keep it self-contained: exact paths, exact
+> commands.
+
+## Context & orientation
+
+**Layer skills in force:** `frontend-architecture` (projection renderer;
+the `apps/web` vs `packages/ui` split; logic in hooks; lint-enforced import
+rows), `design-system` (router `design-system/design-system.md`; every
+visual value maps to a token; the creation gate; component files are law at
+their current revision), `hidden-information` (entitlement is structural;
+memory fidelity; a missing field is a `viewFor`/contracts change, never a
+client workaround). Audit tooling — `gate`, `ai-tells`, `impeccable`, the
+animation skills — is advisory and outranked by the design system.
+
+**Specs implemented from, not paraphrased:** ADR-0027 (the token mapping —
+`docs/adr/0027-tailwind-v4-theme-css-variable-tokens.md` §Decision is the
+spec M1 executes), ADR-0030 (testing-library + jsdom under vitest),
+ADR-0031 (@fontsource self-hosted fonts as `packages/ui` deps).
+
+**Current state (verified during planning):**
+
+- `packages/ui` ships raw TS source: `exports` maps `.` →
+  `./src/index.ts` and `./styles.css` → `./src/styles.css`; no build step,
+  scripts are `typecheck` + `lint` only. Deps: `@radix-ui/react-slot`,
+  `class-variance-authority`, `clsx`, `tailwind-merge`; peer
+  react/react-dom ^19. `tsconfig.json` includes `src/**` only — tests need
+  `test/**` added. One component exists (`src/components/button.tsx`,
+  stock shadcn — rewritten per `design-system/components/core/button.md`);
+  `src/lib/utils.ts` has `cn()`.
+- `packages/ui/src/styles.css` is stock shadcn: one `@theme` block of 19
+  oklch `--color-*` tokens + `--radius`, plus an `@layer base` referencing
+  them. ADR-0027's structure (namespace wipe, 13 primitives as plain
+  custom properties, 12 semantic roles via `@theme inline`, `@utility`
+  non-scalars) is entirely unbuilt — M1 writes it. Line 1
+  (`@import "tailwindcss"`) and the `@source "./"` directive stay
+  (workspace packages are symlinked under node_modules, which Tailwind's
+  auto-detection skips).
+- `apps/web` is TanStack Start: file-based routes in `src/routes/`
+  (`createFileRoute`; `src/routeTree.gen.ts` is generated), root document
+  `src/routes/__root.tsx` (stylesheet wired in the head `links` array via
+  `../styles.css?url`), `src/router.tsx` creates a fresh QueryClient per
+  request — a hidden-information safeguard, **do not change**.
+  `vite.config.ts` plugin order `tailwindcss()` → `tanstackStart()` →
+  `viteReact()` is load-bearing. `apps/web/src/styles.css` imports
+  `@cambio/ui/styles.css` then declares `@source "./"`. One page,
+  `src/routes/index.tsx` (scaffold smoke test), uses
+  `text-muted-foreground` — dead the moment the shadcn tokens are wiped;
+  M1 sweeps it. `import.meta.env` is typed (`vite/client`); `DEV`/`PROD`
+  available.
+- Lint: `packages/config/eslint.base.js` MAY_IMPORT — `ui: []` (nothing,
+  not even contracts), `web: ["@cambio/contracts", "@cambio/ui"]`.
+  External npm deps are not restricted for ui/web. Zod banned;
+  `consistent-type-imports` enforced (inline type imports). Prettier: no
+  semicolons, double quotes, printWidth 100; enforced by the root
+  `//#format:check` turbo task that `lint` depends on. `.tsx`/`.css` are
+  **not** auto-formatted by hooks — run `pnpm format` before the gate.
+- `packages/config/test/eslint.base.test.ts` drives ESLint
+  programmatically against fixture strings (see its `lintErrors` helper
+  and the existing pin "blocks apps/web importing the
+  @cambio/domain/testing subpath") — the pattern for the new ui-row
+  regression test (F2.3). Today only web rows are pinned.
+- Contracts the game objects type against (`web` may import; `ui` may
+  not): `GamePrimitives.ts` — `Rank`, `CardSlug` (e.g. `"AS"`),
+  `SlotIndex` (stable, holes never shift), `SlotRef`, `PowerKind`;
+  `GameView.ts` — `PlayerGameView` (players in seat order, `deckCount`,
+  `discard` with `discard[0]` = top, `phase` tagged union, optional
+  `reveal`), `ViewPlayer.hand: ReadonlyArray<SlotIndex>` (occupancy only),
+  `ViewPhase` variants incl. `SlamWindow { turnPlayerId, closesAt, rank }`
+  and `HoldingCard { card?: CardSlug }`. Card values are optional-absent
+  when unentitled (`exactOptionalPropertyTypes` is on repo-wide) — never
+  null, never a redacted placeholder.
+- No frontend test infra exists. Backend pattern:
+  `packages/application/vitest.config.ts` (minimal `defineConfig`,
+  `include: ["test/**/*.test.ts"]`); turbo `test` task dependsOn
+  `^build`; canonical invocation `pnpm turbo test --filter <pkg>`; never
+  pipe the gate (PreToolUse hook blocks it).
+- Design-gate rendered path: `.agents/scripts/design-gate/render.js`
+  takes `--url`/`--file`/`--html` + `--out`, emits `<out>.png` +
+  `<out>.facts.json`; `hardcheck.js --facts <f> [--tokens <json>]` — a
+  tokens file with a `"spacing"` array upgrades spacing-grid inference to
+  a hard check. Machine setup not done yet (M0). The auto-gate PostToolUse
+  hook fires on every `.tsx` write (skipping test/spec/stories/config
+  files) — expect ~26 advisory nudges during implementation; the intended
+  workflow is one gate run against the gallery URL per milestone, not per
+  file.
+- Fonts: nothing loaded anywhere (no `@font-face`, no fontsource) —
+  everything currently falls back to system faces.
+
+**Design-system inputs read for this plan:** the router
+(`design-system/design-system.md` — MVS floors, creation gate, the
+canonical 26), `references/tokens.md`, `references/voice.md`, all 26 files
+under `design-system/components/core/`, `patterns/forms.md`,
+`patterns/screen-states.md`, `patterns/scenes.md`. Per-component notes
+below cite the spec file and class floor rather than restating anatomy —
+the spec file is the source at implementation time (read its Revisions,
+build the current version).
+
+## Plan of work
+
+Code sketches in this section (prop shapes, CSS structure, export lists)
+are **advisory** — they orient the implementer and are expected to drift;
+the Contract coverage table and the module-layout table below are the
+artifacts reconciled against as-built code at close-out. Prefer
+constraints, test intents, and patterns-to-follow over predicted code.
+
+### Module layout (reconciled at close-out)
+
+| Path                                              | Change  | What / governed by                                                                                                                                                |
+| ------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/ui/package.json`                        | edit    | fontsource deps (ADR-0031); vitest + testing-library devDeps, `test` script (ADR-0030)                                                                            |
+| `packages/ui/tsconfig.json`                       | edit    | add `test/**` to include                                                                                                                                          |
+| `packages/ui/vitest.config.ts`                    | new     | jsdom env; pattern: `packages/application/vitest.config.ts`                                                                                                       |
+| `packages/ui/test/setup.ts`                       | new     | jest-dom matcher registration (referenced from vitest config `setupFiles`)                                                                                        |
+| `packages/ui/src/styles.css`                      | rewrite | ADR-0027 executable token mirror of tokens.md; fontsource imports                                                                                                 |
+| `packages/ui/src/index.ts`                        | edit    | export all 17 generic components                                                                                                                                  |
+| `packages/ui/src/components/button.tsx`           | rewrite | `button.md` (M1 — first casualty of the token wipe)                                                                                                               |
+| `packages/ui/src/components/panel.tsx`            | new     | `panel.md`                                                                                                                                                        |
+| `packages/ui/src/components/badge.tsx`            | new     | `badge.md`                                                                                                                                                        |
+| `packages/ui/src/components/divider.tsx`          | new     | `divider.md`                                                                                                                                                      |
+| `packages/ui/src/components/link.tsx`             | new     | `link.md`                                                                                                                                                         |
+| `packages/ui/src/components/field-scaffold.tsx`   | new     | `field-scaffold.md` + `patterns/forms.md`                                                                                                                         |
+| `packages/ui/src/components/text-field.tsx`       | new     | `text-field.md`                                                                                                                                                   |
+| `packages/ui/src/components/select.tsx`           | new     | `select.md`                                                                                                                                                       |
+| `packages/ui/src/components/toggle.tsx`           | new     | `toggle.md`                                                                                                                                                       |
+| `packages/ui/src/components/modal.tsx`            | new     | `modal.md`                                                                                                                                                        |
+| `packages/ui/src/components/toast.tsx`            | new     | `toast.md`                                                                                                                                                        |
+| `packages/ui/src/components/loading.tsx`          | new     | `loading.md`                                                                                                                                                      |
+| `packages/ui/src/components/empty-state.tsx`      | new     | `empty-state.md`                                                                                                                                                  |
+| `packages/ui/src/components/alert.tsx`            | new     | `alert.md`                                                                                                                                                        |
+| `packages/ui/src/components/list.tsx`             | new     | `list.md` (composes loading/empty-state/alert)                                                                                                                    |
+| `packages/ui/src/components/table.tsx`            | new     | `table.md`                                                                                                                                                        |
+| `packages/ui/src/components/app-shell.tsx`        | new     | `app-shell.md` + `patterns/scenes.md`                                                                                                                             |
+| `packages/ui/test/` (suites)                      | new     | field-scaffold + modal suites planned (F2.4/F6.1); further suites as logic warrants                                                                               |
+| `apps/web/package.json`                           | edit    | vitest + testing-library devDeps, `test` script                                                                                                                   |
+| `apps/web/tsconfig.json`                          | edit    | add `test/**` to include (same gap as ui — found in planning)                                                                                                     |
+| `apps/web/vitest.config.ts`                       | new     | jsdom env; same pattern                                                                                                                                           |
+| `apps/web/test/setup.ts`                          | new     | jest-dom matcher registration                                                                                                                                     |
+| `apps/web/src/routes/index.tsx`                   | edit    | M1 sweep: replace stale shadcn utilities with token utilities                                                                                                     |
+| `apps/web/src/routes/dev/components.tsx`          | new     | the gallery route (F5); DEV-gated                                                                                                                                 |
+| `apps/web/src/routeTree.gen.ts`                   | regen   | generated by TanStack on dev/build — never hand-edited                                                                                                            |
+| `apps/web/src/components/game/playing-card.tsx`   | new     | `playing-card.md`                                                                                                                                                 |
+| `apps/web/src/components/game/hand.tsx`           | new     | `hand.md`                                                                                                                                                         |
+| `apps/web/src/components/game/draw-deck.tsx`      | new     | `draw-deck.md`                                                                                                                                                    |
+| `apps/web/src/components/game/discard-pile.tsx`   | new     | `discard-pile.md`                                                                                                                                                 |
+| `apps/web/src/components/game/seat-arc.ts`        | new     | pure seat-geometry function (F4.1, test-first)                                                                                                                    |
+| `apps/web/src/components/game/table-surface.tsx`  | new     | `table-surface.md`                                                                                                                                                |
+| `apps/web/src/components/game/seat.tsx`           | new     | `seat.md`                                                                                                                                                         |
+| `apps/web/src/components/game/slam-timer.tsx`     | new     | `slam-timer.md`                                                                                                                                                   |
+| `apps/web/src/components/game/turn-indicator.tsx` | new     | `turn-indicator.md`                                                                                                                                               |
+| `apps/web/src/components/game/score-sheet.tsx`    | new     | `score-sheet.md`                                                                                                                                                  |
+| `apps/web/test/` (suites)                         | new     | seat-arc, playing-card, hand, slam-timer suites planned (F6.1); more as logic warrants                                                                            |
+| `packages/config/test/eslint.base.test.ts`        | edit    | pin the `ui: []` MAY_IMPORT row (F2.3)                                                                                                                            |
+| `packages/ui/hardcheck-tokens.json`               | new     | spacing scale from tokens.md for `hardcheck.js --tokens` (F1.6; beside styles.css, its executable sibling — kept out of `.agents/` so ADR-0028 is not implicated) |
+
+### M0 — Ground truth and machinery
+
+1. **Design-gate machine setup** (one-time, not a repo change): from
+   `.agents/scripts/design-gate/`, run `npm install --omit=dev` then
+   `npx playwright install chromium`. Verify with the existing
+   `hardcheck.test.js` if in doubt.
+2. **`packages/ui` test infra.** `package.json`: add devDeps `vitest`,
+   `jsdom`, `@testing-library/react`, `@testing-library/jest-dom`,
+   `@testing-library/user-event`; add script `"test": "vitest run"`; add
+   deps `@fontsource/alfa-slab-one` and `@fontsource/archivo` (ADR-0031 —
+   installed now, imported in M1). `vitest.config.ts`: follow
+   `packages/application/vitest.config.ts`, with
+   `environment: "jsdom"`, include `test/**/*.test.ts` and
+   `test/**/*.test.tsx`, and `setupFiles` pointing at `test/setup.ts`
+   (which registers the jest-dom matchers per ADR-0030).
+   `tsconfig.json`: extend include with `test/**/*.ts`, `test/**/*.tsx`.
+   Land one trivial smoke test (render a plain element, assert with a
+   jest-dom matcher) so the suite is non-empty and the jsdom wiring is
+   proven — avoids needing `passWithNoTests`.
+3. **`apps/web` test infra.** Same treatment: devDeps, `test` script,
+   `vitest.config.ts`, `test/setup.ts`, tsconfig include extension
+   (planning found `apps/web/tsconfig.json` include is also `src/**` +
+   `vite.config.ts` only). Same smoke test.
+4. **ui-boundary regression test (F2.3).** In
+   `packages/config/test/eslint.base.test.ts`, add ui-row cases using the
+   existing `lintErrors` fixture helper (pattern: the web-row pins such
+   as "blocks apps/web importing the @cambio/domain/testing subpath"):
+   the `ui` layer must reject `@cambio/contracts` (and any workspace
+   package/subpath) and must allow an external npm import (ui/web
+   external deps are unrestricted by design). Test titles are chosen by
+   `/implement` when they land.
+5. Turbo already has a global `test` task (dependsOn `^build`); adding
+   the package scripts is all the wiring needed. Checkpoint below.
+
+### M1 — The token layer freezes first
+
+Everything after M1 consumes tokens only. Implement **from ADR-0027
+§Decision** (and tokens.md for values) — not from any skill paraphrase.
+
+1. **Rewrite `packages/ui/src/styles.css`.** Keep `@import "tailwindcss"`
+   and `@source "./"`; add the fontsource imports at the top alongside
+   (ADR-0031): `@fontsource/alfa-slab-one` 400 and `@fontsource/archivo`
+   400/500/600/700 (CSS `@import` rules must precede other statements).
+   Then, per the ADR:
+   - **Wipe** the default namespaces the design system doesn't use
+     (`--color-*: initial;` style) — at minimum color, font, shadow,
+     radius, breakpoint — so off-system utilities like `bg-stone-50`
+     cease to exist. Spacing: tokens.md's scale (4 8 12 16 24 32 48 64,
+     base 4px) sits on Tailwind's default 4px multiplier; whether to keep
+     the multiplier or enumerate the eight steps is an implementation
+     call to record in Progress — the hardcheck spacing file (step 3) is
+     the enforcement either way.
+   - **13 primitives** from tokens.md §Color as plain CSS custom
+     properties (not `@theme` — primitives get no utilities; the
+     role-only indirection is what lets the dark theme land as a
+     re-mapping).
+   - **Exactly the 12 semantic roles** promoted to utilities via
+     `@theme inline`, each aliasing its primitive (dots become dashes:
+     `surface.page` → `--color-surface-page` → `bg-surface-page`).
+   - **Scalar groups** (F1.2): font tokens for `display`/`ui` with the
+     tokens.md fallback stacks; the type scale
+     12/14/15/17/22/28/44/64 with line-heights 1.5 body / 1.1 display;
+     radius `sm` 3px / `md` 6px; breakpoints regular 720px / wide 1200px
+     (compact is the base range — mobile-first); border widths and
+     motion values (`ease.snap`, 140ms, 340ms) as variables.
+   - **Non-scalars** (F1.3) as `@utility` or component-level CSS built on
+     the variables: `radius.card` (6% of card width), the zero-blur
+     elevation shadows (`elevation.raised`, `elevation.float`), the
+     `numeral` treatment (`ui` face + `font-variant-numeric: tabular-nums`).
+     Never hardcoded at use sites.
+   - Replace the stock `@layer base` so base text/background come from
+     `ink.primary`/`surface.page`.
+2. **Sweep the two casualties — same commit, because Tailwind v4 emits
+   nothing for unknown utilities (no build error): a stale class fails
+   silently, so the guard is grep + eyes, not the compiler.**
+   - Rewrite `packages/ui/src/components/button.tsx` per `button.md`
+     (Interactive floor; variants primary/secondary/ghost/icon/danger;
+     the active "sit-down" press — translate by the shadow offset,
+     shadow collapses — is the signature and must not become an opacity
+     flash; focus ring `accent.focus` 3px offset 2px, never removed;
+     danger picks `accent.alarm` vs `accent.alarm-deep` by tokens.md's
+     contrast rule). Keep the existing cva + `cn()` pattern. This pulls
+     button's M2 slot forward so the stock component is never
+     half-migrated.
+   - Fix `apps/web/src/routes/index.tsx`: replace `text-muted-foreground`
+     (and any other stock-shadcn utility) with token utilities; adjust to
+     the rewritten Button's API if it changed.
+3. **Hardcheck tokens file (F1.6).** Write
+   `packages/ui/hardcheck-tokens.json` with a `"spacing"` array
+   `[4, 8, 12, 16, 24, 32, 48, 64]` (the shape `hardcheck.js` reads for
+   token conformance).
+4. Checkpoint: dev server renders the smoke page in the new identity
+   (cream page, real faces once fonts load); grep sweeps clean (commands
+   below); repo green.
+
+### M2 — Gallery scaffold + the 17 generic components
+
+1. **Gallery route first** (F5), so every component lands visible:
+   `apps/web/src/routes/dev/components.tsx` with
+   `createFileRoute("/dev/components")`. Gate on `import.meta.env.DEV`
+   (decided: no new `VITE_*` var) — in production builds the route
+   renders nothing/404 (e.g. throw the router's not-found in `beforeLoad`
+   or render null when `!import.meta.env.DEV`; exact mechanism is the
+   implementer's, the observable contract is F5.2). The gallery is a
+   `web` file: it may import `ui`, the game components, and `contracts`
+   for realistic fixture data (`CardSlug` values like `"AS"`,
+   `ViewPhase` shapes). Structure: one labeled section per component,
+   one labeled mount per required MVS state; interactive/motion states
+   get small local controls or looping demos (F5.1); keep the page one
+   URL (the gate screenshots it) — if it grows unwieldy, split via a
+   `?section=` search param and record the per-section URLs here.
+2. **Primitives**: `panel.tsx` (`panel.md`, Static — variants
+   plain/chrome; chrome is ceremonial, one per screen), `badge.tsx`
+   (`badge.md`, Static — `count` variant is a `numeral` pill; never
+   hidden-state hints), `divider.tsx` (`divider.md`, Static —
+   plain/ornament), `link.tsx` (`link.md`, Interactive floor —
+   underline always on; disabled is `aria-disabled`, `ink.muted`, no
+   underline). Button already done in M1. Gallery entries per state as
+   each lands.
+3. **Form family** (with `patterns/forms.md` open):
+   `field-scaffold.tsx` first (`field-scaffold.md` — the canonical
+   wrapper; label association via real `htmlFor`/`id` wiring, error
+   replaces helper and wires `aria-describedby`/`aria-invalid`;
+   required marker is the word "required", not an asterisk).
+   **Test-first** (F2.4/F6.1): label association and error wiring are
+   logic — write the suite in `packages/ui/test/` before the component.
+   Then `text-field.tsx` (`text-field.md`, Input floor + `code` variant;
+   placeholders are examples, never instructions), `select.tsx`
+   (`select.md`, Input floor + `open`; native select semantics on
+   compact widths — never a custom scroll trap on phones; the custom
+   options panel with the ♦ selected-pip is regular+ presentation),
+   `toggle.tsx` (`toggle.md`, Input floor mapped to off/on; knob slides
+   at `duration.snap` `ease.snap`; the optimistic-flip/revert rule is
+   container behavior, out of scope for the presentational component).
+4. **Overlays**: `modal.tsx` (`modal.md`, Overlay floor
+   open/closing/overflow — focus trapped, page inert, Esc/✕/scrim all
+   close except destructive-confirm; scrim `green-deep` at 55%; enters
+   scale .96→1 at `duration.snap`; suggested pattern: the native
+   `<dialog>` element, which carries Esc + focus semantics without a new
+   dependency — record the call either way). **Test-first** for dismiss
+   behavior (Escape, scrim, destructive-confirm lockout) in
+   `packages/ui/test/`. Then `toast.tsx` (`toast.md` — dock positions
+   per breakpoint, auto-dismiss with hover/focus pausing the clock, max
+   3 stacked; the timing logic is a test candidate).
+5. **Data family — support components before consumers** (deliberate
+   refinement of the root plan's listed order: `list.md` and `table.md`
+   render `loading`/`empty-state`/`alert` in their MVS states):
+   `loading.tsx` (`loading.md` — spinner is a rotating card back,
+   implemented verbatim in ui per the resolved Surprise below: the
+   striped mark is token-drawn decoration, not game vocabulary;
+   skeleton is `tan-paving` at 40%, opacity pulse, no
+   shimmer; nothing renders under 300ms; reduced-motion swaps rotation
+   for a fade pulse), `empty-state.tsx` (`empty-state.md` — `first-use`
+   and `no-results` are distinct by contract, never merged; copy
+   register per surface, voice.md), `alert.tsx` (`alert.md` — variants
+   info/alarm/success/reconnecting; persists while true). Then
+   `list.tsx` (`list.md`, Async/data floor
+   populated/loading/empty/error/partial) and `table.tsx` (`table.md`,
+   same floor; numeric columns right-aligned `numeral` with true minus;
+   wide tables scroll in their own container, never the page).
+6. **`app-shell.tsx`** (`app-shell.md` + `patterns/scenes.md` — the
+   shell owns scene grounds; screens declare a depth, never paint their
+   own; states default/game/reconnecting; safe-area aware on compact).
+   CAM-15 implements the token-expressible grounds (plain cream; the
+   checkered paving is CSS on `surface.warm` primitives); the illustrated
+   courtyard has no asset — flagged in Surprises, not silently resolved.
+7. Export all 17 from `packages/ui/src/index.ts`. Each component lands
+   with its gallery entries in the same step, so the checkpoint is
+   visual as well as green.
+
+### M3 — Game objects in `apps/web/src/components/game/`
+
+All presentational and prop-driven (no fetching, no stores), typed
+against `contracts` where the wire shape exists. Motion is CSS-only
+(decided): transitions/keyframes on `ease.snap` +
+`duration.snap`/`duration.track` only; `prefers-reduced-motion` collapses
+movement to cross-fades + `accent.focus` highlights on origin and
+destination (F3.8) — build the reduced-motion branch alongside each
+animation, not as a later pass.
+
+1. **`playing-card.tsx`** (`playing-card.md` — the 7-state floor,
+   F3.2/F3.3/F3.4). **Test-first.** Entitlement is structural: the prop
+   shape must make "face-down but value present" unrepresentable —
+   advisory sketch: a discriminated prop union where only
+   face-up/peeking variants carry `card: CardSlug` and the face-down
+   variant has no card field at all (mirrors the wire's optional-absent
+   discipline). Test intents: renders a back when no slug is handed;
+   each of the seven states is reachable and designed; after a peek ends
+   the DOM is indistinguishable from a never-peeked sibling (memory
+   fidelity, F3.4). Suit color: hearts/diamonds `accent.suit-red`,
+   spades/clubs `ink.primary` — derivable from the `CardSlug` suit
+   character. `slam-eligible` presents on the back (pulsing
+   `accent.alarm` edge) — eligibility public, value hidden (F3.6).
+   Mini variant for score-sheet/discard under-cards.
+2. **`hand.tsx`** (`hand.md` — F3.7). **Test-first.** Occupancy comes as
+   `ReadonlyArray<SlotIndex>`; holes render as dashed outlines in place;
+   indices are stable — no reflow on removal. States populated/empty/
+   growing/shrinking/awaiting-give/inert; variants own/opponent. Test
+   intent: holes stay holes — a grid given non-contiguous indices renders
+   vacancies at exactly those positions.
+3. **`draw-deck.tsx`** (`draw-deck.md` — count badge composes ui's badge
+   `count` variant; `low` at count ≤ 5 shifts to `accent.alarm-deep`;
+   reshuffle/draw are designed `duration.track` moments, demonstrated in
+   the gallery) and **`discard-pile.tsx`** (`discard-pile.md` — top card
+   face-up dominant, under-edges at thrown angles; `empty` reads as
+   "nothing to act on"; `slam-target` gives the top card the
+   `accent.alarm` frame the eligible backs echo).
+4. **`seat.tsx`** (`seat.md` — F3.5). Props carry public state only:
+   name, card count, connection, turn status; `own` variant is
+   positionally distinct but visually unprivileged. Avatar
+   palette-cycling draws from primitives and must not collide adjacent
+   seats — if extracted as a pure helper, it is unit-testable.
+5. **`seat-arc.ts` + `table-surface.tsx`** (`table-surface.md` —
+   F4.1/F4.2). **Geometry test-first**: a pure function from
+   (seat count 2–5, viewer's seat index) to radial positions, rotated so
+   the viewer is bottom-center, ordered by seat index — jsdom cannot
+   measure layout (ADR-0030), so the logic lives in a pure module and
+   the tests pin the numbers; rendering just applies them. Benches are
+   scenery (always four, never a constraint). Compact (<720px): own hand
+   docks to screen bottom, opponents arc along the top — breakpoint CSS,
+   verified rendered (jsdom can't). `game-over` dims the table under the
+   score-sheet.
+6. **`slam-timer.tsx`** (`slam-timer.md` — F3.6). **Test-first** for
+   countdown rendering: renders the drain from `closesAt`-style props
+   (the wire shape exists in `ViewPhase.SlamWindow`); the bar drains
+   linearly toward a fixed close — no refills, no resets on slam
+   attempts (ADR-0011); duration is config-fed, never a design constant.
+   States hidden/open/resolving/closed; never renders against an empty
+   pile (stays hidden — the component obeys its props; the rule lives
+   server-side).
+7. **`turn-indicator.tsx`** (`turn-indicator.md` — states your-turn/
+   other-turn/slam-window/game-over; copy in voice.md's canonical
+   terminology, public events only, never card values) and
+   **`score-sheet.tsx`** (`score-sheet.md` — renders only from `reveal`
+   data (F3.5); rows compose mini playing-cards face-up; totals in
+   `numeral`, true minus sign (−) per voice.md; winner rows plural on
+   ties; zero never styled as automatically winning).
+8. Gallery sections for all nine, every per-object floor state mounted,
+   motion states as looping demos or control-driven (F5.1).
+
+### M4 — Audit pass and token feedback
+
+1. Design-gate rendered run against the gallery (commands below);
+   hardcheck with `--tokens`; record results here and in the root plan's
+   acceptance checklist (WCAG contrast per tokens.md §Contrast, incl.
+   small-text-on-alarm using `accent.alarm-deep`; spacing conformance).
+2. Run the `gate` skill over the gallery (verdicts advisory — recorded,
+   never auto-"fixed"), then an `ai-tells` audit; triage impeccable
+   observations. Conflicts between any tool and the design system are
+   surfaced to the user; the design system outranks.
+3. Any provisional-token adjustment discovered by rendering (type scale,
+   spacing, `radius.card`, breakpoints are explicitly provisional in
+   tokens.md) goes through the creation gate — STOP, name the gap, wait
+   for the user — and lands as a tokens.md revision mirrored in
+   styles.css. Divergence between the two files is a defect (ADR-0027).
+4. Reduced-motion behavior verified rendered (emulate
+   `prefers-reduced-motion` in the browser/gate run).
+
+### M5 — Close-out
+
+Coverage table completed (by `/implement`, as tests landed); `pnpm format`
+then the full bare gate; module-layout table reconciled against the
+as-built tree; plan docs current; ADR-0030/0031 checked for accuracy
+against what was built; Linear updated.
+
+## Concrete steps & validation
+
+- **M0 setup (one-time, machine):**
+  `cd .agents/scripts/design-gate && npm install --omit=dev && npx playwright install chromium`
+- **M0 checkpoint:** `pnpm install`, then
+  `pnpm turbo test --filter @cambio/config --filter @cambio/ui --filter @cambio/web`
+  — config suite grows the ui-row pins; ui/web suites run their smoke
+  tests on jsdom. `pnpm turbo build typecheck lint test` stays green.
+- **M1 checkpoint:** `pnpm dev`, eyeball `http://localhost:3000` (new
+  identity, both faces render, no network font origin in devtools).
+  Sweeps (expected: no matches):
+  - stale shadcn utilities:
+    `grep -rnE "(text|bg|border|ring)-(background|foreground|card|popover|primary|secondary|muted|accent|destructive|input|ring)" packages/ui/src apps/web/src`
+  - arbitrary-value utilities: `grep -rnE "\-\[" packages/ui/src apps/web/src`
+  - raw hex/font leaks outside styles.css:
+    `grep -rn "#[0-9a-fA-F]\{3,8\}" --include="*.tsx" packages/ui/src apps/web/src`
+    and `grep -rn "font-family" --include="*.tsx" packages/ui/src apps/web/src`
+- **Per-milestone rendered check (M2/M3/M4):** with `pnpm dev` running:
+  - `node .agents/scripts/design-gate/render.js --url http://localhost:3000/dev/components --out /tmp/claude-1000/-home-raafayk7-Documents-cambio/76df1ae7-5bc1-42f2-837f-3776379aa5bb/scratchpad/gallery`
+  - `node .agents/scripts/design-gate/hardcheck.js --facts <that>.facts.json --tokens packages/ui/hardcheck-tokens.json`
+  - one gate run per milestone against the gallery URL — do not chase the
+    auto-gate hook's per-file nudges.
+- **Component tests as they land:**
+  `pnpm turbo test --filter @cambio/ui` and
+  `pnpm turbo test --filter @cambio/web` (turbo builds workspace deps
+  first; the bare package script runs against stale dist — CAM-8
+  lesson). Iterating on one suite after a build: `npx vitest run <file>`
+  inside the package.
+- **F5.2 prod check:** `pnpm --filter @cambio/web build` then serve the
+  build (`vite preview` via the package) and confirm `/dev/components`
+  renders nothing/404.
+- **Boundary:** `pnpm turbo lint` (includes `//#format:check`) and
+  `pnpm turbo test --filter @cambio/config` for the ui-row pins.
+- **Before the gate:** `pnpm format` (tsx/css are not hook-formatted).
+- **Final gate:** `pnpm turbo build typecheck lint test` — run bare,
+  never piped; check the exit code directly.
+
+## Contract coverage
+
+_(maintained by `/implement`, verified by `/review`: one row per root-plan
+contract clause this side owns — the test that pins it, or why none can.
+Each row must also say **what is asserted**, in one phrase. **At plan
+time, fill only the Clause column plus a planned-approach note**; test
+file, name, and assertion phrase are written by `/implement` when the
+test actually lands. A plan-time row that invents a test title and
+assertion is an overclaim waiting to become a review finding.)_
+
+| Clause | Test (file + name) | What is asserted                                                                                                                                                                 |
+| ------ | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F1.1   |                    | (planned) non-vitest: line-by-line convergence audit of styles.css against ADR-0027 §Decision + tokens.md, recorded in Progress; grep for wiped namespaces                       |
+| F1.2   |                    | (planned) non-vitest: same convergence audit covers every scalar group; gate hardcheck corroborates spacing                                                                      |
+| F1.3   |                    | (planned) non-vitest: audit of the `@utility`/component-CSS set + M1 grep sweeps (no hardcoded values at use sites)                                                              |
+| F1.4   |                    | (planned) non-vitest: rendered check — both faces served, devtools/gate network shows no external font origin; tabular numerals visually verified                                |
+| F1.5   |                    | (planned) non-vitest: the M1 grep sweeps (stale shadcn utilities, arbitrary values, hex/font-family leaks), re-run at M4 and close-out                                           |
+| F1.6   |                    | (planned) non-vitest: hardcheck invocation with `--tokens` recorded with its output in Progress                                                                                  |
+| F2.1   |                    | (planned) non-vitest: gallery renders all 17; export completeness checked against `packages/ui/src/index.ts`; per-spec review at current revision                                |
+| F2.2   |                    | (planned) gallery mounts every class-floor state (visual review); logic-carrying states pinned by the F2.4/F6.1 suites                                                           |
+| F2.3   |                    | (planned) vitest: ui-row pins in `packages/config/test/eslint.base.test.ts` (workspace imports rejected, external npm allowed); grep for game vocabulary in ui                   |
+| F2.4   |                    | (planned) vitest: field-scaffold label association + error wiring; modal dismiss behavior (Escape/scrim/destructive lockout); gate WCAG hard checks corroborate focus visibility |
+| F3.1   |                    | (planned) non-vitest: all 9 files exist under `apps/web/src/components/game/`, props typecheck against contracts types; review confirms prop-driven                              |
+| F3.2   |                    | (planned) vitest: playing-card suite reaches all 7 designed states                                                                                                               |
+| F3.3   |                    | (planned) type-level (prop union makes face-down-with-value unrepresentable — typecheck) + vitest: no slug renders a back                                                        |
+| F3.4   |                    | (planned) vitest: after peek ends, DOM indistinguishable from a never-peeked back                                                                                                |
+| F3.5   |                    | (planned) vitest + review: seat props are public-state-only; score-sheet renders solely from reveal-shaped props; numeral/true-minus visually verified                           |
+| F3.6   |                    | (planned) vitest: slam-timer renders window from `closesAt`-style props, config-fed, no reset; slam-eligible-on-backs verified visually                                          |
+| F3.7   |                    | (planned) vitest: hand renders holes at exactly the given non-contiguous indices, no reflow                                                                                      |
+| F3.8   |                    | (planned) non-vitest: grep — motion CSS references only `ease.snap` + the two durations; `prefers-reduced-motion` block present; rendered check of the collapse behavior         |
+| F4.1   |                    | (planned) vitest (test-first): seat-arc geometry for n=2…5 — radial by seat order, viewer rotated bottom-center                                                                  |
+| F4.2   |                    | (planned) non-vitest: rendered check at compact width (own hand docks bottom, opponents arc top) — jsdom cannot measure layout (ADR-0030)                                        |
+| F5.1   |                    | (planned) non-vitest: gallery review checklist — every component × every class-floor state mounted, motion + reduced-motion demonstrable                                         |
+| F5.2   |                    | (planned) non-vitest: prod build check — `/dev/components` renders nothing/404 in `vite preview`; no new `VITE_*` var in the diff                                                |
+| F5.3   |                    | (planned) non-vitest: render.js + hardcheck.js runs against the gallery URL recorded in Progress with outputs                                                                    |
+| F6.1   |                    | (planned) the named logic suites land test-first; this table's Test column is filled by `/implement` as each lands                                                               |
+| F6.2   |                    | (planned) non-vitest: gate + ai-tells runs recorded in this plan; conflicts surfaced, never auto-fixed                                                                           |
+
+## Progress
+
+_(append new entries at the BOTTOM — newest last, timestamped)_
+
+- [ ] 2026-09-04 — frontend child plan written; awaiting sign-off
+
+## Surprises & notes for the root plan
+
+_(found while reading the 26 specs and the repo during planning — recorded,
+not silently resolved)_
+
+- **`loading.md` embeds game identity in a generic component.** The
+  spinner is specified as "a card back rotating flat" — but `loading`
+  lives in `packages/ui`, and F2.3 bars game vocabulary from the 17.
+  Planned reconciliation: `loading` exposes a generic visual slot (the
+  spinner mark is a passed-in node) and the card-back mark is supplied by
+  `apps/web`; the gallery mounts the composed form. **Resolved
+  (2026-09-04, user):** the card-back mark IS generic decoration — drawn
+  purely from tokens, no contracts types, no game props; `loading`
+  implements its spec verbatim in ui. The game-vocabulary bar targets
+  props/APIs, not motifs.
+- **Several specs bind primitives directly, not roles.** Link hover
+  darkens to `green-deep`; the card back is `brick-bright` stripes with a
+  `mustard` frame; the modal scrim is `green-deep` at 55%; skeletons are
+  `tan-paving` at 40%; table-surface's rim is `green-deep`. ADR-0027
+  promotes only the 12 roles to utilities and tokens.md's dark-theme
+  rationale says components reference roles. These will land as
+  component-level `var(--primitive)` references (legal under ADR-0027's
+  "component-level CSS built on the variables"). **Resolved (2026-09-04,
+  user):** these surfaces are deliberately theme-fixed (the card back is
+  the identity); recorded in the root Decision Log, revisited by the
+  dark-theme task.
+- **"radius full" is not in tokens.md.** `badge.md` (count variant) and
+  `seat.md` specify fully-rounded pills; tokens.md's shape scale is only
+  `sm`/`md`/`card`. **Resolved (2026-09-04, user):** `rounded-full` is
+  blessed as the pill idiom — a shape idiom (9999px), not a scale value;
+  no `radius.full` token minted. Ensure the radius namespace wipe keeps
+  it available.
+- **Spec-carried values that tokens.md doesn't list.** Opacity/mix
+  levels (55% scrim and disconnected, 45% disabled, 40% skeleton, 25%
+  hairline rule, 8% hover ink-mix), the toast 4s dwell, discard-pile's
+  ±4–9° thrown angles. The component files are canon, so these are not
+  inventions — but they are visual vocabulary living outside tokens.md.
+  Planned treatment: implement as spec'd, keep them in component CSS
+  named after the spec. **Resolved (2026-09-04, user):** confirmed —
+  spec-carried values are canon and stay in component CSS citing their
+  spec file; no tokens.md promotion in CAM-15.
+- **Scene grounds outrun the asset inventory.** `app-shell.md` +
+  `patterns/scenes.md` make the shell own scene backgrounds, including
+  the full illustrated courtyard for the lobby. No illustration assets
+  exist in the repo, and drawing them is neither token vocabulary nor in
+  CAM-15's component scope. Plan: app-shell takes a declared scene-depth
+  with the token-expressible grounds implemented (plain cream; checkered
+  paving from `surface.warm` primitives); the courtyard illustration is
+  an open gap for the user to schedule (likely CAM-16 territory).
+  **Resolved (2026-09-04, user):** confirmed — the illustration is
+  deferred, scheduled with CAM-16's screens.
+- **F1.6's file initially planned into harness territory.** A
+  design-gate tokens file under `.agents/` would collide with ADR-0028
+  (harness lands on `main`) while being release-branch contract work.
+  **Resolved (2026-09-04, planner):** the file moves to
+  `packages/ui/hardcheck-tokens.json` — beside `styles.css`, whose
+  values it mirrors; `hardcheck.js --tokens` takes any path. No ADR-0028
+  implication remains.
+- **Two class-taxonomy wrinkles, treated as file-governed:**
+  `app-shell.md` declares class "Layout", which is not a row in
+  design-system.md's MVS table — its own States section
+  (default/game/reconnecting) is taken as its floor. Similarly
+  `loading`/`empty-state`/`alert` are "Async/data (support)" and carry
+  their own state lists rather than the five-state data floor (which
+  `list`/`table` do carry). The component file is the authority per the
+  router; noted so the reviewer doesn't read the MVS table stricter than
+  the specs.
+- **Data-family build order refined.** `list.md`/`table.md` render
+  `loading`/`empty-state`/`alert` in their own MVS states, so those three
+  land first within M2's data batch (the root plan's listing order was
+  explicitly "roughly").
+- **`apps/web/tsconfig.json` has the same test-include gap as ui** (root
+  plan M0 mentions only ui's tsconfig); both get `test/**` added in M0.
