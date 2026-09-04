@@ -202,24 +202,31 @@ Clause IDs are referenced by the frontend child plan's coverage table.
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes (run bare — never
-      piped).
-- [ ] All 26 components exist in their decided homes and export cleanly;
-      the gallery renders all of them in dev.
-- [ ] tokens.md ↔ styles.css convergence audit: every tokens.md value
-      present, no extra visual vocabulary in the CSS (divergence is a
-      defect per ADR-0027).
-- [ ] Grep sweeps clean: no stale shadcn utilities, no arbitrary-value
-      utilities, no hardcoded token-covered values in `ui`/`web` source.
-- [ ] Design-gate rendered run over the gallery completed; WCAG hard-check
-      results recorded (contrast rules from tokens.md §Contrast hold, incl.
-      small-text-on-alarm using `accent.alarm-deep`).
-- [ ] ai-tells audit run and scored; findings addressed or explicitly
-      logged as deliberate identity.
-- [ ] Any adjustment to provisional tokens.md values (type scale, spacing,
-      radius.card, breakpoints) went through the creation gate with user
-      approval and landed as a tokens.md revision — or none were needed.
-- [ ] ADR-0030 and ADR-0031 remain accurate to what was built.
+- [x] `pnpm turbo build typecheck lint test` passes (run bare — never
+      piped). 24/24 tasks, 429 tests (194 domain + 83 application + 112
+      api + 16 config + 14 ui + 24 web), 2026-09-04.
+- [x] All 26 components exist in their decided homes and export cleanly;
+      the gallery renders all of them in dev (rendered + inspected at
+      M2/M3/M4).
+- [x] tokens.md ↔ styles.css convergence audit: every tokens.md value
+      present, no extra visual vocabulary (additions all spec-cited);
+      audited at M1, re-audited at M4 after the `--spacing` wipe fix.
+- [x] Grep sweeps clean: stale-shadcn, arbitrary-value, raw-hex,
+      font-family, and (added at M4) off-scale numeric-utility sweeps all
+      empty over `ui`/`web` source.
+- [x] Design-gate rendered run over the gallery completed — final
+      hardcheck **PASS** (0 constraint fails; contrast clean over all
+      sampled nodes, incl. alarm surfaces after the ghost-Retry fix);
+      results in the frontend plan's M4 Progress entry.
+- [x] ai-tells audit run: **4/30** ("invisible"); all three fixes
+      applied; deliberate identity confirmed untouched (its "defensibly
+      intentional" list matches the Decision Log).
+- [x] Provisional tokens.md values: none needed adjustment — recorded in
+      the Decision Log; no creation-gate round required.
+- [x] ADR-0030 and ADR-0031 remain accurate to what was built
+      (testing-library + jsdom exactly as specified; fontsource
+      alfa-slab-one 400 + archivo 400/500/600/700 imported in
+      styles.css).
 
 ## Plan of work
 
@@ -291,7 +298,14 @@ patterns; audits run when there is a complete surface to audit.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-04 — plan written; awaiting sign-off
+- [x] 2026-09-04 — plan written; signed off; committed 9a70ee4
+- [x] 2026-09-04 — M0–M5 implemented on the task branch (see the frontend
+      child plan's Progress for the milestone-by-milestone record):
+      test infra + ui-boundary pins (c480fac), token layer + fonts +
+      button (6d58d70), gallery + 17 generic components (71c73bb), 9 game
+      objects (ed47426), audit pass with gate/ai-tells/hardcheck fixes
+      (3c61e38), close-out (coverage table filled, module layout
+      reconciled, acceptance criteria verified, full gate green).
 
 ## Decision log
 
