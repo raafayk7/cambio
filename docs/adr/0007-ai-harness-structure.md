@@ -2,7 +2,17 @@
 
 - **Status:** accepted
 - **Date:** 2026-08-30
-- **Task:** the Task 2 harness session (HANDOFF §11)
+- **Task:** the Task 2 harness session (HANDOFF §11); amended by CAM-14
+- **Amended:** 2026-09-04 (CAM-14) — the "frontend-specific skills are
+  deliberately deferred" consequence is discharged: the design system
+  landed (CAM-13) and the frontend harness followed
+  ([0029](0029-design-tooling-vendored-first-party.md)). The skill roster
+  now also includes `frontend-architecture`, `design-system`, `ai-tells`,
+  the dissolved design-gate family, `impeccable`, and the vendored
+  animation set (see `.agents/skills/VENDORED.md`); the structure also
+  carries `.agents/agents/` + `.agents/scripts/` with a `.claude/agents`
+  symlink, and a `/ship` command exists alongside plan/implement/review.
+  The Decision's structure is otherwise unchanged.
 
 ## Context
 

@@ -11,7 +11,8 @@
 
 The files and modules this side touches, their current state, and the layer
 rules that apply (name the skills: e.g. effect-domain-modeling,
-infrastructure-persistence).
+infrastructure-persistence for backend; frontend-architecture,
+design-system for frontend).
 
 ## Plan of work
 

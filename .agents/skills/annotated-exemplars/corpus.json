@@ -1,0 +1,125 @@
+{
+  "_note": "Authoritative exemplar bank harvested verbatim from exemplars.pdf (23 pages). Captions are Eman's exact words (extracted as selectable text via PyMuPDF), NOT paraphrased. verdict ∈ good|bad|mixed. controlled_break flags 'Good because it breaks a rule'. Do not edit captions — they are ground truth. Tags/analysis live in SKILL.md.",
+  "source": "exemplars.pdf",
+  "counts": { "good": 12, "bad": 10, "mixed": 1, "total": 23 },
+  "entries": [
+    {
+      "page": 1,
+      "verdict": "bad",
+      "caption": "Generic AI slop -> the pill at the top is standard ai slop, the cards also standard ai slop, the purple also commonly ai used, the icons in the card are also commonly ai used card icons and style"
+    },
+    {
+      "page": 2,
+      "verdict": "bad",
+      "caption": "Generic AI slop -> gradient buttons and text is a big giveaway and then the font choice is poor and ai slop, default dark mode with light effect is typically ai forward"
+    },
+    {
+      "page": 3,
+      "verdict": "bad",
+      "caption": "Generic AI slop -> gradient buttons + text too big, underline is creating hand drawn style but nothing else is hand drawn, the image looks like ai generated it, the light effect on dark mode is ai giveaway as well, buttons are not consistent, too many types of them exist on the screen."
+    },
+    {
+      "page": 4,
+      "verdict": "bad",
+      "caption": "Generic AI slop -> blue and purple gradient and light in the bg of dark. Gradient in text looks bad here, the font choices are also so generic. Overall feels like no personality and character here"
+    },
+    {
+      "page": 5,
+      "verdict": "bad",
+      "caption": "lacks personality, bad use of gradient in text, the CTAs look visually off because of the typography and colors, the glass effect is not executed well. Red gradient in the background mixed with blue makes it look very ai. Too many different font types are being used, the lighting on the human in the center is bad and image itself looks ai generated."
+    },
+    {
+      "page": 6,
+      "verdict": "good",
+      "controlled_break": true,
+      "caption": "Very visually distinct. Breaks traditional layout in a good way. Use anime style art that does not look ai generated. Organic shapes add a lot of personality to the ui. Hierarchy of information and assets allows users eyes to follow a path."
+    },
+    {
+      "page": 7,
+      "verdict": "mixed",
+      "caption": "Good: Good use of gradient in the background. The effects on the images makes it look more real. The font choice is working with intent. Bad: the buttons look out of place because of the gradient glass borders that dont go with the theme + the padding in them looks visually off balance"
+    },
+    {
+      "page": 8,
+      "verdict": "bad",
+      "caption": "the entire page is generic from images to avadars to the subtle gradient in the background, looks like a template. The graident buttons are bad, the hand drawn font does not match the theme or any other elemetns on the page. Things are mispelled and selected state on features is too light."
+    },
+    {
+      "page": 9,
+      "verdict": "good",
+      "caption": "The unique brutalistic style matched the theme of the project. The image and brand elements makes ui looks intentional. The color pallete is good. What makes this stand out is the brand elements"
+    },
+    {
+      "page": 10,
+      "verdict": "bad",
+      "caption": "Purple blue gradient in bg gives ai slop effect. The glass panels are not working, feel shabby. The images feel ai-made, too perfect without human touch. The font choice is also bad"
+    },
+    {
+      "page": 11,
+      "verdict": "good",
+      "caption": "The splash green colors makes it pop, good think fonts, the accent element feels intentional and on brand. The texture on the gradient adds visual depth"
+    },
+    {
+      "page": 12,
+      "verdict": "good",
+      "caption": "Hand-made style human design which looks and feels like actual paper. The texture, color of bg, highlight merging with the actual text, light effect, all make it look human and real"
+    },
+    {
+      "page": 13,
+      "verdict": "good",
+      "caption": "The branding visuals feel alive, there's movement. The color ratio is balanced and the font type is editorial which matches the visual style. The accent elements create a brand identity rather than generic slop."
+    },
+    {
+      "page": 14,
+      "verdict": "good",
+      "caption": "the hero section stands out. The ratio of orange used is very intentional and makes things stand out creating a visual hierarchy, the concept of grey and black surfaces creates depth but doesn't make it feel like it's AI slop, images in cards have a background merging overlay effect that allows text to show despite having an image behind it"
+    },
+    {
+      "page": 15,
+      "verdict": "good",
+      "caption": "Selection of font and right amount of orange used helps create a distinct visual identity. The images have effects on them giving a motion blur effect. The text on the image is visible and clear. The layout of the page is unique with tiny accent elements that create a complete picture."
+    },
+    {
+      "page": 16,
+      "verdict": "good",
+      "controlled_break": true,
+      "caption": "The use of the cutout effect with the elephant being the hero creates a distinct visual sense. The use of textures and lines in the background, the text behind the image and infront and then behind creates depth. The size difference in the small font and large text is stark but that's intentional and that creates an editorial style output."
+    },
+    {
+      "page": 17,
+      "verdict": "good",
+      "controlled_break": true,
+      "caption": "The overlapping card elements with neon colors add a color burst that makes them stand out. The slight shadows behind the card are properly merged with bg, the font is thin and fits the design language. The only bad thing is the padding in the button making it feel not aligned."
+    },
+    {
+      "page": 18,
+      "verdict": "bad",
+      "caption": "Low visibility of text in cards, the cards are too long, the layout is very un-imaginative. Padding in the text inside the cards is poor, there needs to be more space on the right and left. The entire UI lacks personality, it's just static cards of events."
+    },
+    {
+      "page": 19,
+      "verdict": "good",
+      "caption": "The white and red being the main colors with blue creating an overprint effect adds a lot of character. The faded shade of red makes it look vintage, the line and font used is also contributing to the vintage effect along with the layout that creates a unique newspaper like feel and design."
+    },
+    {
+      "page": 20,
+      "verdict": "good",
+      "caption": "For a more tech style page, this does well. The pixel art is distinct but the meaning behind the art adds value as well. The slight light effect on the text going from grey to white really adds depth to the text. Using font weight for emphasis creates a balanced hierarchy."
+    },
+    {
+      "page": 21,
+      "verdict": "good",
+      "caption": "The colorful image has a motion blur effect that compliments the white/cream feel of the interface. Using typography with constraint makes it look less like AI slop and more like human made design. The font choices are very editorial and help enhance the design."
+    },
+    {
+      "page": 22,
+      "verdict": "bad",
+      "caption": "The color palette is screaming AI slop, the glass effect and shabby hot pink gradients, the AI generated art. Everything looks like an AI slop. The size of the headings and CTA text size are the same. The glass effect looks very poorly executed."
+    },
+    {
+      "page": 23,
+      "verdict": "bad",
+      "caption": "This is a less bad example than some of the others however it is still bad because the entire UI has no character. What's good is the claymorphism type effect that makes controls feel tactile however card style is generic, The CTA padding is too much, there are too many surfaces on top of surfaces which gives it a negative feel."
+    }
+  ]
+}

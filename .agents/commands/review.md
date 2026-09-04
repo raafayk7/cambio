@@ -40,9 +40,11 @@ read-only subagents in parallel — four total for fullstack:
   clauses; do not grade coverage by grepping clause ids out of test titles.
   Also flags implemented behavior the contract never asked for.
 - **Architecture reviewer:** receives the diff and the governing skills
-  (`architecture` plus the layer skills for the files touched; always
-  include `hidden-information` if any client-facing payload, contracts
-  schema, or realtime code changed). Treats each skill rule as a checklist
+  (`architecture` plus the layer skills for the files touched — for
+  frontend diffs that means `frontend-architecture`, `design-system`, and
+  `ai-tells`; always include `hidden-information` if any client-facing
+  payload, contracts schema, or realtime code changed). Treats each skill
+  rule as a checklist
   item; reports violations with file:line and the rule violated. Import
   boundaries, purity of domain, ports placement, typed errors, soft-delete
   discipline, and never-send-it-at-all are the recurring high-value checks.
