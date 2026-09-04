@@ -2,6 +2,10 @@
 
 - **Status:** accepted
 - **Date:** 2026-08-31
+- **Amended:** 2026-09-04 (CAM-14) — [0028](0028-harness-changes-land-on-main.md)
+  carves out harness/meta changes, which commit directly to `main` and
+  propagate by merge-down. Task work is unchanged; the Decision below is
+  otherwise intact.
 
 ## Context
 
