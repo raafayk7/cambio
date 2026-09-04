@@ -1,49 +1,241 @@
+/*
+ * The executable mirror of design-system/references/tokens.md (ADR-0027).
+ * tokens.md is the documented source of truth (values, rationale, WCAG
+ * notes); divergence between that file and this one is a defect.
+ *
+ * Structure, per ADR-0027 §Decision:
+ *   - default Tailwind namespaces the design system doesn't use are wiped,
+ *     so off-system utilities (bg-stone-50, text-lg from the stock scale,
+ *     blurred shadows) do not exist to be reached for;
+ *   - color PRIMITIVES are plain custom properties on :root — no utilities;
+ *   - only the SEMANTIC ROLES are promoted to utilities, via @theme inline,
+ *     so the deferred dark theme lands as a role re-mapping (re-point the
+ *     --color-* role variables under a theme selector; no component edits);
+ *   - non-scalar tokens (radius.card, borders, motion durations) are
+ *     custom properties + @utility rules built on them.
+ *
+ * Fonts are self-hosted via @fontsource (ADR-0031).
+ */
+
 @import "tailwindcss";
+@import "@fontsource/alfa-slab-one/400.css";
+@import "@fontsource/archivo/400.css";
+@import "@fontsource/archivo/500.css";
+@import "@fontsource/archivo/600.css";
+@import "@fontsource/archivo/700.css";
 
 /*
- * Scan this package's own components. Workspace packages live under
- * node_modules via symlink, which Tailwind's automatic source detection skips,
- * so consumers would otherwise get unstyled primitives.
+ * Ensure Tailwind scans this package's own sources: workspace packages are
+ * consumed through a node_modules symlink, which automatic source detection
+ * skips.
  */
 @source "./";
 
-/*
- * shadcn/ui default theme tokens (Tailwind v4 `@theme` form).
- *
- * Visual design direction is being decided separately (§2) — these are stock
- * shadcn defaults, deliberately unopinionated. Replace wholesale when the
- * design lands rather than accreting overrides here.
- */
-@theme {
-  --color-background: oklch(1 0 0);
-  --color-foreground: oklch(0.145 0 0);
-  --color-card: oklch(1 0 0);
-  --color-card-foreground: oklch(0.145 0 0);
-  --color-popover: oklch(1 0 0);
-  --color-popover-foreground: oklch(0.145 0 0);
-  --color-primary: oklch(0.205 0 0);
-  --color-primary-foreground: oklch(0.985 0 0);
-  --color-secondary: oklch(0.97 0 0);
-  --color-secondary-foreground: oklch(0.205 0 0);
-  --color-muted: oklch(0.97 0 0);
-  --color-muted-foreground: oklch(0.556 0 0);
-  --color-accent: oklch(0.97 0 0);
-  --color-accent-foreground: oklch(0.205 0 0);
-  --color-destructive: oklch(0.577 0.245 27.325);
-  --color-destructive-foreground: oklch(0.985 0 0);
-  --color-border: oklch(0.922 0 0);
-  --color-input: oklch(0.922 0 0);
-  --color-ring: oklch(0.708 0 0);
+/* ---- Color primitives (tokens.md §Color — primitives) ------------------ */
+/* Plain custom properties: deliberately NOT @theme, so no utility exists
+ * for a primitive. Components reference roles; the few deliberately
+ * theme-fixed surfaces (card back, scrim, link hover — see the CAM-15
+ * root plan Decision Log) use var(--primitive) in component CSS. */
+:root {
+  --cream-scene: #f6dcae;
+  --cream-card: #eee9d2;
+  --tan-paving: #d3a266;
+  --terracotta: #b3613a;
+  --brick-deep: #8e4224;
+  --brick-bright: #be5d2e;
+  --green-table: #36634a;
+  --green-deep: #27311e;
+  --olive: #5d5d31;
+  --red-card: #a52418;
+  --red-bright: #e03322;
+  --ink: #0d0d08;
+  --mustard: #f8ba66;
 
-  --radius: 0.625rem;
+  /* Non-scalar building blocks (tokens.md §Shape, §Motion) */
+  --border-interactive: 1.5px;
+  --border-frame: 2px;
+  --radius-card-ratio: 0.06; /* radius.card: 6% of card width */
+  --duration-snap: 140ms;
+  --duration-track: 340ms;
 }
 
-@layer base {
-  * {
-    border-color: var(--color-border);
+@theme {
+  /* Wipe stock namespaces the design system doesn't use (ADR-0027). */
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --radius-*: initial;
+  --breakpoint-*: initial;
+  --animate-*: initial;
+  --blur-*: initial;
+  --tracking-*: initial;
+  --leading-*: initial;
+
+  /* Spacing: tokens.md scale 4 8 12 16 24 32 48 64 (base 4px), enumerated
+   * so off-scale steps do not exist, and named ORDINALLY — space.N in the
+   * component specs means the Nth step (button.md's "space.2 × space.5" is
+   * 8px × 24px), so p-5 here is 24px, not Tailwind's 20px. Recorded in the
+   * CAM-15 plan Decision Log. */
+  --spacing-*: initial;
+  --spacing-0: 0px;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 24px;
+  --spacing-6: 32px;
+  --spacing-7: 48px;
+  --spacing-8: 64px;
+
+  /* Typography (tokens.md §Typography): faces… */
+  --font-display: "Alfa Slab One", "Rockwell", serif;
+  --font-ui: "Archivo", system-ui, sans-serif;
+
+  /* …and the type scale 12/14/15/17/22/28/44/64 — body sizes carry 1.5,
+   * display sizes 1.1. */
+  --text-xs: 12px;
+  --text-xs--line-height: 1.5;
+  --text-sm: 14px;
+  --text-sm--line-height: 1.5;
+  --text-base: 15px;
+  --text-base--line-height: 1.5;
+  --text-lg: 17px;
+  --text-lg--line-height: 1.5;
+  --text-xl: 22px;
+  --text-xl--line-height: 1.1;
+  --text-2xl: 28px;
+  --text-2xl--line-height: 1.1;
+  --text-3xl: 44px;
+  --text-3xl--line-height: 1.1;
+  --text-4xl: 64px;
+  --text-4xl--line-height: 1.1;
+
+  /* Shape (tokens.md §Shape). rounded-full is the blessed pill idiom. */
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-full: calc(infinity * 1px);
+
+  /* Elevation (tokens.md §Elevation): offset solid shadows, zero blur —
+   * never blurred material shadows. elevation.flat is the absence of a
+   * shadow utility. */
+  --shadow-raised: 3px 3px 0 rgb(13 13 8 / 0.35);
+  --shadow-float: 6px 7px 0 rgb(13 13 8 / 0.35);
+
+  /* Motion (tokens.md §Motion): the papery snap; two durations only. */
+  --ease-snap: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Breakpoints: compact is the base (mobile-first) range. */
+  --breakpoint-regular: 720px;
+  --breakpoint-wide: 1200px;
+}
+
+/* ---- Semantic roles (tokens.md §Color — semantic roles) ---------------- */
+/* @theme inline: utilities emit var(--color-…) references, so a future
+ * theme re-maps roles at runtime without component edits. */
+@theme inline {
+  --color-surface-page: var(--cream-scene);
+  --color-surface-raised: var(--cream-card);
+  --color-surface-table: var(--green-table);
+  /* surface.warm is terracotta-led; the checkerboard pattern pairs it with
+   * tan-paving directly in scene CSS (theme-fixed, see Decision Log). */
+  --color-surface-warm: var(--terracotta);
+  --color-ink-primary: var(--ink);
+  --color-ink-muted: var(--olive);
+  --color-ink-inverse: var(--cream-card);
+  --color-accent-action: var(--green-table);
+  --color-accent-alarm: var(--red-bright);
+  --color-accent-alarm-deep: var(--red-card);
+  /* Renders pips only — never UI meaning (tokens.md quarantine rule). */
+  --color-accent-suit-red: var(--red-card);
+  --color-accent-focus: var(--mustard);
+}
+
+/* ---- Non-scalar utilities (ADR-0027: @utility on the variables) --------- */
+
+/* Borders carry emphasis (tokens.md §Shape): 1.5px solid ink on
+ * interactive objects, 2px on frames. */
+@utility border-interactive {
+  border: var(--border-interactive) solid var(--color-ink-primary);
+}
+@utility border-frame {
+  border: var(--border-frame) solid var(--color-ink-primary);
+}
+
+/* radius.card: 6% of card width — the signature corner scales with the
+ * card. Consumers set --card-width (the playing-card component does). */
+@utility radius-card {
+  border-radius: calc(var(--card-width, 100px) * var(--radius-card-ratio));
+}
+
+/* numeral role: ui face with tabular numerals; minus signs are data. */
+@utility font-numeral {
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The two gameplay durations (transition-duration form). */
+@utility duration-snap {
+  transition-duration: var(--duration-snap);
+}
+@utility duration-track {
+  transition-duration: var(--duration-track);
+}
+
+/* Interactive grounds with the one-step hover darken (button.md hover:
+ * "ground darkens one step (mix 8% ink)" — the shared idiom for every
+ * interactive surface; the 8% is spec-carried, see the CAM-15 Decision
+ * Log). ground-ghost hovers from transparent to an 8% ink tint. */
+@utility ground-action {
+  background-color: var(--color-accent-action);
+  &:hover {
+    background-color: color-mix(in srgb, var(--ink) 8%, var(--color-accent-action));
   }
+}
+@utility ground-raised {
+  background-color: var(--color-surface-raised);
+  &:hover {
+    background-color: color-mix(in srgb, var(--ink) 8%, var(--color-surface-raised));
+  }
+}
+@utility ground-alarm {
+  background-color: var(--color-accent-alarm);
+  &:hover {
+    background-color: color-mix(in srgb, var(--ink) 8%, var(--color-accent-alarm));
+  }
+}
+@utility ground-alarm-deep {
+  background-color: var(--color-accent-alarm-deep);
+  &:hover {
+    background-color: color-mix(in srgb, var(--ink) 8%, var(--color-accent-alarm-deep));
+  }
+}
+@utility ground-ghost {
+  background-color: transparent;
+  &:hover {
+    background-color: color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+}
+
+/* The papery press (button.md active state — the component's signature):
+ * the element translates by the raised-shadow offset and the shadow
+ * collapses, so it physically sits down. Never an opacity flash. */
+@utility press-raised {
+  &:active:not(:disabled) {
+    translate: 3px 3px;
+    box-shadow: none;
+  }
+}
+
+/* ---- Base ---------------------------------------------------------------- */
+@layer base {
   body {
-    background-color: var(--color-background);
-    color: var(--color-foreground);
+    background-color: var(--color-surface-page);
+    color: var(--color-ink-primary);
+    font-family: var(--font-ui);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
   }
 }

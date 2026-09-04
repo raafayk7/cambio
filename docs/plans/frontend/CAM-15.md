@@ -504,6 +504,25 @@ assertion is an overclaim waiting to become a review finding.)_
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [ ] 2026-09-04 — frontend child plan written; awaiting sign-off
+- [x] 2026-09-04 14:00 — M0 complete: design-gate machine setup done
+      (npm install + Chromium); fontsource + vitest/jsdom/testing-library
+      deps added; vitest configs + `test/setup.ts` + smoke tests in ui and
+      web (both green on jsdom); tsconfig `test/**` includes added; ui-row
+      boundary pins added to `packages/config/test/eslint.base.test.ts`
+      (16 config tests green). Commit c480fac. Note: impeccable's edit
+      hook fired on the smoke-test writes — the CAM-14 watch item is
+      answered, the hook works on real in-repo UI writes.
+- [x] 2026-09-04 14:20 — M1 complete: styles.css rewritten per ADR-0027
+      (wipe + 13 primitives on :root + 12 roles via @theme inline +
+      @utility non-scalars + fontsource imports); spacing named ordinally
+      (see root Decision Log); shared `ground-*`/`press-raised` utilities;
+      Button rewritten per button.md; smoke page swept (incl. two stale
+      utilities the plan didn't list: `tracking-tight`, `p-10`/`gap-6` —
+      wiped/re-meaning'd by the new scale); `packages/ui/hardcheck-tokens.json`
+      written; `.claude/launch.json` added for the dev-server preview. All
+      four grep sweeps clean; build/typecheck/lint green; rendered check
+      via design-gate renderer confirms cream page + both faces serving
+      locally (dev server on WEB_PORT=3100 from root .env).
 
 ## Surprises & notes for the root plan
 

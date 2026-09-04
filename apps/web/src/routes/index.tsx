@@ -31,10 +31,10 @@ function Home() {
   })
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col items-start gap-6 p-10">
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col items-start gap-5 p-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Cambio</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Scaffold smoke test.</p>
+        <h1 className="font-display text-2xl">Cambio</h1>
+        <p className="mt-1 text-sm text-ink-muted">Scaffold smoke test.</p>
       </div>
 
       <p className="text-sm" data-testid="health-status">

@@ -1,0 +1,4 @@
+{
+  "$comment": "Design-gate hardcheck input (F1.6) — derived from design-system/references/tokens.md §Spacing. Passed to .agents/scripts/design-gate/hardcheck.js via --tokens so spacing-grid conformance is a measured check, not an inference. Keep convergent with tokens.md and styles.css.",
+  "spacing": [4, 8, 12, 16, 24, 32, 48, 64]
+}

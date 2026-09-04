@@ -347,6 +347,24 @@ timestamp each entry)_
   derives from tokens.md (release-branch content), so placing it in
   harness territory would collide with ADR-0028's land-on-main rule.
   (Planner call resolving the child plan's flag.)
+- 2026-09-04 — **Spacing utilities are named ordinally**: `space.N` in
+  the component specs indexes the tokens.md scale 1-based (button.md's
+  "space.2 × space.5" = 8px × 24px), so `--spacing-5` is 24px — not
+  Tailwind's 20px — and the scale is enumerated (`--spacing-*: initial`)
+  so off-scale steps don't exist. Every spec reference (`space.1`–`.5`)
+  is only consistent with the ordinal reading; verified by grep across
+  `design-system/`.
+- 2026-09-04 — **Shared interactive idioms live as `@utility` rules in
+  styles.css**: the one-step hover darken (`ground-*`, button.md's "mix
+  8% ink" — spec-carried) and the papery press (`press-raised`) are
+  utilities because multiple interactive components share them; both cite
+  their spec in the CSS.
+- 2026-09-04 — **Button `icon` variant takes the secondary ground**
+  (spec leaves the icon ground unstated; square `p-2`, aria-label
+  required) and **`danger` defaults to `accent.alarm-deep`** (labels are
+  small by default; tokens.md's contrast rule reserves `accent.alarm`
+  for large/display labels — the CAM-16 Slam composition overrides at
+  the use site).
 
 ## Surprises & discoveries
 

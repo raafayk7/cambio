@@ -5,38 +5,31 @@ import type * as React from "react"
 import { cn } from "../lib/utils.js"
 
 /**
- * Canonical shadcn/ui Button.
+ * Button — design-system/components/core/button.md (r1).
  *
- * shadcn/ui is copy-in, not a dependency: this file is the generated component,
- * checked in and owned by us. Add more with `pnpm dlx shadcn@latest add <name>`
- * from `packages/ui` — see the README.
+ * Variants: primary / secondary / ghost / icon / danger. `icon` is square
+ * and icon-only: it REQUIRES an accessible label (aria-label). `danger`
+ * uses accent.alarm-deep, the small-label alarm surface per tokens.md's
+ * contrast rule; a display-face large-label danger button (the Slam
+ * composition) may override to accent.alarm at the use site.
  *
- * Visual design direction is being decided separately; do not invent a design
- * system beyond shadcn defaults (§2).
+ * One primary per surface; the active "sit-down" press (press-raised) is
+ * the signature — never replace it with an opacity flash.
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 shrink-0 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-sm border-frame px-5 py-2 font-ui text-base font-semibold shadow-raised transition duration-snap ease-snap press-raised focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent-focus focus-visible:outline-solid disabled:pointer-events-none disabled:opacity-45 disabled:shadow-none [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-9 w-9",
+        primary: "ground-action text-ink-inverse",
+        secondary: "ground-raised text-ink-primary",
+        ghost: "ground-ghost text-ink-primary shadow-none",
+        icon: "ground-raised p-2 text-ink-primary",
+        danger: "ground-alarm-deep text-ink-inverse",
       },
     },
     defaultVariants: {
-      variant: "default",
-      size: "default",
+      variant: "primary",
     },
   },
 )
@@ -46,9 +39,9 @@ export interface ButtonProps
   asChild?: boolean
 }
 
-export function Button({ className, variant, size, asChild = false, ...props }: ButtonProps) {
+export function Button({ className, variant, asChild = false, ...props }: ButtonProps) {
   const Comp = asChild ? Slot : "button"
-  return <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />
+  return <Comp className={cn(buttonVariants({ variant, className }))} {...props} />
 }
 
 export { buttonVariants }
