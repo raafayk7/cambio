@@ -555,6 +555,37 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       styles.css grew card-frame/card-lg/md/sm, card-rank/card-pip,
       text-shadow-poster utilities. Full gate for config/ui/web green;
       full-page render inspected (2 slices) — spec-true.
+- [x] 2026-09-04 16:30 — M4 complete (audits):
+      **Hardcheck** (with `--tokens packages/ui/hardcheck-tokens.json`):
+      final run **PASS** — 0 constraint fails; 1 judged default signal
+      (192px = mx-auto centering residue, unauthored); advisories are the
+      24–44px band (43px shared control box — see the surfaced spec
+      conflict in the root Decision Log; 36px icon buttons; 28px toggle).
+      Earlier runs caught real defects, fixed: ghost Retry on alarm
+      ground 2.66:1 → ink-inverse text; alert/modal ✕ targets 13px →
+      29px via `p-2 -m-2`; and the wipe hole — the bare `--spacing`
+      multiplier survived `--spacing-*: initial`, so off-scale numeric
+      utilities still resolved (w-24/w-64/min-w-32 were live); fixed with
+      an explicit `--spacing: initial` + demo widths moved to the
+      container scale (w-3xs/2xs/xs) + score-sheet/slam-timer edits.
+      **Gate skill** (decompose → map → judge): ⚠️ flagged on 4 —
+      C2 link hit area (fixed: py-1/-my-1), D8 glyph icons (fixed:
+      marks.tsx SVGs; suits kept as identity), D3 empty-state blank
+      (fixed: py-8 → py-5), D10 43px box (surfaced as spec conflict, not
+      fixed — design system outranks). Judge explicitly declined the C3
+      slop escalation: 3 of 5 markers trace to the written design system.
+      D7 personality: satisfied ("could only belong to this product").
+      **ai-tells**: 4/30 ("invisible — your hand is on the wheel").
+      Fixes applied: StateCard label de-eyebrowed to sentence case;
+      fixture copy de-dashed ("Your turn. Draw or take the discard",
+      "no tables open. start one?"); `Call Cambio — ends the game` kept
+      (voice.md-prescribed). aspect-video demo frames kept (screen-ratio
+      demo framing; logged, not churned).
+      **F5.2**: prod build serves / at 200, /dev/components 404 ✓.
+      **F4.2**: compact (390px) render — opponents arc top, own seat
+      docks bottom ✓. **Reduced motion**: emulated — spinner
+      animation-name swaps card-wobble → pulse-soft ✓. All 38 tests +
+      lint + format green after fixes.
 
 ## Surprises & notes for the root plan
 

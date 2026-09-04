@@ -1,6 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority"
 import type * as React from "react"
 
+import { MarkCheck, MarkX } from "../lib/marks.js"
 import { cn } from "../lib/utils.js"
 
 /**
@@ -52,9 +53,7 @@ export function Alert({ className, variant, action, onDismiss, children, ...prop
           !
         </span>
       ) : variant === "success" ? (
-        <span aria-hidden className="font-semibold">
-          ✓
-        </span>
+        <MarkCheck className="size-3 shrink-0" />
       ) : variant === "reconnecting" ? (
         <span
           aria-hidden
@@ -68,9 +67,9 @@ export function Alert({ className, variant, action, onDismiss, children, ...prop
           type="button"
           aria-label="Dismiss"
           onClick={onDismiss}
-          className="cursor-pointer font-semibold transition duration-snap ease-snap focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent-focus focus-visible:outline-solid"
+          className="-m-2 cursor-pointer p-2 transition duration-snap ease-snap focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent-focus focus-visible:outline-solid"
         >
-          ✕
+          <MarkX className="size-3" />
         </button>
       ) : null}
     </div>

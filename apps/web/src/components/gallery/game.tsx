@@ -1,4 +1,5 @@
 import type { Reveal } from "@cambio/contracts"
+import { Button } from "@cambio/ui"
 import * as React from "react"
 
 import { DiscardPile } from "../game/discard-pile.js"
@@ -286,20 +287,15 @@ export function SlamTimerSection() {
       <StateCard label="live demo">
         <div className="flex flex-col items-start gap-2">
           <div className="flex gap-2">
-            <button
-              type="button"
-              className="cursor-pointer font-ui text-sm font-semibold text-accent-action underline"
+            <Button
+              variant="secondary"
               onClick={() => setWindow({ closesAt: Date.now() + 8000, durationMs: 8000 })}
             >
               Open an 8s window
-            </button>
-            <button
-              type="button"
-              className="cursor-pointer font-ui text-sm font-semibold text-accent-action underline"
-              onClick={() => setResolving((current) => !current)}
-            >
+            </Button>
+            <Button variant="secondary" onClick={() => setResolving((current) => !current)}>
               Toggle resolving
-            </button>
+            </Button>
           </div>
           <TableGround>
             <SlamTimer {...(window !== undefined ? { window } : {})} resolving={resolving} />
@@ -314,7 +310,7 @@ export function TurnIndicatorSection() {
   return (
     <Section title="turn-indicator" note="The single textual source of phase truth.">
       <StateCard label="your-turn">
-        <TurnIndicator state="your-turn">Your turn — draw or take the discard</TurnIndicator>
+        <TurnIndicator state="your-turn">Your turn. Draw or take the discard</TurnIndicator>
       </StateCard>
       <StateCard label="other-turn">
         <TurnIndicator state="other-turn">Nadia's turn</TurnIndicator>

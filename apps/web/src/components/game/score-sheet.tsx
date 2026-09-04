@@ -50,13 +50,13 @@ export function ScoreSheet({ reveal, playerName, className }: ScoreSheetProps) {
             <li key={hand.playerId} data-winner={won} className="flex items-center gap-3 py-2">
               <span
                 className={cn(
-                  "w-24 font-ui text-base",
+                  "min-w-0 flex-1 font-ui text-base",
                   won ? "font-bold text-accent-action" : "font-medium text-ink-primary",
                 )}
               >
                 {playerName(hand.playerId)}
               </span>
-              <span className="flex flex-1 gap-1">
+              <span className="flex gap-1">
                 {hand.cards.map(({ slotIndex, card }) => (
                   <PlayingCard key={slotIndex} face="up" card={card} size="sm" />
                 ))}

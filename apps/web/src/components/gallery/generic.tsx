@@ -10,6 +10,7 @@ import {
   List,
   ListRow,
   Loading,
+  MarkSettings,
   Modal,
   Panel,
   Select,
@@ -55,7 +56,7 @@ export function ButtonSection() {
       </StateCard>
       <StateCard label="icon">
         <Button variant="icon" aria-label="Settings">
-          <span aria-hidden>⚙</span>
+          <MarkSettings className="size-4" />
         </Button>
       </StateCard>
       <StateCard label="danger">
@@ -128,20 +129,20 @@ export function PanelSection() {
   return (
     <Section title="panel" note="Static — default only. Never nested more than two deep.">
       <StateCard label="default">
-        <Panel className="w-64">Body copy on raised paper.</Panel>
+        <Panel className="w-3xs">Body copy on raised paper.</Panel>
       </StateCard>
       <StateCard label="default · titled">
-        <Panel className="w-64" title="Room details">
+        <Panel className="w-3xs" title="Room details">
           Body copy on raised paper.
         </Panel>
       </StateCard>
       <StateCard label="plain (grouping without a box)">
-        <Panel variant="plain" className="w-64">
+        <Panel variant="plain" className="w-3xs">
           Body copy, ground only.
         </Panel>
       </StateCard>
       <StateCard label="chrome (one per screen)">
-        <Panel variant="chrome" className="w-64" title="deal me in" titleFace="display">
+        <Panel variant="chrome" className="w-3xs" title="deal me in" titleFace="display">
           The ceremonial dress.
         </Panel>
       </StateCard>
@@ -391,7 +392,7 @@ export function LoadingSection() {
         <Loading delayMs={0} caption="shuffling…" />
       </StateCard>
       <StateCard label="skeleton (matches the real layout)">
-        <div className="w-64">
+        <div className="w-3xs">
           <Skeleton className="h-4 w-3/4" />
           <Skeleton className="mt-2 h-3 w-1/2" />
           <Skeleton className="mt-2 h-3 w-2/3" />
@@ -406,7 +407,7 @@ export function EmptyStateSection() {
     <Section title="empty-state" note="First-use and no-results are distinct by contract.">
       <StateCard label="first-use">
         <EmptyState state="first-use" action={<Button>Start a table</Button>}>
-          no tables open — start one?
+          no tables open. start one?
         </EmptyState>
       </StateCard>
       <StateCard label="no-results">
@@ -434,7 +435,14 @@ export function AlertSection() {
         )}
       </StateCard>
       <StateCard label="alarm (stays until resolved)" wide>
-        <Alert variant="alarm" action={<Button variant="ghost">Retry</Button>}>
+        <Alert
+          variant="alarm"
+          action={
+            <Button variant="ghost" className="text-ink-inverse">
+              Retry
+            </Button>
+          }
+        >
           Couldn't reach the room. Check your connection and retry.
         </Alert>
       </StateCard>
@@ -463,19 +471,19 @@ export function ListSection() {
   return (
     <Section title="list" note="Async/data floor: populated, loading, empty, error, partial.">
       <StateCard label="populated (interactive rows)">
-        <List className="w-72 border-frame">{rows}</List>
+        <List className="w-2xs border-frame">{rows}</List>
       </StateCard>
       <StateCard label="loading (3 skeleton rows)">
-        <List state="loading" className="w-72 border-frame" />
+        <List state="loading" className="w-2xs border-frame" />
       </StateCard>
       <StateCard label="empty">
         <List
           state="empty"
-          className="w-72"
+          className="w-2xs"
           empty={
-            <div className="w-72 rounded-md border-frame bg-surface-raised">
+            <div className="w-2xs rounded-md border-frame bg-surface-raised">
               <EmptyState state="first-use" action={<Button>Start a table</Button>}>
-                no tables open — start one?
+                no tables open. start one?
               </EmptyState>
             </div>
           }
@@ -484,10 +492,17 @@ export function ListSection() {
       <StateCard label="error">
         <List
           state="error"
-          className="w-72"
+          className="w-2xs"
           error={
-            <div className="w-72">
-              <Alert variant="alarm" action={<Button variant="ghost">Retry</Button>}>
+            <div className="w-2xs">
+              <Alert
+                variant="alarm"
+                action={
+                  <Button variant="ghost" className="text-ink-inverse">
+                    Retry
+                  </Button>
+                }
+              >
                 Couldn't load rooms. Retry.
               </Alert>
             </div>
@@ -495,7 +510,7 @@ export function ListSection() {
         />
       </StateCard>
       <StateCard label="partial (trailing skeleton)">
-        <List state="partial" className="w-72 border-frame">
+        <List state="partial" className="w-2xs border-frame">
           {rows}
         </List>
       </StateCard>
@@ -516,7 +531,7 @@ export function TableSection() {
   return (
     <Section title="table" note="Numbers right-align in numeral type with a true minus (−).">
       <StateCard label="populated">
-        <div className="w-80">
+        <div className="w-xs">
           <Table className="border-frame">
             {header}
             <tbody>
@@ -540,7 +555,7 @@ export function TableSection() {
         </div>
       </StateCard>
       <StateCard label="loading">
-        <div className="w-80">
+        <div className="w-xs">
           <Table className="border-frame">
             {header}
             <tbody>
@@ -552,7 +567,7 @@ export function TableSection() {
         </div>
       </StateCard>
       <StateCard label="empty">
-        <div className="w-80">
+        <div className="w-xs">
           <Table className="border-frame">
             {header}
             <tbody>
@@ -564,12 +579,19 @@ export function TableSection() {
         </div>
       </StateCard>
       <StateCard label="error">
-        <div className="w-80">
+        <div className="w-xs">
           <Table className="border-frame">
             {header}
             <tbody>
               <TableStatusRow columns={3}>
-                <Alert variant="alarm" action={<Button variant="ghost">Retry</Button>}>
+                <Alert
+                  variant="alarm"
+                  action={
+                    <Button variant="ghost" className="text-ink-inverse">
+                      Retry
+                    </Button>
+                  }
+                >
                   Couldn't load scores. Retry.
                 </Alert>
               </TableStatusRow>
@@ -578,7 +600,7 @@ export function TableSection() {
         </div>
       </StateCard>
       <StateCard label="partial">
-        <div className="w-80">
+        <div className="w-xs">
           <Table className="border-frame">
             {header}
             <tbody>

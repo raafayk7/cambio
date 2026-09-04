@@ -43,7 +43,7 @@ export function EmptyState({
   return (
     <div
       data-state={state}
-      className={cn("flex flex-col items-center gap-3 py-8 text-center", className)}
+      className={cn("flex flex-col items-center gap-3 py-5 text-center", className)}
       {...props}
     >
       {illustration ?? <SuitMarks />}

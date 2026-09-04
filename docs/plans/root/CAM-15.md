@@ -342,6 +342,26 @@ timestamp each entry)_
   token-expressible scene grounds (plain cream; checkered paving); the
   lobby's illustrated courtyard is an open gap scheduled with CAM-16's
   screens. (User call, round 3.)
+- 2026-09-04 — **Control marks are drawn, not typed**: the gate's D8
+  finding (⚙ ✕ ✓ Unicode glyphs rendered at font metrics, the one
+  undrawn material on the board) is accepted — replaced by inline SVGs
+  (`packages/ui/src/lib/marks.tsx`: MarkX/MarkCheck/MarkSettings) at the
+  2px ink stroke weight. The ♠♥♦♣ suit glyphs stay — declared card
+  motif, identity outranks the gate.
+- 2026-09-04 — **43px control box left as spec'd — conflict surfaced,
+  not auto-fixed**: the gate recommends 44px targets; button.md's canon
+  padding (space.2 × space.5) plus the type scale yields 43px. Design
+  system outranks the gate, so the box stays; flagged for the user as a
+  possible button.md/tokens.md revision (one padding change would move
+  all 28 shared controls). The 24px WCAG floor is met everywhere.
+- 2026-09-04 — **Link hit area**: the bare text link measured 16px vs
+  the 24px floor (the gate's one constraint fail) — fixed inside link.tsx
+  with `py-1 -my-1` (hit area grows, line box unchanged). Inline-link
+  flags on the gallery page itself are the WCAG 2.5.8 inline exception.
+- 2026-09-04 — **Provisional tokens: no adjustments needed.** Rendering
+  all 26 components exercised the type scale, spacing, radius.card ratio,
+  and breakpoints; none required a revision, so no creation-gate round —
+  tokens.md stands as approved in CAM-13.
 - 2026-09-04 — **Hardcheck tokens file lives at
   `packages/ui/hardcheck-tokens.json`**, not under `.agents/` — it
   derives from tokens.md (release-branch content), so placing it in

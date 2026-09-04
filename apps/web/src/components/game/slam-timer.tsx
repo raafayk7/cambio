@@ -60,7 +60,7 @@ export function SlamTimer({ window: slamWindow, resolving = false, className }: 
         aria-valuemin={0}
         aria-valuemax={slamWindow.durationMs}
         aria-valuenow={Math.round(remaining)}
-        className="h-2 w-full min-w-32 overflow-hidden rounded-sm border-interactive bg-surface-raised"
+        className="h-2 w-full overflow-hidden rounded-sm border-interactive bg-surface-raised"
       >
         <div className="h-full bg-accent-alarm" style={{ width: `${pct}%` }} />
       </div>

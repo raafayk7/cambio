@@ -80,6 +80,10 @@
    * 8px × 24px), so p-5 here is 24px, not Tailwind's 20px. Recorded in the
    * CAM-15 plan Decision Log. */
   --spacing-*: initial;
+  /* The bare multiplier must go too — with it alive, any numeric utility
+   * (w-24, p-10) resolves dynamically and off-scale steps sneak back in.
+   * Caught by the design-gate hardcheck during M4. */
+  --spacing: initial;
   --spacing-0: 0px;
   --spacing-1: 4px;
   --spacing-2: 8px;

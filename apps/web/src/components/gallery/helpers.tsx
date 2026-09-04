@@ -39,9 +39,7 @@ export function StateCard({
 }) {
   return (
     <div className={wide ? "flex w-full flex-col gap-2" : "flex flex-col gap-2"}>
-      <span className="font-ui text-xs font-semibold tracking-wide text-ink-muted uppercase">
-        {label}
-      </span>
+      <span className="font-ui text-sm text-ink-muted">{label}</span>
       <div>{children}</div>
     </div>
   )

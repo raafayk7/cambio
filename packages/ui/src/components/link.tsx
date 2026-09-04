@@ -21,7 +21,9 @@ export function Link({ className, asChild = false, ...props }: LinkProps) {
   return (
     <Comp
       className={cn(
-        "font-ui font-medium text-accent-action underline underline-offset-2",
+        // py-1/-my-1: a ≥24px hit area (WCAG 2.5.8) without disturbing the
+        // inline line box — the bare text box measures only 16px.
+        "inline-block py-1 -my-1 font-ui font-medium text-accent-action underline underline-offset-2",
         "transition duration-snap ease-snap",
         "hover:text-(--green-deep) active:text-(--green-deep)",
         "focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent-focus focus-visible:outline-solid",

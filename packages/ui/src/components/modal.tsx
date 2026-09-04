@@ -1,5 +1,6 @@
 import * as React from "react"
 
+import { MarkX } from "../lib/marks.js"
 import { cn } from "../lib/utils.js"
 
 /**
@@ -127,9 +128,9 @@ export function Modal({
           type="button"
           aria-label="Close"
           onClick={requestClose}
-          className="cursor-pointer font-ui text-lg leading-none font-semibold text-ink-primary transition duration-snap ease-snap focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent-focus focus-visible:outline-solid"
+          className="-m-2 cursor-pointer p-2 text-ink-primary transition duration-snap ease-snap focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent-focus focus-visible:outline-solid"
         >
-          ✕
+          <MarkX className="size-4" />
         </button>
       </div>
       <div className="min-h-0 overflow-y-auto p-4">{children}</div>

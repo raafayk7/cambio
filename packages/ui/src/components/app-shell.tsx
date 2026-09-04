@@ -1,5 +1,6 @@
 import type * as React from "react"
 
+import { MarkSettings } from "../lib/marks.js"
 import { cn } from "../lib/utils.js"
 import { Alert } from "./alert.js"
 import { Button } from "./button.js"
@@ -41,9 +42,7 @@ function ConnectionDot({ connection }: { connection: "connected" | "reconnecting
 function SettingsButton({ onSettings }: { onSettings?: (() => void) | undefined }) {
   return (
     <Button variant="icon" aria-label="Settings" {...(onSettings ? { onClick: onSettings } : {})}>
-      <span aria-hidden className="block text-base leading-none">
-        ⚙
-      </span>
+      <MarkSettings className="size-4" />
     </Button>
   )
 }
