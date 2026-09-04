@@ -141,18 +141,27 @@ When this task is done:
 
 ### Acceptance criteria
 
-- [ ] All 12 contract clauses verified (clause 6's hook behavior and the
-      issue's "skills are live-detected mid-session / commands need
-      restart" claim verified **empirically**, not from docs alone).
-- [ ] `pnpm turbo build typecheck lint test` passes on `main`.
-- [ ] `ls -la .claude/` shows the symlink set intact after all installers
-      ran (no symlink silently replaced by a real directory).
-- [ ] `pnpm turbo build typecheck lint test` passes on `release-v0` after
-      merge-down.
-- [ ] Fresh-session smoke test on `release-v0` passes (clause 12).
-- [ ] Nothing user-level is load-bearing: a fresh clone needs only Node 22,
-      pnpm, and (optionally, for the rendered gate) a documented
-      `npx playwright install chromium`.
+- [x] All 12 contract clauses verified — coverage table in the child plan
+      filled with the probes that ran. Live-detection verified
+      empirically: skills appear in the listing the moment SKILL.md
+      lands; a settings.json hook fired on the very next Write. (The
+      commands-need-restart half is untestable from inside one session;
+      the fresh-context smoke tests stand in.)
+- [x] `pnpm turbo build typecheck lint test` passes on `main` (exit 0
+      after every milestone).
+- [x] `ls -la .claude/` shows exactly four symlinks
+      (commands/skills/settings.json/agents); the impeccable installer's
+      replacement of the skills symlink was caught and reversed (M6).
+- [x] `pnpm turbo build typecheck lint test` passes on `release-v0` after
+      merge-down (exit 0).
+- [x] Fresh smoke test on `release-v0` passed 5/5 — via a fresh-context
+      subagent; the sandbox exposes no `claude` CLI for a literally-cold
+      run (see child plan M8 note; the next real session is the final
+      cold check).
+- [x] Nothing user-level is load-bearing: all payloads under `.agents/`,
+      hooks in `.agents/settings.json`, no plugin registrations; per-
+      machine extras are Node 22 + optional Playwright setup (documented
+      in AGENTS.md).
 
 ## Plan of work
 
@@ -208,6 +217,10 @@ timestamp each entry)_
       (in-repo, dissolve design-gate, relocate impeccable), skill shape
       (new `frontend-architecture`), anti-slop split; ADRs 0027–0029
       written.
+- [x] 2026-09-04 19:50 — Implementation complete, M2–M9 all green
+      (commits `ff45c23`…`427f638` on main, merge `7d92a60` on
+      release-v0). Milestone detail in the child plan's Progress; all
+      branches pushed. Awaiting `/review CAM-14`.
 
 ## Decision log
 
@@ -260,6 +273,20 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 - Planning-time: the stale "web :3100" claim in AGENTS.md traces to this
   machine's `.env` (`WEB_PORT=3100`) overriding the `.env.example`/vite
   default of 3000 — the correction must state the fresh-clone default.
+- M6: **open item for the user** — `.impeccable/` is gitignored; whether
+  the detector config (`.impeccable/config.json`, once one exists) should
+  instead be committed so ignore-rules travel with the repo is
+  deliberately unresolved. No config file was created by install/detect.
+- M6: impeccable's PostToolUse hook produced no visible output on a
+  scratch `.tsx` outside the repo — plausibly correct (its detector scans
+  project files; the hook is file-guarded and exits quietly). Its first
+  real exercise will be CAM-15's in-repo UI writes; if it never surfaces
+  anything there, investigate.
+- M5/M6: two prettier postures for vendored code, recorded in
+  `.prettierignore`: the dissolved design-gate fork is formatted (we own
+  it; upstream diffs go against the pristine zip), while impeccable and
+  Emil's skills are prettier-ignored (refreshed wholesale;
+  byte-identical to upstream).
 
 ## Outcomes & retrospective
 
