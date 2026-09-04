@@ -125,3 +125,37 @@ describe("cambioConfig — Gap 2: workspace export subpaths are denied like the 
     expect(errors).toHaveLength(1)
   })
 })
+
+describe("cambioConfig — ui imports no workspace package (MAY_IMPORT ui row, CAM-15)", () => {
+  const cwd = packageDir("../../ui")
+
+  it("blocks packages/ui importing @cambio/contracts", async () => {
+    const errors = await lintErrors(
+      "ui",
+      cwd,
+      "src/probe.ts",
+      'import { PlayerGameView } from "@cambio/contracts"\nexport const probe = PlayerGameView\n',
+    )
+    expect(errors).toHaveLength(1)
+  })
+
+  it("blocks packages/ui importing a workspace export subpath", async () => {
+    const errors = await lintErrors(
+      "ui",
+      cwd,
+      "src/probe.ts",
+      'import { Phase } from "@cambio/domain/testing"\nexport const probe = Phase\n',
+    )
+    expect(errors).toHaveLength(1)
+  })
+
+  it("allows an external npm import in packages/ui (ui/web externals are unrestricted)", async () => {
+    const errors = await lintErrors(
+      "ui",
+      cwd,
+      "src/probe.ts",
+      'import { clsx } from "clsx"\nexport const probe = clsx\n',
+    )
+    expect(errors).toHaveLength(0)
+  })
+})
