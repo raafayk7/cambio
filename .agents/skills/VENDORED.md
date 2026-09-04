@@ -37,6 +37,14 @@ added, refreshed, or removed.
   formatting it would churn every update). Product truth for its
   commands lives in `PRODUCT.md` at the repo root. Its config dir
   `.impeccable/` is gitignored.
+- **Path convention (deliberate split):** impeccable's hook entries and
+  `allowed-tools` address the payload via `.claude/skills/impeccable/…`
+  (the path its installer/updater rewrites), unlike first-party hooks
+  which use `.agents/…` directly; both resolve to the same files through
+  the symlink. Caveat: the hook commands are guarded with
+  `[ ! -f … ] ||`, so if the `.claude/skills` symlink ever breaks, the
+  hooks silently no-op — after any refresh, re-verify the symlink before
+  trusting the hooks.
 - **Refresh:** `npx impeccable update`, then re-verify the `.claude/`
   symlinks, re-lift any hook changes into `.agents/settings.json`, and
   update the version here.
@@ -64,4 +72,6 @@ added, refreshed, or removed.
   `gate`; intent-prep's stale `/impeccable craft` delegation replaced
   with the real command surface plus the Cambio precedence rule;
   advisory-verdict and manual-Playwright notes added; files
-  prettier-formatted.
+  prettier-formatted; `package.json`'s `postinstall` (auto Chromium
+  download) stripped per ADR-0029 and its npm script paths fixed for the
+  flat vendored layout (review fix cycle, F3).

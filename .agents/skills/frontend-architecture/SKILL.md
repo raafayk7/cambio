@@ -14,6 +14,11 @@ rule, the rule belongs in the domain and its visible consequence in the
 
 ## The prime rule, restated from `hidden-information`
 
+- **Card values a player is not entitled to must not exist in any payload
+  sent to that player.** Not hidden by CSS, not present-but-unrendered,
+  not sent-then-filtered client-side. If the bytes reach the browser,
+  assume they are read — so the client never receives, hides, filters, or
+  redacts; the server projection already did.
 - **A missing field is never a client problem to solve.** If the UI needs
   data it doesn't receive, that is a change to `viewFor` and its
   `contracts` schema — made only if the player is entitled to see it.
@@ -25,6 +30,14 @@ rule, the rule belongs in the domain and its visible consequence in the
 - **No shared caches across users.** On the server, one QueryClient per
   request (`apps/web/src/router.tsx` documents why): payloads are
   per-player; a shared cache hands one player another player's view.
+- **Hard prohibitions carried over verbatim:** no Postgres Changes
+  replication to clients, ever; and no Supabase anon-key database access
+  from the browser — clients get no direct database access of any kind.
+  All client data arrives via the API's projections and the Broadcast
+  channels it publishes.
+
+This section is a summary, not a substitute — `hidden-information` is the
+authority and carries the channel discipline this skill doesn't restate.
 
 ## The import boundary (law)
 
@@ -77,23 +90,35 @@ and its best-practices page — stack prescriptions excluded per ADR-0027):
 
 ## Styling and tokens
 
-Tailwind v4, CSS-first, per ADR-0027: every design token is a CSS
-variable in the `@theme` block of `packages/ui/src/styles.css`, mirroring
-`design-system/references/tokens.md` (primitives → semantic roles; the
-four-tier model raw → primitive → semantic → component, kept shallow to
-avoid token proliferation). **No hardcoded visual values anywhere** — an
-arbitrary-value utility (`bg-[#f6dcae]`, `p-[13px]`) is an audit flag.
-New tokens go through the design-system creation gate first (see the
-`design-system` skill), then `@theme`.
+Tailwind v4, CSS-first, per ADR-0027 — read the ADR before implementing;
+this is only its shape: `packages/ui/src/styles.css` mirrors
+`design-system/references/tokens.md`'s **two layers** — primitives live
+as plain CSS custom properties, and only the **semantic roles** are
+promoted to utilities, aliasing primitives via `@theme inline` (so the
+deferred dark theme lands as a role re-mapping). Keep the layering
+shallow — the token-proliferation warning in the Carbonteq reference's
+four-tier model (raw → primitive → semantic → component) applies, but
+Cambio's canonical vocabulary is the two layers in tokens.md, nothing
+more. **No hardcoded visual values anywhere** — an arbitrary-value
+utility (`bg-[#f6dcae]`, `p-[13px]`) is an audit flag. New tokens go
+through the design-system creation gate first (see the `design-system`
+skill), then the styles.
 
 ## What is enforced vs convention
 
-Lint enforces exactly one frontend rule: the workspace-import rows above.
-External npm dependencies in `web`/`ui` are **not** restricted (the
-effect-only policy covers backend layers only), and no test suite runs in
-`apps/web` yet. Everything else in this skill — layering, hooks
-discipline, token usage — is convention held by review and the design
-tooling, so don't mistake a green gate for compliance.
+Lint enforces exactly one **architectural** frontend rule: the
+workspace-import rows above, pinned on release branches by
+`packages/config/test/eslint.base.test.ts` (e.g. "blocks apps/web
+importing the @cambio/domain/testing subpath"); on `main` the claim is
+held by live probe, since that test file lands with the release work.
+(General lint rules — the Zod ban, type-import hygiene — do also apply
+to `web`/`ui`.) External npm dependencies in `web`/`ui` are **not**
+restricted — on release branches the effect-only external-import policy
+(ADR-0017) scopes to the backend layers, and on `main` no such policy
+exists at all. No test suite runs in `apps/web` yet. Everything else in
+this skill — layering, hooks discipline, token usage — is convention
+held by review and the design tooling, so don't mistake a green gate for
+compliance.
 
 ## Routing
 

@@ -221,6 +221,14 @@ timestamp each entry)_
       (commits `ff45c23`…`427f638` on main, merge `7d92a60` on
       release-v0). Milestone detail in the child plan's Progress; all
       branches pushed. Awaiting `/review CAM-14`.
+- [x] 2026-09-04 20:30 — Review: fix-then-ship, 8 findings (retrospective
+      `6efa3cc`). Fix cycle: all eight resolved — F1/F2/F4/F5/F6/F8 by
+      claim amendment (the claims were wrong), F3 by code fix
+      (postinstall stripped, paths corrected, test:hardcheck 25/25),
+      F7 by four-instance sweep. Gate green + convergent post-fix;
+      frontend-architecture grew to 130 lines (over the 80–120 band,
+      accepted for the restored security clauses). Merged down and
+      re-verified; issue → Development Done.
 
 ## Decision log
 
@@ -301,11 +309,11 @@ skill/doc-accuracy defects in the harness content itself — exactly the
 class this repo treats as load-bearing, since future sessions trust
 skills blindly.
 
-### Findings (ranked, all OPEN; the fix cycle works from this list and
+### Findings (ranked; fix cycle 2026-09-04 resolved all eight — per-finding
 
-marks each RESOLVED with the branch taken)
+status and branch taken noted inline)
 
-- **F1 (open) — `frontend-architecture` narrows the hidden-information
+- **F1 (RESOLVED — clauses restored verbatim + both prohibitions added; design-system verb fixed) — `frontend-architecture` narrows the hidden-information
   prime rule.** The "prime rule, restated" section drops the verbatim
   clauses "not hidden by CSS, not present-but-unrendered, not
   sent-then-filtered client-side" and omits both client-relevant hard
@@ -315,7 +323,7 @@ marks each RESOLVED with the branch taken)
   restore the clauses verbatim and add the two prohibitions. Related
   A3-lite: `design-system` skill says "hint at" where the canonical
   router says "display or hint at".
-- **F2 (open) — `frontend-architecture` styling paragraph contradicts
+- **F2 (RESOLVED — claim amended: four-tier re-attributed to the Carbonteq reference, @theme sentence restates ADR-0027s split and defers to the ADR) — `frontend-architecture` styling paragraph contradicts
   canon.** It attributes a "four-tier model raw → primitive → semantic →
   component" to `tokens.md` (which has exactly two layers; the four-tier
   vocabulary is the Carbonteq portal's) and says "every design token is
@@ -323,7 +331,7 @@ marks each RESOLVED with the branch taken)
   (primitives as plain custom properties; only roles promoted via
   `@theme inline`). CAM-15 implements the mapping and will read one of
   these. Fix: re-attribute the four-tier model; restate the ADR's split.
-- **F3 (open) — vendored design-gate `package.json` defects.**
+- **F3 (RESOLVED — postinstall stripped + script paths fixed; npm run test:hardcheck green post-fix; VENDORED.md ledgered) — vendored design-gate `package.json` defects.**
   `"postinstall": "playwright install chromium"` re-introduces the auto
   Chromium download ADR-0029 rejected — the documented step 1
   (`npm install --omit=dev` in AGENTS.md, gate skill, ADR-0029) silently
@@ -332,33 +340,33 @@ marks each RESOLVED with the branch taken)
   (`test:hardcheck` has no other npm path). Fix: strip `postinstall`
   (we own the fork; ledger the fix in VENDORED.md) and correct the
   paths.
-- **F4 (open) — enforcement claim false on `main`.** `frontend-
+- **F4 (RESOLVED — claim amended branch-accurately; regression test now cited by file + name; fourth-instance scar recorded here, not in the branch-shared skill file) — enforcement claim false on `main`.** `frontend-
 architecture`: "the effect-only policy covers backend layers only" —
   `main`'s `eslint.base.js` has no such policy (it lands with CAM-11/12
   on release-v0); probe-verified false where the skill lives. Fourth
   instance of the unverified-enforcement-claim scar. Fix: branch-
   accurate rewording; also cite the release-v0 regression test by
   file + name for the boundary claim (E4).
-- **F5 (open) — `intent-prep` stale delegations.** Frontmatter
+- **F5 (RESOLVED — frontmatter delegation reworded to impeccable + animation skills; enforce-the-floor line now states the advisory model) — `intent-prep` stale delegations.** Frontmatter
   description (the string the skill listing surfaces) still says
   "awesome-design for brand references" — rejected per ADR-0029 and
   contradicted by the skill's own body; and ":83 the gate → verify,
   measure, and enforce the floor" contradicts the advisory model stated
   in gate/AGENTS.md/ADR-0029. Fix: reword both.
-- **F6 (open) — AGENTS.md staleness.** "formatting is enforced, not
+- **F6 (RESOLVED — formatting claim qualified with the carve-out pointer; symlink-convention sentence now lists the full set incl. agents) — AGENTS.md staleness.** "formatting is enforced, not
   aspirational" is unqualified now that `.prettierignore` exempts ~70k
   vendored lines; and the symlink-convention sentences (:9 "skills and
   commands", :66) predate the `agents`/`scripts` additions. Fix: qualify
   with a pointer to `.prettierignore`/VENDORED.md; extend the
   convention sentences.
-- **F7 (open) — false probe claim in the child plan.** The coverage
+- **F7 (RESOLVED by sweep — FOUR instances found and re-scoped: plan-of-work probe text, concrete-steps command, coverage row, M5 Progress entry; one more than the finding listed) — false probe claim in the child plan.** The coverage
   table and M5 text claim "`CLAUDE_PLUGIN_ROOT` grep clean" — the grep
   returns 2 comment hits inside the upstream impeccable payload
   (`staleness-deep.mjs:279,281`). The true claim is "clean excluding the
   upstream impeccable payload". Multi-instance claim: close by sweeping
   every phrasing across both plan docs (table row, M5 plan text, M5
   Progress entry), not by spot-fix.
-- **F8 (open) — `PRODUCT.md` cites release-only ADRs without caveat.**
+- **F8 (RESOLVED — release-branches caveat added, matching the design-system line) — `PRODUCT.md` cites release-only ADRs without caveat.**
   Evidence-on-Hand lists "ADRs 0009–0012, 0021–0023" which don't exist
   on `main`; the neighboring design-system line carries a "(release
   branches)" caveat, this line doesn't. Fix: same caveat.

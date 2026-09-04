@@ -38,9 +38,9 @@ a shortcut.
 - **Every visual value maps to a token.** No hardcoded colors, spacing,
   radii, shadows, easings, or durations — Tailwind utilities come from
   the `@theme` variables (ADR-0027).
-- **Hidden information is design law.** No component may hint at card
-  values the viewer is not entitled to; peeked cards render briefly and
-  are never persisted. When in doubt, load the `hidden-information`
+- **Hidden information is design law.** No component may display or hint
+  at card values the viewer is not entitled to; peeked cards render
+  briefly, then never again — nothing persists what a player once saw. When in doubt, load the `hidden-information`
   skill — `components/core/playing-card.md` is the worked example.
 - **Production doc beats prototype**, and **the design system outranks
   the tooling**: impeccable, the gate family, and the animation skills
