@@ -1,6 +1,7 @@
 import { AppShell } from "@cambio/ui"
 import { createFileRoute, notFound } from "@tanstack/react-router"
 
+import { GameSections } from "../../components/gallery/game.js"
 import { GenericSections } from "../../components/gallery/generic.js"
 
 /**
@@ -27,6 +28,8 @@ function ComponentGallery() {
           </p>
         </div>
         <GenericSections />
+        <h1 className="font-display text-2xl">Game objects</h1>
+        <GameSections />
       </div>
     </AppShell>
   )

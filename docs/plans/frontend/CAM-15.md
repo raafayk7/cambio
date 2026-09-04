@@ -539,6 +539,22 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       --tracking-wide, card-wobble/pulse-soft animations. Bug caught by
       rendered check: a bare `flex` on <dialog> overrode the UA's
       closed-dialog display:none — fixed with `hidden open:flex`.
+- [x] 2026-09-04 15:40 — M3 complete: all 9 game objects in
+      `apps/web/src/components/game/` (playing-card, hand, seat-arc.ts +
+      table-surface, seat, draw-deck, discard-pile, slam-timer,
+      turn-indicator, score-sheet), typed against contracts (CardSlug,
+      SlotIndex, Timestamp, Reveal, Uuid). Test-first suites green:
+      seat-arc (5 — radial geometry, viewer rotation, 72° spacing),
+      playing-card (5 — structural entitlement, 7-state floor, memory
+      fidelity via DOM equality), hand (5 — holes stay holes, stable
+      indices, 2×2 floor, faces only with values), slam-timer (4 — linear
+      drain, fixed close, resolving pause, floor at 0), plus score-sheet
+      (4 — total-order, winners incl. ties, true minus). 24 web tests
+      total. Gallery game sections added; card states mount on a
+      surface-table ground (backs/vacancies are designed for green).
+      styles.css grew card-frame/card-lg/md/sm, card-rank/card-pip,
+      text-shadow-poster utilities. Full gate for config/ui/web green;
+      full-page render inspected (2 slices) — spec-true.
 
 ## Surprises & notes for the root plan
 

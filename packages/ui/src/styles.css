@@ -200,6 +200,41 @@
   border-radius: calc(var(--card-width, 100px) * var(--radius-card-ratio));
 }
 
+/* Card footprints (playing-card.md: size scales by context; rank scales
+ * with the card). Widths derive from the spacing scale; the 5/7 aspect is
+ * the playing-card proportion. card-frame is the shared slot footprint —
+ * cards and empty hand slots (hand.md) both use it. */
+@utility card-frame {
+  width: var(--card-width);
+  aspect-ratio: 5 / 7;
+  border-radius: calc(var(--card-width) * var(--radius-card-ratio));
+}
+@utility card-lg {
+  --card-width: calc(var(--spacing-7) * 2);
+}
+@utility card-md {
+  --card-width: var(--spacing-8);
+}
+@utility card-sm {
+  --card-width: var(--spacing-6);
+}
+
+/* Rank and pip scale with the card, not the page (playing-card.md). */
+@utility card-rank {
+  font-size: calc(var(--card-width, 100px) * 0.3);
+  line-height: 1.1;
+}
+@utility card-pip {
+  font-size: calc(var(--card-width, 100px) * 0.26);
+}
+
+/* Poster text on alarm grounds (slam-timer.md): display face in
+ * ink.inverse with the offset ink shadow — large text passes contrast on
+ * accent.alarm (tokens.md §Contrast). */
+@utility text-shadow-poster {
+  text-shadow: 3px 3px 0 var(--ink);
+}
+
 /* numeral role: ui face with tabular numerals; minus signs are data. */
 @utility font-numeral {
   font-family: var(--font-ui);
