@@ -23,6 +23,12 @@ symlinked from `.agents/`, which is the source of truth for skills and commands.
   silently contradict.
 - **[docs/DECISIONS.md](docs/DECISIONS.md)** — scaffold-era decisions, now
   migrated to ADRs; kept for history.
+- **`design-system/`** — the visual identity: every component, token,
+  pattern, and copy rule for the UI. The router is
+  `design-system/design-system.md`; enter through it, not the folder.
+  **It lives on release branches only** — if the folder is absent you are
+  on `main` or `development`; stop and say so rather than inventing
+  components or tokens from memory. See the `design-system` skill.
 
 Three standing directives from the handoff:
 
@@ -69,6 +75,32 @@ Layer-specific rules live in skills under `.agents/skills/` (portable
 - `hidden-information` — the `viewFor` projection rule and realtime channel
   discipline (security-critical)
 - `adr` — when and how to write an ADR
+- `frontend-architecture` — the client as projection renderer;
+  pages/containers/components layering; the `apps/web` vs `packages/ui`
+  split
+- `design-system` — router into `design-system/` (release branches only);
+  the creation gate
+- `ai-tells` — the repo-facing design audit: scores UI output against the
+  design system for AI-default tells (adapted from Carbonteq's original in
+  `docs/design/resources/`)
+- design-gate family (vendored per ADR-0029, dissolved from Carbonteq's
+  plugin): `gate` — the evaluation pipeline (decompose → map → judge, WCAG
+  hard checks, **verdicts advisory**); `design-context`,
+  `rubric-principles`, `hard-checks`, `intent-prep`, `annotated-exemplars`
+  as its supporting skills; `ai-slop` is **gate-internal** — the
+  repo-facing audit is `ai-tells`
+- `impeccable` — craft linting (installed from pbakaus/impeccable,
+  relocated into `.agents/`; product truth in `PRODUCT.md`)
+- animation set from emilkowalski/skills (MIT): `animate`,
+  `review-animations`, `find-animation-opportunities`,
+  `animation-vocabulary`
+
+**Precedence:** the design system outranks impeccable, the gate family,
+and the animation skills — always. They judge execution quality, never
+components, tokens, or identity; when a generic flag hits deliberate
+Cambio identity (cream paper, poster display face), surface the conflict,
+never auto-"fix". Third-party provenance and licenses:
+`.agents/skills/VENDORED.md`.
 
 ## Workflow
 
@@ -99,6 +131,10 @@ the Linear document
 (deliberately — an in-repo pointer would differ across branches); the
 workflow commands read it, sync the release branch, and never commit to the
 release branch directly except `/plan`'s docs-only commit. See ADR-0008.
+**Exception (ADR-0028):** harness/meta changes — this file, `.agents/`,
+harness-task plan docs and ADRs — commit directly to `main` and propagate
+by merge-down (`main` → `development` → release branch); the merge-down is
+part of the harness task's definition of done.
 
 ## Development
 
@@ -108,7 +144,7 @@ Node 22 (nvm) and pnpm 9. Postgres runs in Docker on host port **5433**.
 docker compose -f docker/docker-compose.yml up -d   # start Postgres
 pnpm install
 pnpm --filter @cambio/api migrate                   # apply SQL migrations
-pnpm dev                                            # api :3001, web :3100
+pnpm dev                                            # api :3001, web :3000 (WEB_PORT overrides)
 pnpm turbo build typecheck lint test                # the full gate
 ```
 
@@ -142,6 +178,19 @@ across lines inside a list item makes prettier **non-convergent**
 (`--write` output still fails `--check`, forever). Keep inline code spans
 on one line; if a sentence forces a break, rephrase it.
 
+**Design hooks (advisory, never blocking).** Two more PostToolUse hooks
+watch `Edit|Write`: the design-gate auto-nudge
+(`.agents/scripts/design-gate/auto-gate.mjs`) fires on `.tsx`/`.jsx`/
+`.html` writes (skipping test/spec/stories/config files) and suggests
+running the `gate` skill; impeccable's detector
+(`.claude/skills/impeccable/scripts/hook.mjs`, plus a Stop-time deep
+pass) runs its deterministic checks on UI files. Both only add context.
+The **rendered** gate path (screenshot + WCAG hard checks) needs a
+one-time per-machine setup — from `.agents/scripts/design-gate/`:
+`npm install --omit=dev` then `npx playwright install chromium`. Nothing
+downloads at session start, and no user-level install is load-bearing:
+everything lives in the repo (ADR-0029).
+
 Environment lives in `.env` at the repo root (copy from `.env.example`). Tests
 are vitest + `@effect/vitest`; domain work is test-first (HANDOFF §12).
 
@@ -151,9 +200,29 @@ line above and retry. Data persists across restarts in the `cambio-pgdata`
 volume, so starting it is always safe. Migrations are idempotent; re-run
 `pnpm --filter @cambio/api migrate` after starting if in doubt.
 
-## Frontend note
+## Frontend
 
-The backend comes first. Frontend skills are deliberately deferred until the
-design system is decided — until then `apps/web` stays at scaffold level, and
-its only architectural rule is the import boundary above (it sees `contracts`
-and `ui`, never the domain).
+The design system landed in CAM-13 and the frontend harness in CAM-14; the
+deferral is over. The rules, in rank order:
+
+1. **The client is a projection renderer, not a second clean
+   architecture.** `apps/web` sees `contracts` and `ui` only and renders
+   whatever `viewFor` sent it; business rules never migrate into
+   containers or hooks. The `frontend-architecture` skill carries the
+   layering; `hidden-information` carries the security law (a missing
+   field is a `viewFor`/contracts change, never a client workaround).
+2. **The design system is visual law.** All UI identity — components,
+   tokens, motion, copy — comes from `design-system/` via the
+   `design-system` skill, which also carries the creation gate (nothing
+   canonical is invented without stopping). Styling is Tailwind v4 with
+   tokens as `@theme` CSS variables (ADR-0027); no hardcoded values.
+3. **The tooling judges craft, not identity.** The gate family evaluates
+   (verdicts advisory until Carbonteq's validation labeling lands),
+   `ai-tells` audits for AI defaults, impeccable lints craft, Emil's
+   skills govern animation execution. The design system outranks them
+   all; conflicts get surfaced, never auto-resolved.
+
+To refresh impeccable: `npx impeccable update`, then re-verify the
+`.claude/` symlinks and that hook entries still live in
+`.agents/settings.json` (installers may write through or replace the
+symlinks — see ADR-0029).

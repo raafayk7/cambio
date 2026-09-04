@@ -562,7 +562,11 @@ probe.)_
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
-- [ ] M2 — AGENTS.md + workflow plumbing
+- [x] 2026-09-04 17:15 — M2 — AGENTS.md (sources-of-truth entry, skills
+      roster + precedence, design-hooks narrative, port fix to 3000 with
+      `WEB_PORT` note, `## Frontend` section, ADR-0028 pointer in
+      Branching) + rosters in implement.md/review.md/child-plan template.
+      Gate green.
 - [ ] M3 — frontend-architecture + design-system skills
 - [ ] M4 — ai-tells adaptation
 - [ ] M5 — design-gate dissolution + hook verified

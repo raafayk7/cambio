@@ -42,8 +42,10 @@ Follow the root plan's milestone order. Rules of engagement:
 - **Lanes:** if both backend and frontend child plans exist, implement the
   shared `contracts` changes first (per the root plan), then run one
   subagent per lane in parallel, each given its child plan and told which
-  skills govern its layers (`architecture` always; `effect-domain-modeling`,
-  `application-layer`, `infrastructure-persistence`, `hidden-information`,
+  skills govern its layers (`architecture` always; backend:
+  `effect-domain-modeling`, `application-layer`,
+  `infrastructure-persistence`; frontend: `frontend-architecture`,
+  `design-system`, `ai-tells`; both sides: `hidden-information`,
   `cambio-rules` as applicable). Single-lane tasks: implement directly, same
   skill discipline.
 - **TDD where the plan says so** — domain work is always test-first
