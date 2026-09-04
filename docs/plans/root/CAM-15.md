@@ -178,7 +178,13 @@ Clause IDs are referenced by the frontend child plan's coverage table.
 - **F5.1** A dev-only route `/dev/components` mounts all 26 components in
   **every** MVS state their class requires (including motion states,
   demonstrable via controls or looping demos, and reduced-motion
-  behavior).
+  behavior). _(Amended in the review fix cycle, finding R1, user-approved:
+  four states are cross-component choreography or one-shot entrance
+  animation and are excluded from the gallery's floor — draw-deck
+  `empty→reshuffling` and `draw`, discard-pile `receiving`, and
+  score-sheet `revealing`. They are CAM-16 game-screen work, per the
+  CSS-only motion Decision Log entry. Hand `growing`/`shrinking` and
+  `inert` are per-component states and ARE mounted.)_
 - **F5.2** The route is excluded from production behavior: in production
   builds it renders nothing/404 (DEV-gated); no new environment variable
   is introduced.
@@ -202,24 +208,35 @@ Clause IDs are referenced by the frontend child plan's coverage table.
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes (run bare — never
-      piped).
-- [ ] All 26 components exist in their decided homes and export cleanly;
-      the gallery renders all of them in dev.
-- [ ] tokens.md ↔ styles.css convergence audit: every tokens.md value
-      present, no extra visual vocabulary in the CSS (divergence is a
-      defect per ADR-0027).
-- [ ] Grep sweeps clean: no stale shadcn utilities, no arbitrary-value
-      utilities, no hardcoded token-covered values in `ui`/`web` source.
-- [ ] Design-gate rendered run over the gallery completed; WCAG hard-check
-      results recorded (contrast rules from tokens.md §Contrast hold, incl.
-      small-text-on-alarm using `accent.alarm-deep`).
-- [ ] ai-tells audit run and scored; findings addressed or explicitly
-      logged as deliberate identity.
-- [ ] Any adjustment to provisional tokens.md values (type scale, spacing,
-      radius.card, breakpoints) went through the creation gate with user
-      approval and landed as a tokens.md revision — or none were needed.
-- [ ] ADR-0030 and ADR-0031 remain accurate to what was built.
+- [x] `pnpm turbo build typecheck lint test` passes (run bare — never
+      piped). 24/24 tasks, 443 tests (194 domain + 83 application + 112
+      api + 16 config + 14 ui + 24 web), 2026-09-04. _(Amended in the
+      review fix cycle: originally misstated as 429 — bad arithmetic,
+      finding R5a; frontend counts grew further in the fix cycle.)_
+- [x] All 26 components exist in their decided homes and export cleanly;
+      the gallery renders all of them in dev (rendered + inspected at
+      M2/M3/M4). _(Fix cycle: state coverage completed per amended F5.1 —
+      hand growing/shrinking/inert added; the four choreography states
+      are excluded by the clause amendment.)_
+- [x] tokens.md ↔ styles.css convergence audit: every tokens.md value
+      present, no extra visual vocabulary (additions all spec-cited);
+      audited at M1, re-audited at M4 after the `--spacing` wipe fix.
+- [x] Grep sweeps clean: stale-shadcn, arbitrary-value, raw-hex,
+      font-family, and (added at M4) off-scale numeric-utility sweeps all
+      empty over `ui`/`web` source.
+- [x] Design-gate rendered run over the gallery completed — final
+      hardcheck **PASS** (0 constraint fails; contrast clean over all
+      sampled nodes, incl. alarm surfaces after the ghost-Retry fix);
+      results in the frontend plan's M4 Progress entry.
+- [x] ai-tells audit run: **4/30** ("invisible"); all three fixes
+      applied; deliberate identity confirmed untouched (its "defensibly
+      intentional" list matches the Decision Log).
+- [x] Provisional tokens.md values: none needed adjustment — recorded in
+      the Decision Log; no creation-gate round required.
+- [x] ADR-0030 and ADR-0031 remain accurate to what was built
+      (testing-library + jsdom exactly as specified; fontsource
+      alfa-slab-one 400 + archivo 400/500/600/700 imported in
+      styles.css).
 
 ## Plan of work
 
@@ -291,7 +308,22 @@ patterns; audits run when there is a complete surface to audit.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-04 — plan written; awaiting sign-off
+- [x] 2026-09-04 — plan written; signed off; committed 9a70ee4
+- [x] 2026-09-04 — M0–M5 implemented on the task branch (see the frontend
+      child plan's Progress for the milestone-by-milestone record):
+      test infra + ui-boundary pins (c480fac), token layer + fonts +
+      button (6d58d70), gallery + 17 generic components (71c73bb), 9 game
+      objects (ed47426), audit pass with gate/ai-tells/hardcheck fixes
+      (3c61e38), close-out (coverage table filled, module layout
+      reconciled, acceptance criteria verified, full gate green).
+- [x] 2026-09-04 — Review fix cycle complete: R1–R8 + R10 resolved (see
+      Outcomes & Retrospective for the branch taken per finding), R9
+      advisories (c) NaN guard, (d) rule-consistent fixture, (b) gallery
+      timer cleanup applied; wordmark prop (R9a) deliberately not taken.
+      Verification: ui 15 + web 26 tests green (3 new tests), all sweeps
+      re-run clean with toast.tsx grep-visible, reduced-motion cross-fade
+      verified by executed probe, hardcheck PASS, hand
+      growing/shrinking/inert rendered and inspected.
 
 ## Decision log
 
@@ -331,7 +363,11 @@ timestamp each entry)_
   (User call, round 3.)
 - 2026-09-04 — **`rounded-full` blessed as the pill idiom** for badge
   count and seat pills: "fully rounded" is a shape idiom (9999px), not a
-  scale value; no `radius.full` token minted. (User call, round 3.)
+  scale value; no tokens.md entry is minted. _(Wording amended in the
+  review fix cycle, finding R5b: styles.css DOES define `--radius-full`
+  in `@theme` — that is the mechanism that keeps `rounded-full` alive
+  after the radius namespace wipe, not a new tokens.md value.)_
+  (User call, round 3.)
 - 2026-09-04 — **Spec-carried values are canon, theme-fixed surfaces
   recorded**: opacity levels, toast dwell, thrown angles implement as
   component CSS citing their spec file — no tokens.md promotion; the
@@ -342,11 +378,57 @@ timestamp each entry)_
   token-expressible scene grounds (plain cream; checkered paving); the
   lobby's illustrated courtyard is an open gap scheduled with CAM-16's
   screens. (User call, round 3.)
+- 2026-09-04 — **Control marks are drawn, not typed**: the gate's D8
+  finding (⚙ ✕ ✓ Unicode glyphs rendered at font metrics, the one
+  undrawn material on the board) is accepted — replaced by inline SVGs
+  (`packages/ui/src/lib/marks.tsx`: MarkX/MarkCheck/MarkSettings) at the
+  2px ink stroke weight. The ♠♥♦♣ suit glyphs stay — declared card
+  motif, identity outranks the gate.
+- 2026-09-04 — **43px control box left as spec'd — conflict surfaced,
+  not auto-fixed**: the gate recommends 44px targets; button.md's canon
+  padding (space.2 × space.5) plus the type scale yields 43px. Design
+  system outranks the gate, so the box stays; flagged for the user as a
+  possible button.md/tokens.md revision (one padding change would move
+  all 28 shared controls). The 24px WCAG floor is met everywhere.
+- 2026-09-04 — **Link hit area**: the bare text link measured 16px vs
+  the 24px floor (the gate's one constraint fail) — fixed inside link.tsx
+  with `py-1 -my-1` (hit area grows, line box unchanged). Inline-link
+  flags on the gallery page itself are the WCAG 2.5.8 inline exception.
+- 2026-09-04 — **Provisional tokens: no adjustments needed.** Rendering
+  all 26 components exercised the type scale, spacing, radius.card ratio,
+  and breakpoints; none required a revision, so no creation-gate round —
+  tokens.md stands as approved in CAM-13.
+- 2026-09-04 — **`.claude/launch.json` stays with the task branch**
+  (review finding R7): it configures launching `@cambio/web`, which is
+  release-branch content — the same routing logic as
+  `hardcheck-tokens.json` — and Claude Code requires the file at that
+  literal path (it is tool-read config, not authored harness content, so
+  the `.agents/`-symlink convention doesn't apply). The `.agents/`
+  lockfile drift from M0's npm install was reverted on this branch (R6);
+  ADR-0028 remains undisturbed.
 - 2026-09-04 — **Hardcheck tokens file lives at
   `packages/ui/hardcheck-tokens.json`**, not under `.agents/` — it
   derives from tokens.md (release-branch content), so placing it in
   harness territory would collide with ADR-0028's land-on-main rule.
   (Planner call resolving the child plan's flag.)
+- 2026-09-04 — **Spacing utilities are named ordinally**: `space.N` in
+  the component specs indexes the tokens.md scale 1-based (button.md's
+  "space.2 × space.5" = 8px × 24px), so `--spacing-5` is 24px — not
+  Tailwind's 20px — and the scale is enumerated (`--spacing-*: initial`)
+  so off-scale steps don't exist. Every spec reference (`space.1`–`.5`)
+  is only consistent with the ordinal reading; verified by grep across
+  `design-system/`.
+- 2026-09-04 — **Shared interactive idioms live as `@utility` rules in
+  styles.css**: the one-step hover darken (`ground-*`, button.md's "mix
+  8% ink" — spec-carried) and the papery press (`press-raised`) are
+  utilities because multiple interactive components share them; both cite
+  their spec in the CSS.
+- 2026-09-04 — **Button `icon` variant takes the secondary ground**
+  (spec leaves the icon ground unstated; square `p-2`, aria-label
+  required) and **`danger` defaults to `accent.alarm-deep`** (labels are
+  small by default; tokens.md's contrast rule reserves `accent.alarm`
+  for large/display labels — the CAM-16 Slam composition overrides at
+  the use site).
 
 ## Surprises & discoveries
 
@@ -362,4 +444,102 @@ timestamp each entry)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+**Review 2026-09-04 — verdict: FIX-THEN-SHIP.** Two read-only reviewers
+(contract, architecture) + independent verification: forced fresh test
+runs (`--force`; config 16 / ui 14 / web 24 / api 112 against live
+Postgres — all green; full-repo total **443**, not the 429 claimed), all
+five grep sweeps re-run clean, and 4 executed timer probes on SlamTimer
+edges (zero-duration, past window, resolving-after-close, mid-drain
+unmount — all pass; probe file deleted after). No hidden-information leak
+found; no test-title fraud — every coverage-table test exists with its
+exact name and asserts what its row claims. Import boundaries clean;
+game components presentational; useEffect discipline clean; router
+safeguard untouched; `design-system/` untouched.
+
+### Findings (fix cycle works from this list)
+
+- **R1 (contract, F5.1 — violated in part).** The gallery does not mount
+  every game-object floor state: hand `inert` (prop exists, never
+  mounted), hand `growing`/`shrinking` (HandProps cannot express per-slot
+  flight), draw-deck `empty→reshuffling`/`draw`, discard-pile
+  `receiving`, score-sheet `revealing`. The acceptance box "the gallery
+  renders all of them" and F5.1's "every MVS state" overclaim. Branches:
+  mount/extend (inert is trivial; per-slot flight props for hand;
+  transitional states as toggle/looping demos) or amend F5.1 with an
+  explicit carve-out for CAM-16 flight choreography (the CSS-only
+  Decision Log entry gestures at this but the clause was never amended) —
+  user's call which states go which way. RESOLVED (fix cycle, user-approved split): hand `inert` mounted; HandProps extended with `inFlightSlot` + `leaving` and growing/shrinking mounted, pinned by two new hand tests; the four cross-component choreography states carved out by an inline F5.1 amendment.
+- **R2 (contract, F3.8 — partial).** Reduced motion: the card flip gets
+  `motion-reduce:transition-none` (instant swap), not the cross-fade
+  playing-card.md specifies; selected-lift/leaving-rotate transforms have
+  no motion-reduce branch; the accent.focus origin/destination highlight
+  is deferred to CAM-16's moving container (defensible — it needs slot
+  choreography — but unstated in the contract). Fix: cross-fade the flip
+  under motion-reduce; note the highlight deferral at the clause.
+  RESOLVED (fix cycle, implementation strengthened): the flip now cross-fades under motion-reduce (flipper never rotates; faces swap via opacity at duration.snap) — verified by an executed reduced-motion probe (flipper transform none, back opacity 0, face opacity 1, transition-property opacity); outer state transitions get motion-reduce:transition-none (state survives, movement goes); the highlight deferral is noted in the F3.8 coverage row.
+- **R3 (contract, F2.1 spec drifts).** (a) playing-card `selected` omits
+  the spec'd `accent.focus` ring (has lift + shadow-float only —
+  playing-card.md state 4 says "same visual language as keyboard focus");
+  (b) field-scaffold has no `read-only` mode ("label + value text only").
+  RESOLVED (fix cycle, implementation strengthened): selected now carries the accent.focus ring + lift (playing-card.tsx); FieldScaffold gained `readOnlyValue` rendering label + value text only, pinned by a new test; gallery updated.
+- **R4 (violation, repo hygiene).** `packages/ui/src/components/toast.tsx`
+  contains a literal NUL byte (0x00, byte 3625) in the effect-dep
+  separator `join("\x00")` — meant to be a plain separator. Git treats
+  the file as **binary** (undiffable) and grep skips it, which quietly
+  excluded it from every F1.5 sweep. Fix the byte, then re-run all
+  sweeps including this file. RESOLVED (fix cycle): NUL replaced with a comma separator; the diff no longer contains binary files; ALL sweeps re-run with toast.tsx visible — clean, including a repo-wide NUL scan.
+- **R5 (doc claims false — close by sweep, not spot-fix).**
+  (a) "**429 tests**": instances = root plan Acceptance criteria
+  (this file) and the 2026-09-04 implementation Linear comment; true
+  count 443 (194+83+112+16+14+24). (b) "**no `radius.full` token
+  minted**": instances = root Decision Log (round-3 pill entry) and the
+  child plan's Surprises resolution — but styles.css does define
+  `--radius-full` in `@theme` (required to keep `rounded-full` alive
+  after the wipe); amend wording to "no tokens.md entry; the CSS carries
+  `--radius-full` as the wipe-survival mechanism". Fixer must re-grep
+  all phrasings across every plan doc + ADRs before closing.
+  RESOLVED (fix cycle, claims amended by sweep): grep for `429` and `radius.full`/`radius-full` across docs/plans/ + docs/adr/ found and amended every instance (root acceptance criterion with amendment note; root Decision Log pill entry; child Surprises resolution); the outdated implementation Linear comment was edited to 443. The only other `429` hit is CAM-7's unrelated line-number citation.
+- **R6 (deviation-not-logged).**
+  `.agents/scripts/design-gate/package-lock.json` was modified on the
+  task branch (M0 `npm install` side effect; removes `hasInstallScript`)
+  — `.agents/` routes to `main` per ADR-0028. Revert the file on this
+  branch. RESOLVED (fix cycle): reverted via `git checkout release-v0 -- .agents/scripts/design-gate/package-lock.json`; the committed diff no longer touches `.agents/`.
+- **R7 (deviation-not-logged).** `.claude/launch.json` is a new real file
+  in `.claude/` on the task branch; the AGENTS.md convention makes
+  `.claude/` symlinks-from-`.agents/`, and ADR-0028 routes harness config
+  to `main`. Counter-reading: it launches `@cambio/web`, release-branch
+  content (same logic as `hardcheck-tokens.json`). Needs an explicit
+  routing decision recorded either way. RESOLVED (fix cycle, decision logged): `.claude/launch.json` stays with the task branch — tool-read config at a literal path configuring release-branch app content; recorded in the Decision Log.
+- **R8 (ADR-0027 gap).** The `@theme` wipe omits `--ease-*` — stock
+  `ease-in`/`ease-out`/`ease-in-out` utilities still exist to be reached
+  for, against the two-easing-token vocabulary. Add `--ease-*: initial`.
+  Also log that `--container-*` is deliberately kept (layout measure
+  scale used by modal/gallery/demo widths; not visual-identity
+  vocabulary). RESOLVED (fix cycle): `--ease-*: initial` added to the wipe with a comment recording that `--container-*` is deliberately kept as the layout measure scale.
+- **R9 (advisories — fix optional, user's call).**
+  (a) AppShell hardcodes the "Cambio" wordmark + `state: "game"` naming
+  inside `packages/ui` — spec-carried (app-shell.md), surfaced as the
+  known tension with the zero-app-knowledge rule; a `wordmark` prop
+  would resolve it. (b) Gallery peek demo: un-cleaned `setTimeout` +
+  local state named `window` shadowing the global (dev-only).
+  (c) SlamTimer with `durationMs: 0` produces `NaN%` width — masked by
+  the closed state's `opacity-0`; a guard would harden it (probe-backed).
+  (d) score-sheet **test** fixture gives a lone `KS` hand a total of 13 —
+  rule-inconsistent flavor (black king is −1); ScoreSheet never computes,
+  but fixture data shouldn't contradict the rules. (e) A stale turbo
+  cache entry existed for a working-tree web state (28 tests incl. a
+  since-deleted probe file); forced fresh runs were used for all review
+  evidence — no repo change needed, noted for cache hygiene.
+- **R10 (skill staleness).** `frontend-architecture` SKILL.md states "No
+  test suite runs in `apps/web` yet" — now false (24-test suite landed).
+  Harness fix routed to `main` per ADR-0028: correct that sentence (and
+  scan the same skill for the MAY_IMPORT-pin phrasing, which this task
+  also extended with ui-row pins). RESOLVED (fix cycle): sentence corrected on `main` (frontend test suites now exist per ADR-0030; MAY_IMPORT pin example extended to mention the ui rows) and merged down main → development → release-v0 per ADR-0028.
+
+### What passed
+
+Token layer (F1.1–F1.6) exact against ADR-0027 + tokens.md (with R8 as
+the one wipe gap); entitlement structure (F3.3/F3.4) leak-proof incl.
+spread-abuse check; seat-arc geometry verified mathematically; F2.3 pins
+real; F5.2 prod gating real; audits corroborated by their fix artifacts.
+Coverage table: no test-name or assertion discrepancies.
