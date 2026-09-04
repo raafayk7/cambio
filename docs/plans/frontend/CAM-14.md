@@ -573,7 +573,14 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       `import "@cambio/domain"` in apps/web fails eslint with the
       boundaries rationale). Both skills live-detected mid-session. Gate
       green.
-- [ ] M4 — ai-tells adaptation
+- [x] 2026-09-04 17:55 — M4 — ai-tells adapted into
+      `.agents/skills/ai-tells/` (house frontmatter; repo surfaces replace
+      the app/ paths; three dangling skill refs removed; cn()/@theme
+      re-scoped as sanctioned; category 8 re-anchored to game-screen
+      rhythm; cream-defensibly-intentional calibration; grading anchored
+      to tokens.md/voice.md with the pattern-only-on-main fallback). Grep
+      for Next.js-isms clean except the deliberate foreign-stack row.
+      Live-detected. Gate green.
 - [ ] M5 — design-gate dissolution + hook verified
 - [ ] M6 — impeccable install/relocate + PRODUCT.md
 - [ ] M7 — Emil's skills + attribution ledger
