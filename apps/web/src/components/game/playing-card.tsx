@@ -63,9 +63,14 @@ export function PlayingCard(props: PlayingCardProps) {
       data-in-flight={inFlight ? "true" : undefined}
       data-leaving-play={leavingPlay ? "true" : undefined}
       className={cn(
-        "card-frame relative transition duration-snap ease-snap perspective-normal",
+        // motion-reduce: state transitions jump — the lifted/rotated state
+        // itself survives, only the movement goes (tokens.md §Motion).
+        "card-frame relative transition duration-snap ease-snap perspective-normal motion-reduce:transition-none",
         sizeClass,
-        selected && "z-10 -translate-y-1",
+        // selected: lift + accent.focus ring — same visual language as
+        // keyboard focus (playing-card.md state 4; review finding R3a).
+        selected &&
+          "z-10 -translate-y-1 outline-3 outline-offset-2 outline-accent-focus outline-solid",
         (inFlight || leavingPlay) && "z-20 duration-track",
         leavingPlay && "rotate-6",
         className,
@@ -73,7 +78,10 @@ export function PlayingCard(props: PlayingCardProps) {
     >
       <div
         className={cn(
-          "relative size-full transition-transform duration-snap ease-snap transform-3d motion-reduce:transition-none",
+          // Reduced motion: the 3D flip collapses to a cross-fade
+          // (playing-card.md; review finding R2) — the flipper never
+          // rotates and the two faces swap by opacity instead.
+          "relative size-full transition-transform duration-snap ease-snap transform-3d motion-reduce:transition-none motion-reduce:transform-none",
           showFace && "rotate-y-180",
         )}
       >
@@ -81,12 +89,16 @@ export function PlayingCard(props: PlayingCardProps) {
           aria-hidden
           className={cn(
             "absolute inset-0 border-interactive card-frame card-back-mark backface-hidden",
+            "motion-reduce:transition-opacity motion-reduce:duration-snap motion-reduce:ease-snap",
+            showFace ? "motion-reduce:opacity-0" : "motion-reduce:opacity-100",
             selected || inFlight || leavingPlay ? "shadow-float" : "shadow-raised",
           )}
         />
         <span
           className={cn(
             "absolute inset-0 rotate-y-180 border-interactive card-frame bg-surface-raised backface-hidden",
+            "motion-reduce:transition-opacity motion-reduce:duration-snap motion-reduce:ease-snap motion-reduce:transform-none",
+            showFace ? "motion-reduce:opacity-100" : "motion-reduce:opacity-0",
             selected || inFlight || leavingPlay ? "shadow-float" : "shadow-raised",
           )}
         >

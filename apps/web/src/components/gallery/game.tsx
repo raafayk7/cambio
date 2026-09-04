@@ -61,6 +61,8 @@ const FIXTURE_REVEAL: Reveal = {
 
 export function PlayingCardSection() {
   const [peeking, setPeeking] = React.useState(false)
+  const peekTimer = React.useRef<number | undefined>(undefined)
+  React.useEffect(() => () => window.clearTimeout(peekTimer.current), [])
   return (
     <Section
       title="playing-card"
@@ -87,7 +89,8 @@ export function PlayingCardSection() {
             className="block cursor-pointer"
             onClick={() => {
               setPeeking(true)
-              window.setTimeout(() => setPeeking(false), 2000)
+              window.clearTimeout(peekTimer.current)
+              peekTimer.current = window.setTimeout(() => setPeeking(false), 2000)
             }}
             aria-label="Peek at the card"
           >
@@ -160,6 +163,21 @@ export function HandSection() {
             slamWindow
             faces={[{ slotIndex: 2, card: "8H" }]}
           />
+        </TableGround>
+      </StateCard>
+      <StateCard label="growing (penalty arrives in-flight, slot 4)">
+        <TableGround>
+          <Hand variant="own" slots={[0, 1, 2, 3]} inFlightSlot={4} />
+        </TableGround>
+      </StateCard>
+      <StateCard label="shrinking (slammed card leaves face-up, slot 1)">
+        <TableGround>
+          <Hand variant="own" slots={[0, 2, 3]} leaving={{ slotIndex: 1, card: "9H" }} />
+        </TableGround>
+      </StateCard>
+      <StateCard label="inert (no hover affordance — not your turn)">
+        <TableGround>
+          <Hand variant="own" slots={[0, 1, 2, 3]} inert onSlotClick={() => {}} />
         </TableGround>
       </StateCard>
     </Section>
@@ -273,7 +291,7 @@ export function TableSurfaceSection() {
 }
 
 export function SlamTimerSection() {
-  const [window, setWindow] = React.useState<{ closesAt: number; durationMs: number }>()
+  const [demoWindow, setDemoWindow] = React.useState<{ closesAt: number; durationMs: number }>()
   const [resolving, setResolving] = React.useState(false)
   return (
     <Section
@@ -289,7 +307,7 @@ export function SlamTimerSection() {
           <div className="flex gap-2">
             <Button
               variant="secondary"
-              onClick={() => setWindow({ closesAt: Date.now() + 8000, durationMs: 8000 })}
+              onClick={() => setDemoWindow({ closesAt: Date.now() + 8000, durationMs: 8000 })}
             >
               Open an 8s window
             </Button>
@@ -298,7 +316,10 @@ export function SlamTimerSection() {
             </Button>
           </div>
           <TableGround>
-            <SlamTimer {...(window !== undefined ? { window } : {})} resolving={resolving} />
+            <SlamTimer
+              {...(demoWindow !== undefined ? { window: demoWindow } : {})}
+              resolving={resolving}
+            />
           </TableGround>
         </div>
       </StateCard>

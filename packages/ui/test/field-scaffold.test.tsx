@@ -65,4 +65,16 @@ describe("FieldScaffold", () => {
     )
     expect(screen.getByLabelText("Player name")).toHaveAttribute("id", "player-name")
   })
+
+  it("read-only renders label + value text only — no field, no helper (R3b)", () => {
+    render(
+      <FieldScaffold label="Player name" helper="Shown at the table." readOnlyValue="Nadia">
+        <input type="text" />
+      </FieldScaffold>,
+    )
+    expect(screen.getByText("Player name")).toBeInTheDocument()
+    expect(screen.getByText("Nadia")).toBeInTheDocument()
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
+    expect(screen.queryByText("Shown at the table.")).not.toBeInTheDocument()
+  })
 })

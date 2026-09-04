@@ -22,6 +22,9 @@ export interface FieldScaffoldProps {
   error?: React.ReactNode
   /** Dims label + helper to 45% (the field manages its own disabled look). */
   disabled?: boolean
+  /** read-only state (field-scaffold.md): label + value text ONLY — the
+   * wrapped field, helper, and error are not rendered. */
+  readOnlyValue?: React.ReactNode
   className?: string
   children: React.ReactElement<{ id?: string }>
 }
@@ -32,10 +35,20 @@ export function FieldScaffold({
   helper,
   error,
   disabled = false,
+  readOnlyValue,
   className,
   children,
 }: FieldScaffoldProps) {
   const generatedId = React.useId()
+
+  if (readOnlyValue !== undefined) {
+    return (
+      <div className={cn("flex flex-col gap-1", className)}>
+        <span className="font-ui font-semibold text-ink-primary">{label}</span>
+        <p className="font-ui text-base text-ink-primary">{readOnlyValue}</p>
+      </div>
+    )
+  }
   const child = React.Children.only(children)
   const fieldId = child.props.id ?? generatedId
   const messageId = `${fieldId}-message`

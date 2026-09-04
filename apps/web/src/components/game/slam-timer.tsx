@@ -40,7 +40,9 @@ export function SlamTimer({ window: slamWindow, resolving = false, className }: 
   if (slamWindow === undefined) return null
 
   const closed = remaining <= 0
-  const pct = (remaining / slamWindow.durationMs) * 100
+  // Guard the zero-duration edge: NaN% is dropped by CSS and the fill
+  // would default to full width (probe-backed, review finding R9c).
+  const pct = slamWindow.durationMs > 0 ? (remaining / slamWindow.durationMs) * 100 : 0
 
   return (
     <div

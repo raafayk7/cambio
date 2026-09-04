@@ -73,6 +73,12 @@
   --blur-*: initial;
   --tracking-*: initial;
   --leading-*: initial;
+  /* Two easings exist in the vocabulary: ease.snap and the skeleton's
+   * ease-in-out (spec-carried) — the stock ease-in/out/linear utilities
+   * must not be reachable (review finding R8). --container-* is
+   * deliberately KEPT: it is the layout measure scale (modal max-w-md,
+   * page columns, demo widths), not visual-identity vocabulary. */
+  --ease-*: initial;
 
   /* Spacing: tokens.md scale 4 8 12 16 24 32 48 64 (base 4px), enumerated
    * so off-scale steps do not exist, and named ORDINALLY — space.N in the

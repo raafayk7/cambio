@@ -29,6 +29,13 @@ export interface HandProps {
   slamWindow?: boolean
   /** Slot vacated by a correct slam, awaiting the slammer's give. */
   awaitingGiveSlot?: SlotIndex
+  /** `growing` (hand.md): a penalty/give card arriving in-flight into this
+   * slot — renders a face-down card in flight (unseen by everyone,
+   * ADR-0022). */
+  inFlightSlot?: SlotIndex
+  /** `shrinking` (hand.md): a slammed card leaving play from this slot —
+   * every slam publicly reveals the card, so it departs face-up. */
+  leaving?: { slotIndex: SlotIndex; card: CardSlug }
   /** Not interactable — no hover affordance (not your turn, no window). */
   inert?: boolean
   onSlotClick?: (slot: SlotIndex) => void
@@ -41,6 +48,8 @@ export function Hand({
   faces = [],
   slamWindow = false,
   awaitingGiveSlot,
+  inFlightSlot,
+  leaving,
   inert = false,
   onSlotClick,
   className,
@@ -49,6 +58,8 @@ export function Hand({
     3,
     ...slots,
     ...(awaitingGiveSlot !== undefined ? [awaitingGiveSlot] : []),
+    ...(inFlightSlot !== undefined ? [inFlightSlot] : []),
+    ...(leaving !== undefined ? [leaving.slotIndex] : []),
   )
   const slotCount = Math.ceil((highest + 1) / 2) * 2
   const occupied = new Set<number>(slots)
@@ -62,6 +73,21 @@ export function Hand({
         const isOccupied = occupied.has(slotIndex)
         const face = faceBySlot.get(slotIndex)
         const awaiting = awaitingGiveSlot === slotIndex
+
+        if (inFlightSlot === slotIndex) {
+          return (
+            <div key={slotIndex} data-slot-index={slotIndex} data-occupied="true">
+              <PlayingCard face="down" size={cardSize} inFlight />
+            </div>
+          )
+        }
+        if (leaving?.slotIndex === slotIndex) {
+          return (
+            <div key={slotIndex} data-slot-index={slotIndex} data-occupied="true">
+              <PlayingCard face="up" card={leaving.card} size={cardSize} leavingPlay />
+            </div>
+          )
+        }
 
         const card = isOccupied ? (
           <PlayingCard

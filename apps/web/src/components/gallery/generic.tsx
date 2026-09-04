@@ -177,9 +177,9 @@ export function FieldScaffoldSection() {
           <TextField placeholder="e.g. Nadia" disabled />
         </FieldScaffold>
       </StateCard>
-      <StateCard label="read-only">
-        <FieldScaffold label="Player name">
-          <TextField defaultValue="Nadia" readOnly />
+      <StateCard label="read-only (label + value text only)">
+        <FieldScaffold label="Player name" readOnlyValue="Nadia">
+          <TextField />
         </FieldScaffold>
       </StateCard>
     </Section>

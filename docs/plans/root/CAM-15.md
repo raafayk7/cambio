@@ -178,7 +178,13 @@ Clause IDs are referenced by the frontend child plan's coverage table.
 - **F5.1** A dev-only route `/dev/components` mounts all 26 components in
   **every** MVS state their class requires (including motion states,
   demonstrable via controls or looping demos, and reduced-motion
-  behavior).
+  behavior). _(Amended in the review fix cycle, finding R1, user-approved:
+  four states are cross-component choreography or one-shot entrance
+  animation and are excluded from the gallery's floor — draw-deck
+  `empty→reshuffling` and `draw`, discard-pile `receiving`, and
+  score-sheet `revealing`. They are CAM-16 game-screen work, per the
+  CSS-only motion Decision Log entry. Hand `growing`/`shrinking` and
+  `inert` are per-component states and ARE mounted.)_
 - **F5.2** The route is excluded from production behavior: in production
   builds it renders nothing/404 (DEV-gated); no new environment variable
   is introduced.
@@ -203,11 +209,15 @@ Clause IDs are referenced by the frontend child plan's coverage table.
 ### Acceptance criteria
 
 - [x] `pnpm turbo build typecheck lint test` passes (run bare — never
-      piped). 24/24 tasks, 429 tests (194 domain + 83 application + 112
-      api + 16 config + 14 ui + 24 web), 2026-09-04.
+      piped). 24/24 tasks, 443 tests (194 domain + 83 application + 112
+      api + 16 config + 14 ui + 24 web), 2026-09-04. _(Amended in the
+      review fix cycle: originally misstated as 429 — bad arithmetic,
+      finding R5a; frontend counts grew further in the fix cycle.)_
 - [x] All 26 components exist in their decided homes and export cleanly;
       the gallery renders all of them in dev (rendered + inspected at
-      M2/M3/M4).
+      M2/M3/M4). _(Fix cycle: state coverage completed per amended F5.1 —
+      hand growing/shrinking/inert added; the four choreography states
+      are excluded by the clause amendment.)_
 - [x] tokens.md ↔ styles.css convergence audit: every tokens.md value
       present, no extra visual vocabulary (additions all spec-cited);
       audited at M1, re-audited at M4 after the `--spacing` wipe fix.
@@ -306,6 +316,14 @@ timestamp each entry)_
       objects (ed47426), audit pass with gate/ai-tells/hardcheck fixes
       (3c61e38), close-out (coverage table filled, module layout
       reconciled, acceptance criteria verified, full gate green).
+- [x] 2026-09-04 — Review fix cycle complete: R1–R8 + R10 resolved (see
+      Outcomes & Retrospective for the branch taken per finding), R9
+      advisories (c) NaN guard, (d) rule-consistent fixture, (b) gallery
+      timer cleanup applied; wordmark prop (R9a) deliberately not taken.
+      Verification: ui 15 + web 26 tests green (3 new tests), all sweeps
+      re-run clean with toast.tsx grep-visible, reduced-motion cross-fade
+      verified by executed probe, hardcheck PASS, hand
+      growing/shrinking/inert rendered and inspected.
 
 ## Decision log
 
@@ -345,7 +363,11 @@ timestamp each entry)_
   (User call, round 3.)
 - 2026-09-04 — **`rounded-full` blessed as the pill idiom** for badge
   count and seat pills: "fully rounded" is a shape idiom (9999px), not a
-  scale value; no `radius.full` token minted. (User call, round 3.)
+  scale value; no tokens.md entry is minted. _(Wording amended in the
+  review fix cycle, finding R5b: styles.css DOES define `--radius-full`
+  in `@theme` — that is the mechanism that keeps `rounded-full` alive
+  after the radius namespace wipe, not a new tokens.md value.)_
+  (User call, round 3.)
 - 2026-09-04 — **Spec-carried values are canon, theme-fixed surfaces
   recorded**: opacity levels, toast dwell, thrown angles implement as
   component CSS citing their spec file — no tokens.md promotion; the
@@ -376,6 +398,14 @@ timestamp each entry)_
   all 26 components exercised the type scale, spacing, radius.card ratio,
   and breakpoints; none required a revision, so no creation-gate round —
   tokens.md stands as approved in CAM-13.
+- 2026-09-04 — **`.claude/launch.json` stays with the task branch**
+  (review finding R7): it configures launching `@cambio/web`, which is
+  release-branch content — the same routing logic as
+  `hardcheck-tokens.json` — and Claude Code requires the file at that
+  literal path (it is tool-read config, not authored harness content, so
+  the `.agents/`-symlink convention doesn't apply). The `.agents/`
+  lockfile drift from M0's npm install was reverted on this branch (R6);
+  ADR-0028 remains undisturbed.
 - 2026-09-04 — **Hardcheck tokens file lives at
   `packages/ui/hardcheck-tokens.json`**, not under `.agents/` — it
   derives from tokens.md (release-branch content), so placing it in
@@ -438,7 +468,7 @@ safeguard untouched; `design-system/` untouched.
   transitional states as toggle/looping demos) or amend F5.1 with an
   explicit carve-out for CAM-16 flight choreography (the CSS-only
   Decision Log entry gestures at this but the clause was never amended) —
-  user's call which states go which way. RESOLVED: pending.
+  user's call which states go which way. RESOLVED (fix cycle, user-approved split): hand `inert` mounted; HandProps extended with `inFlightSlot` + `leaving` and growing/shrinking mounted, pinned by two new hand tests; the four cross-component choreography states carved out by an inline F5.1 amendment.
 - **R2 (contract, F3.8 — partial).** Reduced motion: the card flip gets
   `motion-reduce:transition-none` (instant swap), not the cross-fade
   playing-card.md specifies; selected-lift/leaving-rotate transforms have
@@ -446,18 +476,18 @@ safeguard untouched; `design-system/` untouched.
   is deferred to CAM-16's moving container (defensible — it needs slot
   choreography — but unstated in the contract). Fix: cross-fade the flip
   under motion-reduce; note the highlight deferral at the clause.
-  RESOLVED: pending.
+  RESOLVED (fix cycle, implementation strengthened): the flip now cross-fades under motion-reduce (flipper never rotates; faces swap via opacity at duration.snap) — verified by an executed reduced-motion probe (flipper transform none, back opacity 0, face opacity 1, transition-property opacity); outer state transitions get motion-reduce:transition-none (state survives, movement goes); the highlight deferral is noted in the F3.8 coverage row.
 - **R3 (contract, F2.1 spec drifts).** (a) playing-card `selected` omits
   the spec'd `accent.focus` ring (has lift + shadow-float only —
   playing-card.md state 4 says "same visual language as keyboard focus");
   (b) field-scaffold has no `read-only` mode ("label + value text only").
-  RESOLVED: pending.
+  RESOLVED (fix cycle, implementation strengthened): selected now carries the accent.focus ring + lift (playing-card.tsx); FieldScaffold gained `readOnlyValue` rendering label + value text only, pinned by a new test; gallery updated.
 - **R4 (violation, repo hygiene).** `packages/ui/src/components/toast.tsx`
   contains a literal NUL byte (0x00, byte 3625) in the effect-dep
   separator `join("\x00")` — meant to be a plain separator. Git treats
   the file as **binary** (undiffable) and grep skips it, which quietly
   excluded it from every F1.5 sweep. Fix the byte, then re-run all
-  sweeps including this file. RESOLVED: pending.
+  sweeps including this file. RESOLVED (fix cycle): NUL replaced with a comma separator; the diff no longer contains binary files; ALL sweeps re-run with toast.tsx visible — clean, including a repo-wide NUL scan.
 - **R5 (doc claims false — close by sweep, not spot-fix).**
   (a) "**429 tests**": instances = root plan Acceptance criteria
   (this file) and the 2026-09-04 implementation Linear comment; true
@@ -468,24 +498,24 @@ safeguard untouched; `design-system/` untouched.
   after the wipe); amend wording to "no tokens.md entry; the CSS carries
   `--radius-full` as the wipe-survival mechanism". Fixer must re-grep
   all phrasings across every plan doc + ADRs before closing.
-  RESOLVED: pending.
+  RESOLVED (fix cycle, claims amended by sweep): grep for `429` and `radius.full`/`radius-full` across docs/plans/ + docs/adr/ found and amended every instance (root acceptance criterion with amendment note; root Decision Log pill entry; child Surprises resolution); the outdated implementation Linear comment was edited to 443. The only other `429` hit is CAM-7's unrelated line-number citation.
 - **R6 (deviation-not-logged).**
   `.agents/scripts/design-gate/package-lock.json` was modified on the
   task branch (M0 `npm install` side effect; removes `hasInstallScript`)
   — `.agents/` routes to `main` per ADR-0028. Revert the file on this
-  branch. RESOLVED: pending.
+  branch. RESOLVED (fix cycle): reverted via `git checkout release-v0 -- .agents/scripts/design-gate/package-lock.json`; the committed diff no longer touches `.agents/`.
 - **R7 (deviation-not-logged).** `.claude/launch.json` is a new real file
   in `.claude/` on the task branch; the AGENTS.md convention makes
   `.claude/` symlinks-from-`.agents/`, and ADR-0028 routes harness config
   to `main`. Counter-reading: it launches `@cambio/web`, release-branch
   content (same logic as `hardcheck-tokens.json`). Needs an explicit
-  routing decision recorded either way. RESOLVED: pending.
+  routing decision recorded either way. RESOLVED (fix cycle, decision logged): `.claude/launch.json` stays with the task branch — tool-read config at a literal path configuring release-branch app content; recorded in the Decision Log.
 - **R8 (ADR-0027 gap).** The `@theme` wipe omits `--ease-*` — stock
   `ease-in`/`ease-out`/`ease-in-out` utilities still exist to be reached
   for, against the two-easing-token vocabulary. Add `--ease-*: initial`.
   Also log that `--container-*` is deliberately kept (layout measure
   scale used by modal/gallery/demo widths; not visual-identity
-  vocabulary). RESOLVED: pending.
+  vocabulary). RESOLVED (fix cycle): `--ease-*: initial` added to the wipe with a comment recording that `--container-*` is deliberately kept as the layout measure scale.
 - **R9 (advisories — fix optional, user's call).**
   (a) AppShell hardcodes the "Cambio" wordmark + `state: "game"` naming
   inside `packages/ui` — spec-carried (app-shell.md), surfaced as the
@@ -504,7 +534,7 @@ safeguard untouched; `design-system/` untouched.
   test suite runs in `apps/web` yet" — now false (24-test suite landed).
   Harness fix routed to `main` per ADR-0028: correct that sentence (and
   scan the same skill for the MAY_IMPORT-pin phrasing, which this task
-  also extended with ui-row pins). RESOLVED: pending.
+  also extended with ui-row pins). RESOLVED (fix cycle): sentence corrected on `main` (frontend test suites now exist per ADR-0030; MAY_IMPORT pin example extended to mention the ui rows) and merged down main → development → release-v0 per ADR-0028.
 
 ### What passed
 

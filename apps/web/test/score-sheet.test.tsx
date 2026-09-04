@@ -26,8 +26,10 @@ const reveal = {
     },
     { playerId: C, cards: [] },
   ],
+  // Rule-consistent totals (HANDOFF §1: black kings −1, red kings −2):
+  // A holds KS → −1; B holds KH+KD → −4; C holds nothing → 0.
   scores: [
-    { playerId: A, total: 13 },
+    { playerId: A, total: -1 },
     { playerId: B, total: -4 },
     { playerId: C, total: 0 },
   ],
@@ -38,7 +40,7 @@ describe("ScoreSheet", () => {
   it("orders rows by total ascending — card count is irrelevant", () => {
     render(<ScoreSheet reveal={reveal} playerName={(id) => names[id] ?? "?"} />)
     const rows = screen.getAllByRole("listitem")
-    expect(rows.map((row) => row.textContent?.slice(0, 3))).toEqual(["Sam", "Raa", "Nad"])
+    expect(rows.map((row) => row.textContent?.slice(0, 3))).toEqual(["Sam", "Nad", "Raa"])
   })
 
   it("marks only the winners — zero can lose to negatives", () => {
