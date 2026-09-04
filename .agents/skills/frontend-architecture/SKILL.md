@@ -108,17 +108,20 @@ skill), then the styles.
 
 Lint enforces exactly one **architectural** frontend rule: the
 workspace-import rows above, pinned on release branches by
-`packages/config/test/eslint.base.test.ts` (e.g. "blocks apps/web
-importing the @cambio/domain/testing subpath"); on `main` the claim is
-held by live probe, since that test file lands with the release work.
-(General lint rules — the Zod ban, type-import hygiene — do also apply
-to `web`/`ui`.) External npm dependencies in `web`/`ui` are **not**
-restricted — on release branches the effect-only external-import policy
-(ADR-0017) scopes to the backend layers, and on `main` no such policy
-exists at all. No test suite runs in `apps/web` yet. Everything else in
-this skill — layering, hooks discipline, token usage — is convention
-held by review and the design tooling, so don't mistake a green gate for
-compliance.
+`packages/config/test/eslint.base.test.ts` (both directions since
+CAM-15: "blocks apps/web importing the @cambio/domain/testing subpath"
+and the `ui: []` row's own pins — contracts rejected, subpaths rejected,
+external npm allowed); on `main` the claim is held by live probe, since
+that test file lands with the release work. (General lint rules — the
+Zod ban, type-import hygiene — do also apply to `web`/`ui`.) External
+npm dependencies in `web`/`ui` are **not** restricted — on release
+branches the effect-only external-import policy (ADR-0017) scopes to
+the backend layers, and on `main` no such policy exists at all. Since
+CAM-15, `packages/ui` and `apps/web` carry vitest suites on jsdom with
+testing-library (ADR-0030) — run them through turbo like every other
+package. Everything else in this skill — layering, hooks discipline,
+token usage — is convention held by review and the design tooling, so
+don't mistake a green gate for compliance.
 
 ## Routing
 
