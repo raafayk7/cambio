@@ -613,7 +613,18 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       third-party payloads). Emil payload prettier-ignored alongside
       impeccable (byte-identical to upstream). All four live-detected.
       Gate green, convergent.
-- [ ] M8 — verification on main (incl. ADR-0007 roster amendment)
+- [x] 2026-09-04 19:20 — M8 — ADR-0007 amended (header line; accepted
+      body untouched) + index rows for 0007/0008 amendments; close-out
+      grep clean (all line refs target untouched probe anchors);
+      fresh-context smoke test passed 5/5 (skills listed, commands
+      present, router answers absent-on-main correctly, AGENTS.md
+      Frontend section + precedence, symlinks intact) — two anomalies
+      explained: review-animations hidden by design
+      (disable-model-invocation) and a stale branch snapshot in the
+      subagent. Gate green, convergent. Note: a literally-cold `claude -p`
+      run wasn't possible from this sandbox (no CLI on PATH) — the
+      user-opened fresh session and M9's release-v0 check are the true
+      cold tests.
 - [ ] M9 — merge-down + release smoke + close-out
 
 ## Surprises & notes for the root plan
