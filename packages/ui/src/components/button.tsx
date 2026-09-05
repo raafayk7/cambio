@@ -5,13 +5,16 @@ import type * as React from "react"
 import { cn } from "../lib/utils.js"
 
 /**
- * Button — design-system/components/core/button.md (r1).
+ * Button — design-system/components/core/button.md (r2).
  *
  * Variants: primary / secondary / ghost / icon / danger. `icon` is square
  * and icon-only: it REQUIRES an accessible label (aria-label). `danger`
  * uses accent.alarm-deep, the small-label alarm surface per tokens.md's
  * contrast rule; a display-face large-label danger button (the Slam
  * composition) may override to accent.alarm at the use site.
+ *
+ * Text variants carry the 44px touch floor (touch-floor, r2); the icon
+ * variant keeps its own square size per the canon.
  *
  * One primary per surface; the active "sit-down" press (press-raised) is
  * the signature — never replace it with an opacity flash.
@@ -21,11 +24,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "ground-action text-ink-inverse",
-        secondary: "ground-raised text-ink-primary",
-        ghost: "ground-ghost text-ink-primary shadow-none",
+        primary: "touch-floor ground-action text-ink-inverse",
+        secondary: "touch-floor ground-raised text-ink-primary",
+        ghost: "touch-floor ground-ghost text-ink-primary shadow-none",
         icon: "ground-raised p-2 text-ink-primary",
-        danger: "ground-alarm-deep text-ink-inverse",
+        danger: "touch-floor ground-alarm-deep text-ink-inverse",
       },
     },
     defaultVariants: {

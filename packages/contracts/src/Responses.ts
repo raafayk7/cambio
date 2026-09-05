@@ -10,7 +10,12 @@ import { LobbyView, PlayerGameView } from "./GameView.js"
  * version rides beside the view for client staleness checks (C2.6).
  */
 
-/** `POST /lobbies` (201) and `POST /lobbies/:gameId/join`: the caller gets their grants. */
+/**
+ * `POST /lobbies` (201), `POST /lobbies/:gameId/join`, and
+ * `GET /lobbies/:gameId` (CAM-17 C5 — the room-screen reload bootstrap):
+ * the caller gets their grants. One schema for all three, deliberately —
+ * the GET reuses the join response's frozen shape rather than aliasing it.
+ */
 export const LobbyResponse = Schema.Struct({
   lobby: LobbyView,
   version: GameVersion,

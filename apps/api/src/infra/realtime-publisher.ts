@@ -1,4 +1,5 @@
 import { projectEvents, lobbyView, RealtimePublisherPort } from "@cambio/application"
+import type { LobbyUpdated } from "@cambio/contracts"
 import { Effect, Layer, Redacted } from "effect"
 
 import { AppConfig } from "../config.js"
@@ -92,12 +93,16 @@ export const makeRealtimePublisher = (
         }
         return deliver(messages)
       }),
-    publishLobby: (gameId, lobby) =>
+    publishLobby: (gameId, lobby, version) =>
       Effect.suspend(() => {
-        const view = lobbyView(lobby)
-        return deliver([
-          { topic: roomTopic(topicSecret, gameId), event: "LobbyUpdated", payload: view },
-        ])
+        // Tagged like every other broadcast (C3): event name = payload._tag,
+        // and the version rides along for the client's staleness guard.
+        const payload: LobbyUpdated = {
+          _tag: "LobbyUpdated",
+          lobby: lobbyView(lobby),
+          version,
+        }
+        return deliver([{ topic: roomTopic(topicSecret, gameId), event: payload._tag, payload }])
       }),
   }
 }

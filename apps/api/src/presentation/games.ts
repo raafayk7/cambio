@@ -1,6 +1,6 @@
-import { RoomRegistry, toDomainCommand, viewFor } from "@cambio/application"
+import { playerNames, RoomRegistry, toDomainCommand, viewFor } from "@cambio/application"
 import { decodeWireCommandEither, encodeGameReply, encodeViewResponse } from "@cambio/contracts"
-import { GameId, GameRepository, seatOf } from "@cambio/domain"
+import { GameId, GameRepository, seatOf, type UserId } from "@cambio/domain"
 import { Effect, Either, Option, Redacted, type Runtime, Schema } from "effect"
 import type { FastifyInstance } from "fastify"
 
@@ -46,11 +46,16 @@ export const gamesRoutes =
         const command = toDomainCommand(user.id, wire.right)
         return run(
           reply,
-          Effect.flatMap(RoomRegistry, (rooms) => rooms.execute(gameId.right, command)),
+          Effect.flatMap(RoomRegistry, (rooms) => rooms.execute(gameId.right, command)).pipe(
+            // C2: names ride beside the state for viewFor's projection.
+            Effect.flatMap(({ state, version }) =>
+              Effect.map(playerNames(state), (names) => ({ state, version, names })),
+            ),
+          ),
           {
             statusOf: commandErrorStatus,
-            onSuccess: ({ state, version }) =>
-              reply.send(encodeGameReply({ view: viewFor(user.id, state), version })),
+            onSuccess: ({ state, version, names }) =>
+              reply.send(encodeGameReply({ view: viewFor(user.id, state, names), version })),
           },
         )
       },
@@ -69,17 +74,34 @@ export const gamesRoutes =
         // optimization, not the source of truth.
         return run(
           reply,
-          Effect.flatMap(GameRepository, (games) => games.load(gameId.right)),
+          Effect.flatMap(GameRepository, (games) => games.load(gameId.right)).pipe(
+            // 404-before-names (C2): membership is decided on the state
+            // FIRST — names of a game the caller cannot see are never
+            // fetched; `names: null` marks the refusal for onSuccess.
+            Effect.flatMap(({ state, version }) =>
+              Option.isNone(seatOf(state, user.id))
+                ? Effect.succeed({
+                    state,
+                    version,
+                    names: null as ReadonlyMap<UserId, string> | null,
+                  })
+                : Effect.map(playerNames(state), (names) => ({
+                    state,
+                    version,
+                    names: names as ReadonlyMap<UserId, string> | null,
+                  })),
+            ),
+          ),
           {
             statusOf: commandErrorStatus,
-            onSuccess: ({ state, version }) => {
-              if (Option.isNone(seatOf(state, user.id))) {
+            onSuccess: ({ state, version, names }) => {
+              if (names === null) {
                 // Identical body to an unknown game — no existence leak.
                 return reply.code(404).send(typedErrorBody(404, { _tag: "GameNotFound" }))
               }
               return reply.send(
                 encodeViewResponse({
-                  view: viewFor(user.id, state),
+                  view: viewFor(user.id, state, names),
                   version,
                   grants: grantsFor(topicSecret, gameId.right, user.id),
                 }),

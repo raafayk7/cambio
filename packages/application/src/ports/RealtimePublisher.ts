@@ -1,5 +1,11 @@
 import { Context, type Effect } from "effect"
-import { type GameEvent, type GameId, type GameState, type Lobby } from "@cambio/domain"
+import {
+  type GameEvent,
+  type GameId,
+  type GameState,
+  type GameVersion,
+  type Lobby,
+} from "@cambio/domain"
 
 /**
  * Realtime publisher port.
@@ -27,6 +33,15 @@ export class RealtimePublisherPort extends Context.Tag("@cambio/application/Real
       state: GameState,
       events: ReadonlyArray<GameEvent>,
     ) => Effect.Effect<void>
-    readonly publishLobby: (gameId: GameId, lobby: Lobby) => Effect.Effect<void>
+    /**
+     * The pre-game lobby broadcast (CAM-17 C3): `version` is the room's
+     * just-persisted version — it rides inside the tagged `LobbyUpdated`
+     * payload so clients can discard broadcasts older than their bootstrap.
+     */
+    readonly publishLobby: (
+      gameId: GameId,
+      lobby: Lobby,
+      version: GameVersion,
+    ) => Effect.Effect<void>
   }
 >() {}

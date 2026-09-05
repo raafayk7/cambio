@@ -1,10 +1,10 @@
 import { expect } from "@effect/vitest"
 import type { PlayerGameView } from "@cambio/contracts"
-import { applyCommand, type Command, type GameState } from "@cambio/domain"
+import { applyCommand, type Command, type GameState, UserId } from "@cambio/domain"
 import { ts } from "@cambio/domain/testing"
-import { Either } from "effect"
+import { Either, Schema } from "effect"
 
-import { clearPublisherJournal, type makeTestApp } from "./http.js"
+import { clearPublisherJournal, publisherJournal, type makeTestApp } from "./http.js"
 
 /**
  * Shared e2e plumbing (extracted from EndToEndGame.test.ts for CAM-7,
@@ -95,6 +95,12 @@ export const setupGame = async (app: TestApp, names: ReadonlyArray<string>) => {
     })
     expect(joined.statusCode).toBe(200)
   }
+  // Snapshot the create/join lobby publishes before the clear below wipes
+  // them — B5 asserts names flow through these payloads end to end.
+  const lobbyPublishes = publisherJournal.filter(
+    (e): e is Extract<(typeof publisherJournal)[number], { _tag: "lobby" }> =>
+      e._tag === "lobby" && (e.gameId as string) === gameId,
+  )
   clearPublisherJournal()
   const startRes = await app.inject({
     method: "POST",
@@ -103,5 +109,13 @@ export const setupGame = async (app: TestApp, names: ReadonlyArray<string>) => {
   })
   expect(startRes.statusCode).toBe(200)
   const byId = new Map(players.map((p) => [p.userId, p]))
-  return { gameId, players, byId, startRes }
+  // The names map viewFor takes (CAM-17 C2) — what the server's playerNames
+  // composes per request, rebuilt here from the created players. Fixture
+  // names must stay ≥3 chars: the leak scanner matches whole strings against
+  // card slugs, so a player literally named "AS" would false-positive.
+  const toUserId = Schema.decodeUnknownSync(UserId)
+  const nameById: ReadonlyMap<UserId, string> = new Map(
+    players.map((p, i) => [toUserId(p.userId), names[i]!]),
+  )
+  return { gameId, players, byId, nameById, startRes, lobbyPublishes }
 }

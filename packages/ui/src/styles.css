@@ -294,6 +294,14 @@
   }
 }
 
+/* The 44px touch floor (button.md r2, CAM-17): minimum control height for
+ * text buttons. Spec-carried value citing its spec, like the other
+ * canon-carried constants — 44 is not on the spacing scale and must not
+ * become a token. The icon variant is exempt (its own square size). */
+@utility touch-floor {
+  min-height: 44px;
+}
+
 /* The papery press (button.md active state — the component's signature):
  * the element translates by the raised-shadow offset and the shadow
  * collapses, so it physically sits down. Never an opacity flash. */
@@ -331,12 +339,27 @@
   background-size: 64px 64px;
 }
 
+/* The lobby's full illustrated courtyard (scenes.md lobby row, realized
+ * CAM-17 through the creation gate; app-shell.md r2). The asset inlines
+ * primitive values because an external SVG cannot read page custom
+ * properties — the mapping is documented in the SVG header. Edges carry
+ * the scene; the center stays calm for content. */
+@utility scene-courtyard {
+  background-color: var(--cream-scene);
+  background-image: url("./assets/scene-courtyard.svg");
+  background-size: cover;
+  background-position: center;
+}
+
 /* Safe-area padding for the shell on notched compact devices
- * (app-shell.md: safe-area aware; the own-hand dock reserves the bottom). */
+ * (app-shell.md: safe-area aware; the own-hand dock reserves the bottom —
+ * which is why the bottom inset matters most: without it the dock sits
+ * under the home bar. Bottom inset added in CAM-17, S2). */
 @utility safe-area-shell {
   padding-top: env(safe-area-inset-top);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ---- Base ---------------------------------------------------------------- */

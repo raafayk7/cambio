@@ -79,20 +79,36 @@ const revealOf = (state: GameState): Contracts.Reveal => {
   }
 }
 
-export const viewFor = (viewerId: UserId, state: GameState): Contracts.PlayerGameView => ({
+/**
+ * `names` (CAM-17 C2): the players' public display names, composed by the
+ * caller via `playerNames` — names live in the `users` table, never in the
+ * fold-rebuilt `GameState`. The `?? ""` arm is defensive totality for the
+ * soft-deleted-user edge (FK + `game_players` guarantee coverage in every
+ * reachable game); names are public labels, identical for every viewer.
+ */
+export const viewFor = (
+  viewerId: UserId,
+  state: GameState,
+  names: ReadonlyMap<UserId, string>,
+): Contracts.PlayerGameView => ({
   players: state.players.map((p) => ({
     id: p.id,
+    name: names.get(p.id) ?? "",
     hand: p.hand.map((s) => s.slotIndex),
   })),
   deckCount: state.deck.length,
   discard: [...state.discard],
   phase: projectPhase(viewerId, state.phase),
+  // The started-with config (C4): definitionally the value the game runs on —
+  // `GameState.config` is persisted and round-tripped, never re-read from env.
+  config: { slamWindowMs: state.config.slamWindowMs },
   ...(state.phase._tag === "Ended" ? { reveal: revealOf(state) } : {}),
 })
 
 /** The lobby is fully public (ADR-0019) — one shape for every viewer. */
 export const lobbyView = (lobby: Lobby): Contracts.LobbyView => ({
   id: lobby.id,
-  members: [...lobby.members],
+  // Names are public labels (CAM-17 C1) — every recipient may see them.
+  members: lobby.members.map((m) => ({ id: m.id, name: m.name })),
   status: lobby.status,
 })

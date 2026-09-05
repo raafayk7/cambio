@@ -47,6 +47,19 @@ export const UserRepositoryLive = Layer.effect(
           if (rows.length === 0) return yield* Effect.fail(new UserNotFound({ userId }))
           return yield* decodeUser(rows[0])
         }),
+
+      // Batch lookup (CAM-17 C2): one IN query; missing/soft-deleted ids are
+      // simply absent from the result — callers decide what absence means.
+      findManyById: (userIds) =>
+        userIds.length === 0
+          ? Effect.succeed([])
+          : Effect.gen(function* () {
+              const rows = yield* sql`
+                SELECT user_id, user_name FROM users
+                WHERE ${sql.in("user_id", userIds)} AND deleted_at IS NULL
+              `.pipe(Effect.mapError(storage("users.findManyById")))
+              return yield* Effect.forEach(rows, decodeUser)
+            }),
     }
   }),
 )

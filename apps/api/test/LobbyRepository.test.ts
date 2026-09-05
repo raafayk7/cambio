@@ -14,7 +14,7 @@ import {
   leaveLobby,
   type Lobby,
 } from "@cambio/domain"
-import { ts, uid } from "@cambio/domain/testing"
+import { ts, uid, user } from "@cambio/domain/testing"
 
 import { ensureRosterUsers, makeTestRuntime } from "./support/db.js"
 
@@ -50,7 +50,7 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
         const sql = yield* SqlClient.SqlClient
 
         // v0 insert — creator only.
-        let lobby: Lobby = createLobby(gameId, uid(0))
+        let lobby: Lobby = createLobby(gameId, user(0))
         let version = yield* games.saveLobby({
           gameId,
           lobby,
@@ -64,7 +64,7 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
         expect(row[0]).toEqual({ status: "lobby", phase: null })
 
         // Two joins, loadLobby exact after each.
-        for (const joiner of [uid(1), uid(2)]) {
+        for (const joiner of [user(1), user(2)]) {
           lobby = right(joinLobby(lobby, joiner))
           version = yield* games.saveLobby({ gameId, lobby, expectedVersion: version })
           const loaded = yield* games.loadLobby(gameId)
@@ -75,7 +75,7 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
         // uid(1) leaves — seats compact to join order 0..n-1 over live rows.
         lobby = right(leaveLobby(lobby, uid(1)))
         version = yield* games.saveLobby({ gameId, lobby, expectedVersion: version })
-        expect((yield* games.loadLobby(gameId)).lobby.members).toEqual([uid(0), uid(2)])
+        expect((yield* games.loadLobby(gameId)).lobby.members).toEqual([user(0), user(2)])
         const seats = yield* sql<{ user_id: string; seat_index: number }>`
           SELECT user_id, seat_index FROM game_players
           WHERE game_id = ${gameId} AND deleted_at IS NULL
@@ -87,9 +87,9 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
         ])
 
         // The leaver rejoins — the soft-deleted row resurrects at the tail.
-        lobby = right(joinLobby(lobby, uid(1)))
+        lobby = right(joinLobby(lobby, user(1)))
         version = yield* games.saveLobby({ gameId, lobby, expectedVersion: version })
-        expect((yield* games.loadLobby(gameId)).lobby.members).toEqual([uid(0), uid(2), uid(1)])
+        expect((yield* games.loadLobby(gameId)).lobby.members).toEqual([user(0), user(2), user(1)])
 
         // Everyone leaves — the lobby is abandoned, and stays loadable as such.
         for (const leaver of [uid(0), uid(2), uid(1)]) {
@@ -111,10 +111,10 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
     await run(
       Effect.gen(function* () {
         const games = yield* GameRepository
-        const lobby = createLobby(gameId, uid(0))
+        const lobby = createLobby(gameId, user(0))
         const v1 = yield* games.saveLobby({ gameId, lobby, expectedVersion: GameVersion.make(0) })
 
-        const grown = right(joinLobby(lobby, uid(1)))
+        const grown = right(joinLobby(lobby, user(1)))
         yield* games.saveLobby({ gameId, lobby: grown, expectedVersion: v1 })
 
         // Reusing the consumed v1 must conflict, typed, with the live version.
@@ -132,7 +132,7 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
         // Guard held: still the two-member lobby at version 2.
         const after = yield* games.loadLobby(gameId)
         expect(after.version).toBe(2)
-        expect(after.lobby.members).toEqual([uid(0), uid(1)])
+        expect(after.lobby.members).toEqual([user(0), user(1)])
       }),
     )
   })
@@ -144,9 +144,9 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
         const games = yield* GameRepository
         const sql = yield* SqlClient.SqlClient
 
-        let lobby = createLobby(gameId, uid(0))
-        lobby = right(joinLobby(lobby, uid(1)))
-        lobby = right(joinLobby(lobby, uid(2)))
+        let lobby = createLobby(gameId, user(0))
+        lobby = right(joinLobby(lobby, user(1)))
+        lobby = right(joinLobby(lobby, user(2)))
         let version = yield* games.saveLobby({
           gameId,
           lobby,
@@ -156,7 +156,14 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
 
         // The lobby→game transition: one save of the whole deal batch,
         // guarded by the lobby's current version.
-        const [state, events] = right(dealGame(lobby.members, 424242, config, ts(1000)))
+        const [state, events] = right(
+          dealGame(
+            lobby.members.map((m) => m.id),
+            424242,
+            config,
+            ts(1000),
+          ),
+        )
         const gameVersion = yield* games.save({
           gameId,
           state,
@@ -175,7 +182,7 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
         const started = yield* games.loadLobby(gameId)
         expect(started.lobby).toEqual({
           id: gameId,
-          members: [uid(0), uid(1), uid(2)],
+          members: [user(0), user(1), user(2)],
           status: "started",
         })
 
@@ -200,14 +207,21 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
     const exit = await runtime.runPromiseExit(
       Effect.gen(function* () {
         const games = yield* GameRepository
-        let lobby = createLobby(gameId, uid(0))
-        lobby = right(joinLobby(lobby, uid(1)))
+        let lobby = createLobby(gameId, user(0))
+        lobby = right(joinLobby(lobby, user(1)))
         const version = yield* games.saveLobby({
           gameId,
           lobby,
           expectedVersion: GameVersion.make(0),
         })
-        const [state, events] = right(dealGame(lobby.members, 7, config, ts(1000)))
+        const [state, events] = right(
+          dealGame(
+            lobby.members.map((m) => m.id),
+            7,
+            config,
+            ts(1000),
+          ),
+        )
         const gameVersion = yield* games.save({
           gameId,
           state,
@@ -243,7 +257,7 @@ describe("GameRepository lobby methods (ADR-0019, clause 13)", () => {
         const games = yield* GameRepository
         yield* games.saveLobby({
           gameId,
-          lobby: createLobby(gameId, uid(0)),
+          lobby: createLobby(gameId, user(0)),
           expectedVersion: GameVersion.make(0),
         })
         const loaded = yield* games.load(gameId).pipe(Effect.either)

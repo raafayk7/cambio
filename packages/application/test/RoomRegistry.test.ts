@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Cause, Effect, Exit, Fiber, TestClock } from "effect"
 import { applyCommand, type Command, dealGame, Timestamp } from "@cambio/domain"
-import { gid, legalCandidates, uid } from "@cambio/domain/testing"
+import { gid, legalCandidates, uid, user } from "@cambio/domain/testing"
 import { RoomRegistry } from "../src/room/RoomRegistry.js"
 import {
   choose,
@@ -26,7 +26,7 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
     const h = makeHarness()
     return Effect.gen(function* () {
       const registry = yield* RoomRegistry
-      yield* seedLobby({ id: gid(1), members: [uid(0), uid(1)], status: "open" })
+      yield* seedLobby({ id: gid(1), members: [user(0), user(1)], status: "open" })
       const started = yield* registry.start(gid(1), { starterId: uid(1), config })
       h.journal.splice(0)
 
@@ -123,7 +123,7 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
       const h = makeHarness()
       return Effect.gen(function* () {
         const registry = yield* RoomRegistry
-        yield* seedLobby({ id: gid(1), members: [uid(0), uid(1)], status: "open" })
+        yield* seedLobby({ id: gid(1), members: [user(0), user(1)], status: "open" })
         const started = yield* registry.start(gid(1), { starterId: uid(0), config })
 
         // Something else bumped the row behind the actor's back.
@@ -157,7 +157,7 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
       const h = makeHarness()
       return Effect.gen(function* () {
         const registry = yield* RoomRegistry
-        yield* seedLobby({ id: gid(1), members: [uid(0), uid(1)], status: "open" })
+        yield* seedLobby({ id: gid(1), members: [user(0), user(1)], status: "open" })
         const started = yield* registry.start(gid(1), { starterId: uid(0), config })
 
         const cambio = legalCandidates(started.state, NOW).find((c) => c._tag === "CallCambio")
@@ -186,7 +186,7 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
       const h = makeHarness()
       return Effect.gen(function* () {
         const registry = yield* RoomRegistry
-        yield* seedLobby({ id: gid(1), members: [uid(0), uid(1)], status: "open" })
+        yield* seedLobby({ id: gid(1), members: [user(0), user(1)], status: "open" })
 
         // A non-abandoning leave keeps the actor resident…
         yield* registry.leave(gid(1), uid(1))
@@ -210,7 +210,7 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
       const h = makeHarness()
       return Effect.gen(function* () {
         const registry = yield* RoomRegistry
-        yield* seedLobby({ id: gid(1), members: [uid(0), uid(1)], status: "open" })
+        yield* seedLobby({ id: gid(1), members: [user(0), user(1)], status: "open" })
         const started = yield* registry.start(gid(1), { starterId: uid(0), config })
         const cmd = choose(started.state, NOW)
 
@@ -244,7 +244,7 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
       const hB = makeHarness()
       const setup = Effect.gen(function* () {
         const registry = yield* RoomRegistry
-        yield* seedLobby({ id: gid(1), members: [uid(0)], status: "open" })
+        yield* seedLobby({ id: gid(1), members: [user(0)], status: "open" })
         yield* registry.join(gid(1), uid(1))
         const started = yield* registry.start(gid(1), { starterId: uid(1), config })
         const one = yield* registry.execute(gid(1), choose(started.state, NOW))
@@ -283,14 +283,14 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
       return Effect.gen(function* () {
         const controlReply = yield* Effect.gen(function* () {
           const registry = yield* RoomRegistry
-          yield* seedLobby({ id: gid(2), members: [uid(0)], status: "open" })
+          yield* seedLobby({ id: gid(2), members: [user(0)], status: "open" })
           yield* registry.join(gid(2), uid(1))
           return yield* registry.join(gid(2), uid(2))
         }).pipe(Effect.provide(hA.layer))
 
         yield* Effect.gen(function* () {
           const registry = yield* RoomRegistry
-          yield* seedLobby({ id: gid(2), members: [uid(0)], status: "open" })
+          yield* seedLobby({ id: gid(2), members: [user(0)], status: "open" })
           yield* registry.join(gid(2), uid(1))
         }).pipe(Effect.provide(hB.layer))
         const restartedReply = yield* RoomRegistry.pipe(

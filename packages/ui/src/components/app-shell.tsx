@@ -13,9 +13,9 @@ import { Button } from "./button.js"
  * face, settings icon-button + connection dot on the right — no nav
  * tabs; this app is a corridor, not a site). The shell owns the scene
  * grounds (patterns/scenes.md): screens declare a depth, never paint
- * their own. `courtyard` (lobby) has no illustration asset yet and falls
- * back to plain cream — an open gap scheduled with CAM-16 (plan Decision
- * Log). The `game` state collapses the header to a floating icon pair;
+ * their own. `courtyard` (lobby) renders the illustrated courtyard scene
+ * (realized in CAM-17 through the creation gate; app-shell.md r2). The
+ * `game` state collapses the header to a floating icon pair;
  * `reconnecting` adds the alert bar under the header while play stays
  * visibly live.
  */
@@ -39,9 +39,14 @@ function ConnectionDot({ connection }: { connection: "connected" | "reconnecting
   )
 }
 
+// Rendered only when a handler exists — an interactive-looking control
+// that does nothing on activation is worse than its absence (gate
+// finding, CAM-17). The canon's settings icon-button appears as soon as
+// a settings surface does.
 function SettingsButton({ onSettings }: { onSettings?: (() => void) | undefined }) {
+  if (onSettings === undefined) return null
   return (
-    <Button variant="icon" aria-label="Settings" {...(onSettings ? { onClick: onSettings } : {})}>
+    <Button variant="icon" aria-label="Settings" onClick={onSettings}>
       <MarkSettings className="size-4" />
     </Button>
   )
@@ -56,10 +61,18 @@ export function AppShell({
   children,
   ...props
 }: AppShellProps) {
-  const ground = scene === "paving" ? "scene-paving" : "bg-surface-page"
+  const ground =
+    scene === "paving"
+      ? "scene-paving"
+      : scene === "courtyard"
+        ? "scene-courtyard"
+        : "bg-surface-page"
 
   return (
-    <div className={cn("flex min-h-dvh flex-col safe-area-shell", ground, className)} {...props}>
+    <div
+      className={cn("relative flex min-h-dvh flex-col safe-area-shell", ground, className)}
+      {...props}
+    >
       {state === "game" ? (
         <div className="absolute top-2 right-2 z-40 flex items-center gap-2">
           <ConnectionDot connection={connection} />

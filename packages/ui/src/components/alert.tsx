@@ -14,7 +14,9 @@ import { cn } from "../lib/utils.js"
  * game does not pause). Info surfaces use the warm role's tan half —
  * terracotta fails small-text contrast (tokens.md §Contrast; recorded in
  * the plan). Only informational alerts are dismissible — an active error
- * stays until resolved.
+ * stays until resolved. The action slot carries the variant's ink (a
+ * ghost button on the dark alarm/success grounds inherits inverse ink
+ * here, not via per-call-site overrides — CAM-17 audit fix).
  */
 const alertVariants = cva(
   "flex w-full items-center gap-2 rounded-sm border-2 border-ink-primary px-3 py-2 font-ui text-base font-medium",
@@ -61,7 +63,15 @@ export function Alert({ className, variant, action, onDismiss, children, ...prop
         />
       ) : null}
       <span className="flex-1">{children}</span>
-      {action}
+      {action !== undefined ? (
+        <span
+          className={
+            variant === "alarm" || variant === "success" ? "[&_button]:text-ink-inverse" : undefined
+          }
+        >
+          {action}
+        </span>
+      ) : null}
       {onDismiss !== undefined ? (
         <button
           type="button"

@@ -107,9 +107,9 @@ describe("SlamTiming (CAM-7 C1.3, C2.3, C4.2)", () => {
               clock.set(Timestamp.make(closesAt))
             }
           }),
-        publishLobby: (gameId, lobby) =>
+        publishLobby: (gameId, lobby, version) =>
           Effect.sync(() => {
-            journal.push({ op: "publishLobby", gameId, lobby })
+            journal.push({ op: "publishLobby", gameId, lobby, version })
           }),
       })
       const deps = Layer.mergeAll(

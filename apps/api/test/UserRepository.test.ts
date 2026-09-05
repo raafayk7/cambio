@@ -41,6 +41,30 @@ describe("UserRepositoryLive (C4.1)", () => {
     expect(result.left._tag).toBe("UserNotFound")
   })
 
+  it("findManyById returns present users; missing and soft-deleted ids are simply absent (C2)", async () => {
+    const carol = user(3, "carol")
+    const dave = user(4, "dave")
+    const ghost = user(998, "ghost")
+    const found = await runtime.runPromise(
+      Effect.gen(function* () {
+        const users = yield* UserRepository
+        const sql = yield* SqlClient.SqlClient
+        yield* users.create(carol)
+        yield* users.create(dave)
+        yield* sql`UPDATE users SET deleted_at = now() WHERE user_id = ${dave.id}`
+        return yield* users.findManyById([carol.id, dave.id, ghost.id])
+      }),
+    )
+    expect(found).toStrictEqual([carol])
+  })
+
+  it("findManyById of an empty id list is an empty result, no query needed (C2)", async () => {
+    const found = await runtime.runPromise(
+      UserRepository.pipe(Effect.flatMap((users) => users.findManyById([]))),
+    )
+    expect(found).toStrictEqual([])
+  })
+
   it("a soft-deleted user is not found (C4.1, C3.6 discipline)", async () => {
     const bob = user(2, "bob")
     const result = await runtime.runPromise(

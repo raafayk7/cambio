@@ -197,20 +197,30 @@ suites (probe-verified via exploration of `apps/api/test/` on this branch).
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes, run bare (no pipes).
-- [ ] Two-browser walkthrough works end to end: name → create → share link
-      → second browser: name → auto-join → live member list both sides →
-      start → both land on `/game/:gameId` placeholder.
-- [ ] Reloading `/room/:gameId` mid-lobby recovers the full room screen
-      (R3).
-- [ ] Both screens pass through the design-gate (verdicts advisory,
-      conflicts surfaced); `ai-tells` audit run on the new surfaces before
-      review; impeccable audit/polish pass per screen. Design system
-      outranks all three — conflicts flagged, never auto-fixed.
-- [ ] The 8-state MVS checklist is answered for both screens (built or
-      justified N/A per state, recorded in the frontend child plan).
-- [ ] No hidden-information regressions: `AdversarialProjection.test.ts`
-      and the leak-free end-to-end flow stay green with names added.
+- [x] `pnpm turbo build typecheck lint test` passes, run bare (no pipes) —
+      25/25 tasks, 513 tests (contracts 10, domain 194, application 86,
+      api 118, ui 18, web 71, config 16).
+- [x] Two-browser-equivalent walkthrough verified live (in-app browser as
+      player 1, separate-cookie-jar HTTP session as player 2): name →
+      create → share link → second player joins → member list updated
+      live via LobbyUpdated → start → `/game/:gameId` placeholder; plus
+      realtime-container kill/restart showing the reconnecting banner and
+      recovery without reload.
+- [x] Reloading `/room/:gameId` mid-lobby recovers members, status, and
+      grants (R3); visiting the room of a started game redirects the
+      player to the game route (R2 reconciliation).
+- [x] Both screens through the full design-gate pipeline
+      (decompose→map→judge): both **flagged with zero blocking findings**;
+      actionable accidentals fixed or logged (frontend plan Progress
+      16:00); conflicts with canon surfaced, never auto-fixed. `ai-tells`
+      scored the surface 1/30 ("invisible"); impeccable audit ran with 8
+      execution findings, all addressed or logged.
+- [x] The 8-state MVS ledger answered per screen in the frontend child
+      plan (built or justified N/A, verified against source by the
+      impeccable pass).
+- [x] No hidden-information regressions: `AdversarialProjection.test.ts`
+      (with the identical-names-for-every-viewer invariant) and the
+      leak-free end-to-end flow green with names added.
 
 ## Plan of work
 
@@ -265,7 +275,29 @@ changes before screens are gated (so the gate sees final geometry).
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-05 — plan written, awaiting implementation
+- [x] 2026-09-05 — plan written and signed off
+- [x] 2026-09-05 12:00 — M1 + M2 complete (backend lane): contracts
+      harness + C1–C5 frozen shapes landed with schema tests; name
+      plumbing (Lobby aggregate + viewFor names argument +
+      UserRepository.findManyById), tagged versioned LobbyUpdated,
+      config.slamWindowMs on the view, GET /lobbies/:gameId with the
+      byte-identical 404 trio. Filtered backend gate green: contracts 10,
+      domain 194, application 86, api 118 tests. Coverage table filled.
+- [x] 2026-09-05 12:00 — M4 system-wide half done (orchestrator): S1 44px
+      touch floor (button.md r2), S2 AppShell fixes, ADR-0032 env
+      plumbing, courtyard scene realized through the creation gate
+      (user-approved full courtyard; app-shell.md r2). M3 + screens
+      running in the frontend lane.
+- [x] 2026-09-05 15:00 — M3–M5 complete (frontend lane): API client,
+      identity flow, realtime service + connection hook, lobby + room
+      screens, placeholder game route, 34 new web tests. Full gate green.
+- [x] 2026-09-05 16:00 — M6 complete (orchestrator): live walkthrough
+      verified (create/join/live-membership/reload/reconnect/start/
+      redirect-rescue, names + slamWindowMs confirmed on the wire, 44px
+      floor measured in the rendered DOM); design-gate pipeline per
+      screen (both flagged/0-blocking), ai-tells 1/30, impeccable
+      audited; fix batches applied and re-verified; final gate 25/25.
+      Details in the frontend child plan Progress.
 
 ## Decision log
 
@@ -316,6 +348,16 @@ timestamp each entry)_
 - 2026-09-05 — S1 mechanism: 44px **minimum control height** in the
   button canon, padding untouched — user call at sign-off. Rejected:
   `space.3` vertical padding (~50px box, larger visual shift).
+- 2026-09-05 — (implement) soft-deleted users mid-lobby keep their row
+  via LEFT JOIN + COALESCE to an empty name, and viewFor names fall back
+  to an empty string — deliberate totality decisions flagged for the
+  reviewer in the backend child plan, chosen over dropping rows or
+  failing the projection.
+- 2026-09-05 — (implement) courtyard realization: the SVG asset inlines
+  primitive hex values (an external background image cannot read page
+  custom properties) with the token mapping documented in the asset
+  header — the scene-paving theme-fixed precedent, noted for the
+  hardcheck's token scan.
 
 ## Surprises & discoveries
 

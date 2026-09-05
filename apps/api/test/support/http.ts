@@ -5,7 +5,7 @@ import {
   SeedPort,
   SessionSignerPort,
 } from "@cambio/application"
-import type { GameEvent, GameId, GameState, Lobby } from "@cambio/domain"
+import type { GameEvent, GameId, GameState, GameVersion, Lobby } from "@cambio/domain"
 import { Timestamp } from "@cambio/domain"
 import { Effect, Layer, ManagedRuntime, Redacted, Ref } from "effect"
 import { pino } from "pino"
@@ -47,7 +47,12 @@ export type PublishedEntry =
       readonly state: GameState
       readonly events: ReadonlyArray<GameEvent>
     }
-  | { readonly _tag: "lobby"; readonly gameId: GameId; readonly lobby: Lobby }
+  | {
+      readonly _tag: "lobby"
+      readonly gameId: GameId
+      readonly lobby: Lobby
+      readonly version: GameVersion
+    }
 
 /**
  * Recording publisher journal — shared across suites (fileParallelism is
@@ -63,9 +68,9 @@ const recordingPublisher = Layer.succeed(RealtimePublisherPort, {
     Effect.sync(() => {
       publisherJournal.push({ _tag: "game", gameId, state, events })
     }),
-  publishLobby: (gameId, lobby) =>
+  publishLobby: (gameId, lobby, version) =>
     Effect.sync(() => {
-      publisherJournal.push({ _tag: "lobby", gameId, lobby })
+      publisherJournal.push({ _tag: "lobby", gameId, lobby, version })
     }),
 })
 

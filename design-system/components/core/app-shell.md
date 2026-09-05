@@ -1,6 +1,6 @@
 name: app-shell
 status: draft
-version: 1
+version: 2
 extends: none
 
 The screen frame. Class: **Layout**.
@@ -35,3 +35,13 @@ None.
 ## Revisions
 
 - r1: initial (CAM-13).
+- r2 (CAM-17): the courtyard scene ground is realized (creation-gate
+  round; the illustrated SVG lives in the ui package and follows
+  scenes.md law — flat ink, token palette, edges busy / center calm);
+  the shell root is the positioned ancestor for the game state's
+  floating controls; safe-area padding covers the bottom inset so the
+  own-hand dock clears home bars; the settings icon-button renders only
+  when a handler is supplied — an interactive-looking control that does
+  nothing is worse than its absence (design-gate finding), so the canon
+  header's settings affordance appears with the settings surface, not
+  before it.

@@ -37,7 +37,12 @@ export type JournalEntry =
       readonly state: GameState
       readonly events: ReadonlyArray<GameEvent>
     }
-  | { readonly op: "publishLobby"; readonly gameId: GameId; readonly lobby: Lobby }
+  | {
+      readonly op: "publishLobby"
+      readonly gameId: GameId
+      readonly lobby: Lobby
+      readonly version: GameVersion
+    }
 
 export const makeJournal = (): Array<JournalEntry> => []
 
@@ -135,9 +140,14 @@ export const makeGameRepoStub = (journal: Array<JournalEntry>) => {
       const row = rows.get(gameId)
       if (row === undefined) return Effect.fail(new GameNotFound({ gameId }))
       if (row.state !== null) {
+        // Deterministic stub names for the derived started lobby (CAM-17 C1):
+        // the seat index mirrors `user(n)`/`ensureRosterUsers` naming.
         const lobby: Lobby = {
           id: gameId,
-          members: row.state.players.map((p) => p.id),
+          members: row.state.players.map((p, seat) => ({
+            id: p.id,
+            name: `sim-player-${seat}`,
+          })),
           status: "started",
         }
         return Effect.succeed({ lobby, version: row.version })
@@ -170,9 +180,9 @@ export const makePublisherStub = (journal: Array<JournalEntry>) => {
       Effect.sync(() => {
         journal.push({ op: "publishGame", gameId, state, events })
       }),
-    publishLobby: (gameId, lobby) =>
+    publishLobby: (gameId, lobby, version) =>
       Effect.sync(() => {
-        journal.push({ op: "publishLobby", gameId, lobby })
+        journal.push({ op: "publishLobby", gameId, lobby, version })
       }),
   })
   return { layer }
@@ -203,12 +213,19 @@ export const makeIdsStub = (mint: (n: number) => GameId) => {
   })
 }
 
-/** Every listed user exists (name `u<i>`); anyone else is UserNotFound. */
+/** Every listed user exists (name `sim-player-<i>`, the `user(n)` fixture's); anyone else is UserNotFound. */
 export const usersStub = (existing: ReadonlyArray<UserId>) =>
   Layer.succeed(UserRepository, {
     create: () => Effect.die("create unused in this suite"),
     findById: (userId: UserId) =>
       existing.includes(userId)
-        ? Effect.succeed({ id: userId, name: `u${existing.indexOf(userId)}` })
+        ? Effect.succeed({ id: userId, name: `sim-player-${existing.indexOf(userId)}` })
         : Effect.fail(new UserNotFound({ userId })),
+    // Missing ids are simply absent (the port's C2 contract).
+    findManyById: (userIds: ReadonlyArray<UserId>) =>
+      Effect.succeed(
+        userIds
+          .filter((id) => existing.includes(id))
+          .map((id) => ({ id, name: `sim-player-${existing.indexOf(id)}` })),
+      ),
   })
