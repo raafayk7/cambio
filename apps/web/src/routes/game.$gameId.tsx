@@ -17,11 +17,7 @@ export const Route = createFileRoute("/game/$gameId")({
 function GameHoldingPage() {
   const connection = useConnection()
   return (
-    <AppShell
-      scene="paving"
-      connection={connection}
-      state={connection === "reconnecting" ? "reconnecting" : "default"}
-    >
+    <AppShell scene="paving" connection={connection}>
       <div className="flex flex-1 items-center justify-center">
         <Loading delayMs={0} caption="shuffling…" />
       </div>

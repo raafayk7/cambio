@@ -6,7 +6,7 @@ import { Alert } from "./alert.js"
 import { Button } from "./button.js"
 
 /**
- * AppShell — design-system/components/core/app-shell.md (r2).
+ * AppShell — design-system/components/core/app-shell.md (r3).
  * Class: Layout.
  *
  * The screen frame: slim header on surface.page (wordmark in the display
@@ -15,25 +15,38 @@ import { Button } from "./button.js"
  * grounds (patterns/scenes.md): screens declare a depth, never paint
  * their own. `courtyard` (lobby) renders the illustrated courtyard scene
  * (realized in CAM-17 through the creation gate; app-shell.md r2). The
- * `game` state collapses the header to a floating icon pair;
- * `reconnecting` adds the alert bar under the header while play stays
- * visibly live.
+ * `game` state collapses the header to a floating icon pair.
+ *
+ * `state` is the chrome axis only (r3, CAM-18 S1) — reconnecting is
+ * orthogonal, derived from `connection` on either chrome: `default`
+ * chrome gets the alert bar under the header (unchanged); `game` chrome
+ * gets the same Alert reconnecting variant floating below the icon pair,
+ * inside the flex column the floating controls already anchor to (the
+ * shell root stays their positioned ancestor). Play stays visibly live
+ * behind either treatment.
  */
 export interface AppShellProps extends React.HTMLAttributes<HTMLDivElement> {
   scene?: "plain" | "paving" | "courtyard"
-  state?: "default" | "game" | "reconnecting"
+  state?: "default" | "game"
   onSettings?: () => void
   connection?: "connected" | "reconnecting"
 }
 
+// Shape redundancy (r3, CAM-18 S2): filled disc when connected, hollow
+// ring when reconnecting — color is never the only signal, and in game
+// chrome this dot is the only always-visible one. `data-connection`
+// gives structural tests a hook that doesn't depend on class internals
+// (ADR-0030; empty-state.tsx's `data-state` precedent).
 function ConnectionDot({ connection }: { connection: "connected" | "reconnecting" }) {
+  const connected = connection === "connected"
   return (
     <span
       role="status"
-      aria-label={connection === "connected" ? "Connected" : "Reconnecting"}
+      aria-label={connected ? "Connected" : "Reconnecting"}
+      data-connection={connection}
       className={cn(
-        "inline-block size-2 rounded-full border border-ink-primary",
-        connection === "connected" ? "bg-accent-action" : "bg-accent-alarm",
+        "inline-block size-3 rounded-full",
+        connected ? "border border-ink-primary bg-accent-action" : "border-2 border-accent-alarm",
       )}
     />
   )
@@ -74,24 +87,33 @@ export function AppShell({
       {...props}
     >
       {state === "game" ? (
-        <div className="absolute top-2 right-2 z-40 flex items-center gap-2">
-          <ConnectionDot connection={connection} />
-          <SettingsButton onSettings={onSettings} />
-        </div>
-      ) : (
-        <header className="flex items-center justify-between bg-surface-page px-4 py-2">
-          <span className="font-display text-lg">Cambio</span>
-          <div className="flex items-center gap-3">
+        <div className="absolute inset-x-2 top-2 z-40 flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
             <ConnectionDot connection={connection} />
             <SettingsButton onSettings={onSettings} />
           </div>
-        </header>
+          {connection === "reconnecting" ? (
+            <Alert variant="reconnecting" className="w-full">
+              Reconnecting…
+            </Alert>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <header className="flex items-center justify-between bg-surface-page px-4 py-2">
+            <span className="font-display text-lg">Cambio</span>
+            <div className="flex items-center gap-3">
+              <ConnectionDot connection={connection} />
+              <SettingsButton onSettings={onSettings} />
+            </div>
+          </header>
+          {connection === "reconnecting" ? (
+            <Alert variant="reconnecting" className="rounded-none border-x-0">
+              Reconnecting…
+            </Alert>
+          ) : null}
+        </>
       )}
-      {state === "reconnecting" ? (
-        <Alert variant="reconnecting" className="rounded-none border-x-0">
-          Reconnecting…
-        </Alert>
-      ) : null}
       <main className="flex min-h-0 flex-1 flex-col">{children}</main>
     </div>
   )

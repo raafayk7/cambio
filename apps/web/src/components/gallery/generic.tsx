@@ -652,10 +652,23 @@ export function AppShellSection() {
           </AppShell>
         </div>
       </StateCard>
-      <StateCard label="reconnecting" wide>
+      <StateCard label="default + reconnecting (banner under the header)" wide>
         <div className="aspect-video w-full overflow-hidden rounded-md border-frame">
-          <AppShell state="reconnecting" connection="reconnecting" className="min-h-0 h-full">
+          <AppShell connection="reconnecting" className="min-h-0 h-full">
             <div className="p-4">Play stays visibly live.</div>
+          </AppShell>
+        </div>
+      </StateCard>
+      <StateCard label="game + reconnecting (orthogonal to the collapsed chrome, r3)" wide>
+        <div className="aspect-video w-full overflow-hidden rounded-md border-frame">
+          <AppShell
+            state="game"
+            scene="paving"
+            connection="reconnecting"
+            onSettings={() => {}}
+            className="min-h-0 h-full"
+          >
+            <div className="p-4" />
           </AppShell>
         </div>
       </StateCard>

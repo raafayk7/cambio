@@ -1,6 +1,6 @@
 name: app-shell
 status: draft
-version: 2
+version: 3
 extends: none
 
 The screen frame. Class: **Layout**.
@@ -15,11 +15,22 @@ The screen frame. Class: **Layout**.
   chrome).
 - The game screen may collapse the header to a floating icon-button pair —
   play is full-bleed.
+- Connection dot: shape-redundant, never color-only (r3) — a filled disc
+  when connected, a hollow ring when reconnecting, both ~12px (the ordinal
+  scale's `size-3`). In the collapsed `game` chrome this dot is the only
+  always-visible connection signal.
 
 ## States
 
-- `default` / `game` (collapsed header) / `reconnecting` (alert bar under
-  the header).
+- Chrome: `default` / `game` (collapsed header) — this is the only axis
+  `state` controls (r3).
+- Connection (orthogonal, r3): `connected` / `reconnecting`, driven by the
+  `connection` prop on **either** chrome. `default` chrome renders the
+  alert bar under the header (unchanged since r1); `game` chrome renders
+  the same Alert `reconnecting` variant floating directly below the
+  icon-button pair, inside the shell root's positioned floating-controls
+  column — never a second, competing piece of visual vocabulary. Play
+  stays visibly live behind both treatments.
 
 ## Variants
 
@@ -48,3 +59,15 @@ None.
   nothing is worse than its absence (design-gate finding), so the canon
   header's settings affordance appears with the settings surface, not
   before it.
+- r3 (CAM-18 S1/S2, 2026-09-05): the mutually exclusive `state` union
+  (`default` | `game` | `reconnecting`) is split into two orthogonal
+  axes — `state` keeps the chrome (`default` | `game`) and reconnecting
+  now derives from the existing `connection` prop on either chrome, so
+  the collapsed `game` chrome can show the reconnecting treatment
+  instead of being unable to represent it. `game` chrome's reconnecting
+  signal is the existing Alert `reconnecting` variant, floated below the
+  icon-button pair inside the same positioned column — no new visual
+  vocabulary. The connection dot gains shape redundancy: filled disc
+  (connected) vs. hollow ring (reconnecting), sized from the ordinal
+  scale (`size-3`, ~12px) — closes the color-only exposure the CAM-17
+  judge flagged.
