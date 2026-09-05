@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, describe, expect, it } from "@effect/vitest"
-import { type GameEvent } from "@cambio/domain"
-import { card, gid, uid } from "@cambio/domain/testing"
+import { type GameEvent, GameVersion } from "@cambio/domain"
+import { card, gid, uid, user } from "@cambio/domain/testing"
 import { RealtimeClient, type RealtimeChannel } from "@supabase/realtime-js"
 import { Effect } from "effect"
 
@@ -145,14 +145,24 @@ describe("realtime broadcast integration", () => {
       makeFetchTransport({ realtimeUrl: REALTIME_URL, jwtSecret: JWT_SECRET }),
     )
     await Effect.runPromise(
-      publisher.publishLobby(gid(902), { id: gid(902), members: [p0], status: "open" }),
+      publisher.publishLobby(
+        gid(902),
+        { id: gid(902), members: [user(0)], status: "open" },
+        GameVersion.make(2),
+      ),
     )
 
     await waitFor(() => roomSink.length >= 1, 10_000)
+    // Tagged payload (CAM-17 C3): event name = _tag, version rides along;
+    // members carry their public names (C1).
     expect(roomSink).toEqual([
       {
         event: "LobbyUpdated",
-        payload: { id: gid(902), members: [p0], status: "open" },
+        payload: {
+          _tag: "LobbyUpdated",
+          lobby: { id: gid(902), members: [user(0)], status: "open" },
+          version: 2,
+        },
       },
     ])
     await channel.unsubscribe()

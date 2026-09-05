@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
-import { type GameEvent, type GameState, decodeGameConfig } from "@cambio/domain"
-import { card, gid, slot, ts, uid } from "@cambio/domain/testing"
+import { type GameEvent, type GameState, GameVersion, decodeGameConfig } from "@cambio/domain"
+import { card, gid, slot, ts, uid, user } from "@cambio/domain/testing"
 import { Effect } from "effect"
 
 import { type BroadcastMessage, makeRealtimePublisher } from "../src/infra/realtime-publisher.js"
@@ -96,13 +96,23 @@ describe("publishLobby", () => {
     Effect.gen(function* () {
       const { calls, transport } = makeRecorder()
       const publisher = makeRealtimePublisher(SECRET, transport)
-      yield* publisher.publishLobby(game, { id: game, members: [p0, p1], status: "open" })
+      yield* publisher.publishLobby(
+        game,
+        { id: game, members: [user(0), user(1)], status: "open" },
+        GameVersion.make(3),
+      )
+      // Tagged payload (CAM-17 C3): event name = _tag, version rides along;
+      // members carry their public names (C1).
       expect(calls).toEqual([
         [
           {
             topic: roomTopic(SECRET, game),
             event: "LobbyUpdated",
-            payload: { id: game, members: [p0, p1], status: "open" },
+            payload: {
+              _tag: "LobbyUpdated",
+              lobby: { id: game, members: [user(0), user(1)], status: "open" },
+              version: 3,
+            },
           },
         ],
       ])
@@ -124,11 +134,11 @@ describe("failure containment (C4.3)", () => {
   it.effect("a defective transport is swallowed too", () =>
     Effect.gen(function* () {
       const publisher = makeRealtimePublisher(SECRET, () => Effect.die(new Error("boom")))
-      const result = yield* publisher.publishLobby(game, {
-        id: game,
-        members: [p0],
-        status: "open",
-      })
+      const result = yield* publisher.publishLobby(
+        game,
+        { id: game, members: [user(0)], status: "open" },
+        GameVersion.make(1),
+      )
       expect(result).toBeUndefined()
     }),
   )

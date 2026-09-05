@@ -9,7 +9,7 @@ import {
   type Lobby,
   type UserId,
 } from "@cambio/domain"
-import { gid, ts, uid } from "@cambio/domain/testing"
+import { gid, ts, uid, user } from "@cambio/domain/testing"
 import { joinLobby } from "../src/use-cases/JoinLobby.js"
 import {
   makeGameRepoStub,
@@ -44,12 +44,17 @@ describe("joinLobby (clause 2)", () => {
   it.effect("appends in join order, saves at the loaded version, publishes after persist", () => {
     const journal = makeJournal()
     const repo = makeGameRepoStub(journal)
-    return seeded(journal, seedLobby(newLobby(gid(1), uid(0)))).pipe(
+    return seeded(journal, seedLobby(newLobby(gid(1), user(0)))).pipe(
       Effect.andThen(joinLobby({ gameId: gid(1), userId: uid(1) })),
       Effect.map((result) => {
-        expect(result.lobby.members).toEqual([uid(0), uid(1)])
+        // The joiner's name came from the repository lookup (C1).
+        expect(result.lobby.members).toEqual([user(0), user(1)])
         expect(result.version).toBe(2)
         expect(opsOf(journal)).toEqual(["loadLobby", "saveLobby", "publishLobby"])
+        // C3: the publish carries the just-persisted version — the one the
+        // use case returns, not the version it loaded (kills a
+        // newVersion→version swap in the publish).
+        expect(journal[2]).toMatchObject({ op: "publishLobby", version: result.version })
       }),
       Effect.provide(layers(journal, repo)),
     )
@@ -80,12 +85,16 @@ describe("joinLobby (clause 2)", () => {
 
   refusal(
     "a full lobby",
-    seedLobby({ id: gid(1), members: [uid(0), uid(1), uid(2), uid(3), uid(4)], status: "open" }),
+    seedLobby({
+      id: gid(1),
+      members: [user(0), user(1), user(2), user(3), user(4)],
+      status: "open",
+    }),
     uid(5),
     "LobbyFull",
   )
 
-  refusal("joining twice", seedLobby(newLobby(gid(1), uid(1))), uid(1), "AlreadyInLobby")
+  refusal("joining twice", seedLobby(newLobby(gid(1), user(1))), uid(1), "AlreadyInLobby")
 
   refusal(
     "an abandoned lobby",
@@ -120,7 +129,7 @@ describe("joinLobby (clause 2)", () => {
 
   refusal(
     "an unknown user",
-    seedLobby(newLobby(gid(1), uid(0))),
+    seedLobby(newLobby(gid(1), user(0))),
     "00000000-0000-4000-8000-00000000beef" as UserId,
     "UserNotFound",
   )

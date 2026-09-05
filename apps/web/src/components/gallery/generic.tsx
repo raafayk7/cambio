@@ -146,6 +146,13 @@ export function PanelSection() {
           The ceremonial dress.
         </Panel>
       </StateCard>
+      <StateCard label="wash (on illustrated scenes only, panel.md r2)" wide>
+        <div className="scene-courtyard flex justify-center rounded-md border-frame p-5">
+          <Panel variant="wash" className="w-2xs">
+            The painting shows through the paper.
+          </Panel>
+        </div>
+      </StateCard>
     </Section>
   )
 }
@@ -622,18 +629,25 @@ export function AppShellSection() {
   return (
     <Section
       title="app-shell"
-      note="The shell owns scene grounds; screens declare a depth. The courtyard illustration is an open gap (CAM-16). This gallery page itself runs inside the default shell."
+      note="The shell owns scene grounds; screens declare a depth. This gallery page itself runs inside the default shell."
     >
       <StateCard label="default (plain cream)" wide>
         <div className="aspect-video w-full overflow-hidden rounded-md border-frame">
-          <AppShell className="min-h-0 h-full">
+          <AppShell onSettings={() => {}} className="min-h-0 h-full">
             <div className="p-4">Screen content</div>
           </AppShell>
         </div>
       </StateCard>
+      <StateCard label="courtyard scene (lobby, app-shell.md r2)" wide>
+        <div className="aspect-video w-full overflow-hidden rounded-md border-frame">
+          <AppShell scene="courtyard" className="min-h-0 h-full">
+            <div className="p-4" />
+          </AppShell>
+        </div>
+      </StateCard>
       <StateCard label="game (collapsed header, paving scene)" wide>
-        <div className="relative aspect-video w-full overflow-hidden rounded-md border-frame">
-          <AppShell state="game" scene="paving" className="min-h-0 h-full">
+        <div className="aspect-video w-full overflow-hidden rounded-md border-frame">
+          <AppShell state="game" scene="paving" onSettings={() => {}} className="min-h-0 h-full">
             <div className="p-4" />
           </AppShell>
         </div>

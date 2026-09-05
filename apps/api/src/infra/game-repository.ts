@@ -383,7 +383,9 @@ export const GameRepositoryLive = Layer.effect(
                     SELECT user_id FROM game_players
                     WHERE game_id = ${input.gameId} AND deleted_at IS NULL
                   `
-                  const memberSet = new Set<string>(input.lobby.members)
+                  // Ids only (CAM-17 C1): names live in `users` and re-join on
+                  // load — storing them here would violate store-nothing-derivable.
+                  const memberSet = new Set<string>(input.lobby.members.map((m) => m.id))
                   for (const row of live) {
                     if (!memberSet.has(row.user_id)) {
                       yield* sql`
@@ -393,10 +395,10 @@ export const GameRepositoryLive = Layer.effect(
                       `
                     }
                   }
-                  for (const [position, userId] of input.lobby.members.entries()) {
+                  for (const [position, member] of input.lobby.members.entries()) {
                     yield* sql`
                       INSERT INTO game_players (game_id, user_id, seat_index)
-                      VALUES (${input.gameId}, ${userId}, ${position})
+                      VALUES (${input.gameId}, ${member.id}, ${position})
                       ON CONFLICT (game_id, user_id) DO UPDATE
                       SET seat_index = EXCLUDED.seat_index, deleted_at = NULL,
                           updated_at = now()
@@ -418,10 +420,18 @@ export const GameRepositoryLive = Layer.effect(
           if (gameRow === undefined) {
             return yield* Effect.fail(new GameNotFound({ gameId }))
           }
-          const members = yield* sql<{ user_id: string }>`
-            SELECT user_id FROM game_players
-            WHERE game_id = ${gameId} AND deleted_at IS NULL
-            ORDER BY seat_index
+          // LEFT JOIN + COALESCE, deliberately (CAM-17 C1): a member row must
+          // never vanish because its user was soft-deleted mid-lifecycle — the
+          // usual filter-soft-deletes convention is applied to the JOINED
+          // table by projecting the name as the loud-but-valid '—' (the
+          // contracts DisplayName totality value), not by dropping the member.
+          const members = yield* sql<{ user_id: string; user_name: string }>`
+            SELECT gp.user_id, COALESCE(u.user_name, '—') AS user_name
+            FROM game_players gp
+            LEFT JOIN users u
+              ON u.user_id = gp.user_id AND u.deleted_at IS NULL
+            WHERE gp.game_id = ${gameId} AND gp.deleted_at IS NULL
+            ORDER BY gp.seat_index
           `
           const status: LobbyStatus =
             gameRow.status === "lobby"
@@ -431,7 +441,7 @@ export const GameRepositoryLive = Layer.effect(
                 : "started"
           const lobby = yield* Schema.decodeUnknown(Lobby)({
             id: gameId,
-            members: members.map((m) => m.user_id),
+            members: members.map((m) => ({ id: m.user_id, name: m.user_name })),
             status,
           }).pipe(Effect.mapError(storage("games.loadLobby.decode")))
           return { lobby, version: GameVersion.make(Number(gameRow.version)) }

@@ -63,6 +63,13 @@ const startGame = async () => {
   return { gameId, alice, bob }
 }
 
+/** The names map viewFor takes (C2) — mirrors the server's playerNames. */
+const namesOf = (alice: Player, bob: Player): ReadonlyMap<UserId, string> =>
+  new Map([
+    [toUserId(alice.userId), "Alice"],
+    [toUserId(bob.userId), "Bob"],
+  ])
+
 /** The server's deal, replayed from the fixed seed. Timestamps don't shape it. */
 const replayDeal = (alice: Player, bob: Player): GameState => {
   const dealt = dealGame(
@@ -94,7 +101,7 @@ describe("POST /games/:gameId/commands (C1.4, C6.1)", () => {
         source: "deck",
       },
     }
-    expect(body.view).toEqual(viewFor(toUserId(alice.userId), afterDraw))
+    expect(body.view).toEqual(viewFor(toUserId(alice.userId), afterDraw, namesOf(alice, bob)))
     expectNoLeak(body, entitledSlugs(afterDraw, toUserId(alice.userId)), "draw reply")
   })
 
@@ -164,7 +171,7 @@ describe("GET /games/:gameId/view (C1.6)", () => {
     expect(body.view.players.map((p) => p.id)).toEqual([alice.userId, bob.userId])
 
     const replayed = replayDeal(alice, bob)
-    expect(body.view).toEqual(viewFor(toUserId(bob.userId), replayed))
+    expect(body.view).toEqual(viewFor(toUserId(bob.userId), replayed, namesOf(alice, bob)))
     expectNoLeak(body, entitledSlugs(replayed, toUserId(bob.userId)), "bob snapshot")
   })
 

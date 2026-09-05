@@ -43,6 +43,6 @@ export const leaveLobby = (
       lobby: next,
       expectedVersion: version,
     })
-    yield* publisher.publishLobby(input.gameId, next)
+    yield* publisher.publishLobby(input.gameId, next, newVersion)
     return { lobby: next, version: newVersion }
   })

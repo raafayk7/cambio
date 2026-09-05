@@ -31,6 +31,7 @@ const repoStub = (findById: (typeof UserRepository.Service)["findById"], onConsu
       onConsult?.()
       return findById(userId)
     },
+    findManyById: () => Effect.die("findManyById unused in this suite"),
   })
 
 const liveUserRepo = repoStub(() => Effect.succeed(USER))

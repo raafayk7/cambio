@@ -9,7 +9,7 @@ import {
   Timestamp,
   type UserId,
 } from "@cambio/domain"
-import { gid, uid } from "@cambio/domain/testing"
+import { gid, uid, user } from "@cambio/domain/testing"
 import { startGame } from "../src/use-cases/StartGame.js"
 import {
   makeGameRepoStub,
@@ -46,19 +46,20 @@ describe("startGame (clause 4)", () => {
     () => {
       const journal = makeJournal()
       const repo = makeGameRepoStub(journal)
-      const members = [uid(0), uid(1), uid(2)]
+      const members = [user(0), user(1), user(2)]
+      const seats = members.map((m) => m.id)
       return seedLobby({ id: gid(1), members, status: "open" }).pipe(
         Effect.map(() => journal.splice(0)),
         // uid(1), not the creator — no host concept.
         Effect.andThen(startGame({ gameId: gid(1), starterId: uid(1), config })),
         Effect.map((result) => {
-          expect(result.state.players.map((p) => p.id)).toEqual(members)
+          expect(result.state.players.map((p) => p.id)).toEqual(seats)
           expect(result.state.config).toEqual(config)
           expect(result.version).toBe(2) // the lobby's v1 consumed by the deal save
           expect(result.events.map((e) => e._tag)).toEqual(["GameStarted"])
           expect(opsOf(journal)).toEqual(["loadLobby", "save", "publishGame"])
           // Deterministic deal: stubbed seed + clock reproduce it exactly.
-          const dealt = dealGame(members, SEED, config, NOW)
+          const dealt = dealGame(seats, SEED, config, NOW)
           expect(dealt._tag).toBe("Right")
           if (dealt._tag === "Right") expect(result.state).toEqual(dealt.right[0])
         }),
@@ -88,14 +89,14 @@ describe("startGame (clause 4)", () => {
   // Passed through from dealGame — the single source of the 2–5 rule.
   refusal(
     "a 1-member lobby",
-    { id: gid(1), members: [uid(0)], status: "open" },
+    { id: gid(1), members: [user(0)], status: "open" },
     uid(0),
     "BadPlayerCount",
   )
 
   refusal(
     "a non-member starter",
-    { id: gid(1), members: [uid(0), uid(1)], status: "open" },
+    { id: gid(1), members: [user(0), user(1)], status: "open" },
     uid(2),
     "NotInLobby",
   )
@@ -110,7 +111,7 @@ describe("startGame (clause 4)", () => {
   it.effect("an already-started lobby cannot start again", () => {
     const journal = makeJournal()
     const repo = makeGameRepoStub(journal)
-    const members = [uid(0), uid(1)]
+    const members = [user(0), user(1)]
     return seedLobby({ id: gid(1), members, status: "open" }).pipe(
       Effect.andThen(startGame({ gameId: gid(1), starterId: uid(0), config })),
       Effect.map(() => journal.splice(0)),

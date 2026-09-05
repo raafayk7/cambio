@@ -1,6 +1,6 @@
 name: app-shell
 status: draft
-version: 1
+version: 2
 extends: none
 
 The screen frame. Class: **Layout**.
@@ -35,3 +35,16 @@ None.
 ## Revisions
 
 - r1: initial (CAM-13).
+- r2 (CAM-17): the courtyard scene ground is realized (creation-gate
+  round, then a user-directed art revision: the ground is the
+  moodboard's own painted courtyard — a hi-res regeneration of
+  lums-illustrated image9, shipped as `scene-courtyard.webp` in the ui
+  package; content floats over it on `panel` wash variants so the hero
+  table stays visible);
+  the shell root is the positioned ancestor for the game state's
+  floating controls; safe-area padding covers the bottom inset so the
+  own-hand dock clears home bars; the settings icon-button renders only
+  when a handler is supplied — an interactive-looking control that does
+  nothing is worse than its absence (design-gate finding), so the canon
+  header's settings affordance appears with the settings surface, not
+  before it.

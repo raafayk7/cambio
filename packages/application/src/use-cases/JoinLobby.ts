@@ -54,13 +54,15 @@ export const joinLobby = (
     const publisher = yield* RealtimePublisherPort
 
     const { lobby, version } = yield* games.loadLobby(input.gameId)
-    yield* users.findById(input.userId)
-    const next = yield* addMember(lobby, input.userId)
+    // The lookup's result now matters (CAM-17 C1): the joiner's display name
+    // is embedded in the membership the transition appends.
+    const joiner = yield* users.findById(input.userId)
+    const next = yield* addMember(lobby, joiner)
     const newVersion = yield* games.saveLobby({
       gameId: input.gameId,
       lobby: next,
       expectedVersion: version,
     })
-    yield* publisher.publishLobby(input.gameId, next)
+    yield* publisher.publishLobby(input.gameId, next, newVersion)
     return { lobby: next, version: newVersion }
   })

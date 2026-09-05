@@ -78,7 +78,7 @@ type SlamCommand = Extract<Command, { readonly _tag: "Slam" }>
 const makeWorld = async (slamWindowMs: number) => {
   const clock = makeSettableClock(EPOCH)
   const { app, runtime } = await makeTestApp({ slamWindowMs }, { clock: clock.layer })
-  const { gameId, players, byId, startRes } = await setupGame(app, ["Alice", "Bob"])
+  const { gameId, players, byId, nameById, startRes } = await setupGame(app, ["Alice", "Bob"])
   const dealt = dealGame(
     players.map((p) => toUserId(p.userId)),
     TEST_SEED,
@@ -93,6 +93,7 @@ const makeWorld = async (slamWindowMs: number) => {
     gameId,
     players,
     byId,
+    nameById,
     state: dealt.right[0],
     now: EPOCH,
     lastVersion: (startRes.json() as { version: number }).version,
@@ -116,7 +117,7 @@ const makeWorld = async (slamWindowMs: number) => {
       world.state = apply(world.state, command, world.now)
       const body = res.json() as { view: PlayerGameView; version: number }
       expect(body.view, `view after ${command._tag}`).toEqual(
-        viewFor(toUserId((command as { playerId: string }).playerId), world.state),
+        viewFor(toUserId((command as { playerId: string }).playerId), world.state, nameById),
       )
       expectNoLeak(
         body,
@@ -147,7 +148,7 @@ const makeWorld = async (slamWindowMs: number) => {
   }
   // The deal happened under the frozen injected clock.
   expect((startRes.json() as { view: PlayerGameView }).view).toEqual(
-    viewFor(toUserId(players[0]!.userId), world.state),
+    viewFor(toUserId(players[0]!.userId), world.state, nameById),
   )
   return world
 }
@@ -424,7 +425,7 @@ describe("SlamWindow e2e (CAM-7)", () => {
       const firstRes = responseFor(first)
       expect(firstRes.statusCode).toBe(200)
       const firstBody = firstRes.json() as { view: PlayerGameView; version: number }
-      expect(firstBody.view).toEqual(viewFor(toUserId(first.playerId), world.state))
+      expect(firstBody.view).toEqual(viewFor(toUserId(first.playerId), world.state, world.nameById))
       expect(firstBody.version).toBe(versionBefore + 1)
 
       // The engine's own answer for the loser: judged against the
@@ -435,7 +436,9 @@ describe("SlamWindow e2e (CAM-7)", () => {
         world.state = pureSecond.right[0]
         expect(secondRes.statusCode).toBe(200)
         const secondBody = secondRes.json() as { view: PlayerGameView; version: number }
-        expect(secondBody.view).toEqual(viewFor(toUserId(second.playerId), world.state))
+        expect(secondBody.view).toEqual(
+          viewFor(toUserId(second.playerId), world.state, world.nameById),
+        )
         expect(secondBody.version).toBe(versionBefore + 2)
         expect(entries.length).toBe(2)
       } else {
@@ -456,7 +459,7 @@ describe("SlamWindow e2e (CAM-7)", () => {
         cookies: { cambio_session: world.players[0]!.cookie },
       })
       const viewBody = viewRes.json() as { view: PlayerGameView; version: number }
-      expect(viewBody.view).toEqual(viewFor(toUserId(alice), world.state))
+      expect(viewBody.view).toEqual(viewFor(toUserId(alice), world.state, world.nameById))
       expectNoLeak(viewBody, entitledSlugs(world.state, toUserId(alice)), "post-race view")
     } finally {
       await world.close()
@@ -524,7 +527,9 @@ describe("SlamWindow e2e (CAM-7)", () => {
         cookies: { cambio_session: world.players[0]!.cookie },
       })
       const viewBody = viewRes.json() as { view: PlayerGameView; version: number }
-      expect(viewBody.view).toEqual(viewFor(toUserId(world.players[0]!.userId), world.state))
+      expect(viewBody.view).toEqual(
+        viewFor(toUserId(world.players[0]!.userId), world.state, world.nameById),
+      )
       expectNoLeak(
         viewBody,
         entitledSlugs(world.state, toUserId(world.players[0]!.userId)),
@@ -591,7 +596,7 @@ describe("SlamWindow e2e (CAM-7)", () => {
       expect(res.statusCode).toBe(200)
       state = apply(state, command, phase.closesAt + 1)
       const body = res.json() as { view: PlayerGameView; version: number }
-      expect(body.view).toEqual(viewFor(issuer, state))
+      expect(body.view).toEqual(viewFor(issuer, state, worldOne.nameById))
       expectNoLeak(body, entitledSlugs(state, issuer), "restart command reply")
 
       // Exactly one close batch, before the command's; the refusal itself

@@ -60,7 +60,7 @@
       "dependsOn": ["^build"],
       "cache": false,
       "persistent": true,
-      "passThroughEnv": ["VITE_API_URL"]
+      "passThroughEnv": ["VITE_API_URL", "VITE_REALTIME_URL", "VITE_REALTIME_ANON_JWT"]
     },
     "@cambio/web#build": {
       "dependsOn": ["^build"],
@@ -71,7 +71,7 @@
       "outputs": ["dist/**", ".output/**", ".tanstack/**", "src/routeTree.gen.ts"],
       // Hashed, not passed through: VITE_ vars are baked into the client bundle,
       // so a change genuinely must produce a different build.
-      "env": ["VITE_API_URL"]
+      "env": ["VITE_API_URL", "VITE_REALTIME_URL", "VITE_REALTIME_ANON_JWT"]
     }
   }
 }

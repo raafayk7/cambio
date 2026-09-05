@@ -38,6 +38,7 @@ const recordingRepo = () => {
         created.push(user)
       }),
     findById: (userId) => Effect.fail(new UserNotFound({ userId })),
+    findManyById: () => Effect.die("findManyById unused in this suite"),
   })
   return { created, layer }
 }
@@ -45,6 +46,7 @@ const recordingRepo = () => {
 const failingRepo = Layer.succeed(UserRepository, {
   create: () => Effect.fail(new StorageError({ operation: "users.create", cause: "down" })),
   findById: (userId) => Effect.fail(new UserNotFound({ userId })),
+  findManyById: () => Effect.die("findManyById unused in this suite"),
 })
 
 describe("createTemporaryUser", () => {

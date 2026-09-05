@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer } from "effect"
-import { gid, uid } from "@cambio/domain/testing"
+import { gid, user } from "@cambio/domain/testing"
 import { createLobby } from "../src/use-cases/CreateLobby.js"
 import {
   makeGameRepoStub,
@@ -16,13 +16,19 @@ describe("createLobby (clause 1)", () => {
     () => {
       const journal = makeJournal()
       const repo = makeGameRepoStub(journal)
-      return createLobby({ creatorId: uid(0) }).pipe(
+      return createLobby({ creator: user(0) }).pipe(
         Effect.map((result) => {
-          expect(result.lobby).toEqual({ id: gid(0), members: [uid(0)], status: "open" })
+          expect(result.lobby).toEqual({ id: gid(0), members: [user(0)], status: "open" })
           expect(result.version).toBe(1)
           // Persist before publish, and nothing else.
           expect(opsOf(journal)).toEqual(["saveLobby", "publishLobby"])
-          expect(journal[1]).toMatchObject({ op: "publishLobby", gameId: gid(0) })
+          // C3: the publish carries the just-persisted version — the one the
+          // use case returns (kills a newVersion→version swap in the publish).
+          expect(journal[1]).toMatchObject({
+            op: "publishLobby",
+            gameId: gid(0),
+            version: result.version,
+          })
         }),
         Effect.provide(
           Layer.mergeAll(makeIdsStub(gid), repo.layer, makePublisherStub(journal).layer),

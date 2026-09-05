@@ -1,5 +1,6 @@
 import { Data, Either, Schema } from "effect"
-import { GameId, UserId } from "./Ids.js"
+import { GameId, type UserId } from "./Ids.js"
+import { User } from "./User.js"
 
 /**
  * The pre-game lobby (ADR-0019): a pure model deliberately OUTSIDE the rules
@@ -21,8 +22,13 @@ export type LobbyStatus = typeof LobbyStatus.Type
 
 export const Lobby = Schema.Struct({
   id: GameId,
-  /** Join order — and, at start, the seat order (§4.5, ADR-0019). */
-  members: Schema.Array(UserId),
+  /**
+   * Join order — and, at start, the seat order (§4.5, ADR-0019). Members are
+   * full `{id, name}` users (CAM-17 C1): names are public labels shown at the
+   * table, embedded so every projection/publish site works without a lookup.
+   * Persistence stores ids only — names re-join from `users` on load.
+   */
+  members: Schema.Array(User),
   status: LobbyStatus,
 })
 export type Lobby = typeof Lobby.Type
@@ -59,22 +65,23 @@ const requireOpen = (lobby: Lobby): Either.Either<Lobby, LobbyNotJoinable> =>
     : Either.left(new LobbyNotJoinable({ status: lobby.status }))
 
 /** A fresh lobby: sole member is its creator (root plan clause 1). */
-export const createLobby = (id: GameId, creator: UserId): Lobby => ({
+export const createLobby = (id: GameId, creator: User): Lobby => ({
   id,
   members: [creator],
   status: "open",
 })
 
-/** Append a member in join order (root plan clause 2). */
+/** Append a member in join order (root plan clause 2). Membership is by id. */
 export const joinLobby = (
   lobby: Lobby,
-  userId: UserId,
+  user: User,
 ): Either.Either<Lobby, LobbyFull | AlreadyInLobby | LobbyNotJoinable> =>
   Either.gen(function* () {
     yield* requireOpen(lobby)
-    if (lobby.members.includes(userId)) return yield* Either.left(new AlreadyInLobby({ userId }))
+    if (lobby.members.some((m) => m.id === user.id))
+      return yield* Either.left(new AlreadyInLobby({ userId: user.id }))
     if (lobby.members.length >= MAX_LOBBY_MEMBERS) return yield* Either.left(new LobbyFull())
-    return { ...lobby, members: [...lobby.members, userId] }
+    return { ...lobby, members: [...lobby.members, user] }
   })
 
 /**
@@ -87,8 +94,9 @@ export const leaveLobby = (
 ): Either.Either<Lobby, NotInLobby | LobbyNotJoinable> =>
   Either.gen(function* () {
     yield* requireOpen(lobby)
-    if (!lobby.members.includes(userId)) return yield* Either.left(new NotInLobby({ userId }))
-    const members = lobby.members.filter((m) => m !== userId)
+    if (!lobby.members.some((m) => m.id === userId))
+      return yield* Either.left(new NotInLobby({ userId }))
+    const members = lobby.members.filter((m) => m.id !== userId)
     return {
       ...lobby,
       members,
@@ -98,9 +106,10 @@ export const leaveLobby = (
 
 /**
  * Start-eligibility: any current member may start — no host concept (root
- * plan Decision Log). Returns the seat order (= join order). Deliberately no
- * member-count check: `dealGame`'s `BadPlayerCount` is the single source of
- * the 2–5 rule.
+ * plan Decision Log). Returns the seat order (= join order) as member IDS —
+ * `dealGame` and every engine consumer stay id-typed (CAM-17 C1).
+ * Deliberately no member-count check: `dealGame`'s `BadPlayerCount` is the
+ * single source of the 2–5 rule.
  */
 export const startSeats = (
   lobby: Lobby,
@@ -108,7 +117,7 @@ export const startSeats = (
 ): Either.Either<ReadonlyArray<UserId>, NotInLobby | LobbyNotJoinable> =>
   Either.gen(function* () {
     yield* requireOpen(lobby)
-    if (!lobby.members.includes(starter))
+    if (!lobby.members.some((m) => m.id === starter))
       return yield* Either.left(new NotInLobby({ userId: starter }))
-    return lobby.members
+    return lobby.members.map((m) => m.id)
   })

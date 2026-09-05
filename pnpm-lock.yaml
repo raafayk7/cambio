@@ -99,6 +99,9 @@ importers:
       '@cambio/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@supabase/realtime-js':
+        specifier: 2.112.4
+        version: 2.112.4
       '@tanstack/react-query':
         specifier: 5.101.4
         version: 5.101.4(react@19.2.8)
@@ -223,6 +226,9 @@ importers:
       '@cambio/config':
         specifier: workspace:*
         version: link:../config
+      '@effect/vitest':
+        specifier: 0.30.0
+        version: 0.30.0(effect@3.22.1)(vitest@3.2.7(@types/node@22.20.1)(jiti@2.7.0)(jsdom@30.0.1)(lightningcss@1.33.0)(tsx@4.23.5))
       '@types/node':
         specifier: 22.20.1
         version: 22.20.1
@@ -232,6 +238,9 @@ importers:
       typescript:
         specifier: 5.9.3
         version: 5.9.3
+      vitest:
+        specifier: 3.2.7
+        version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(jsdom@30.0.1)(lightningcss@1.33.0)(tsx@4.23.5)
 
   packages/domain:
     dependencies:

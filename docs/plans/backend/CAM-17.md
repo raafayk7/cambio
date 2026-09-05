@@ -132,7 +132,7 @@ already broadcast to the whole room inside `GameStarted`).
 
 | Clause | Shape (advisory sketch — coverage table is what gets reconciled)                                                                                                                                                                                                                                                                                                                                     |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1     | `LobbyView.members: Array({ id: Uuid, name: String })` (name is 1–32 by construction at `POST /users`; responses carry it as plain `Schema.String`, the `SessionUser` precedent)                                                                                                                                                                                                                     |
+| C1     | `LobbyView.members: Array({ id: Uuid, name: String })` (name constrained by the shared `DisplayName` schema — amended in the review fix cycle, F4: the plan-time claim "1–32 by construction, plain Schema.String" became false once `"—"` fallbacks and wire validation landed)                                                                                                                     |
 | C2     | `ViewPlayer` gains `name: Schema.String`; identical value in every viewer's projection                                                                                                                                                                                                                                                                                                               |
 | C3     | `LobbyUpdated = Schema.TaggedStruct("LobbyUpdated", { lobby: LobbyView, version: GameVersion })` exported from `GameEvents.ts` with decode/encode helpers; **not** added to `RoomGameEvent` (that union is the projection of the 22 in-game domain events; `LobbyUpdated` is the pre-game row-backed broadcast). `version` added at root-plan reconciliation — the client's staleness guard needs it |
 | C4     | `PlayerGameView` gains `config: Schema.Struct({ slamWindowMs: Schema.Int })` — mirrors the `GameStarted` event's `config` field verbatim                                                                                                                                                                                                                                                             |
@@ -337,24 +337,120 @@ a planned approach**; test file, name, and assertion phrase are written by
 `/implement` as each test lands — planned approaches name suites to
 extend, never invented test titles.)_
 
-| Clause | Test (file + name)                                                                                                                                                                          | What is asserted |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| C1     | _planned:_ contracts schema test (new `packages/contracts/test/`) + extended member assertions in `apps/api/test/Lobbies.test.ts` and `LobbyRepository.test.ts`                             | _(pending)_      |
-| C2     | _planned:_ contracts schema test + extended `packages/application/test/ViewFor.test.ts` structure coverage; identical-for-every-viewer via `AdversarialProjection.test.ts`                  | _(pending)_      |
-| C3     | _planned:_ contracts schema test (tag + version + round-trip + bare-payload rejection) + updated publishLobby expectations in `RealtimePublisher.test.ts` and `RealtimeIntegration.test.ts` | _(pending)_      |
-| C4     | _planned:_ `ViewFor.test.ts` sources config from state; equals-started-with pinned via the `slamWindowMs` override already used by `apps/api/test/Lobbies.test.ts` start coverage           | _(pending)_      |
-| C5     | _planned:_ decode of the GET-lobby 200 body through `LobbyResponse` in the new `Lobbies.test.ts` describe                                                                                   | _(pending)_      |
-| B1     | _planned:_ new GET describe in `Lobbies.test.ts` — member 200, exact body keys, own-grants isolation mirroring the join-grants test                                                         | _(pending)_      |
-| B2     | _planned:_ same describe — raw-body equality across non-member / unknown-id / non-open 404s                                                                                                 | _(pending)_      |
-| B3     | _planned:_ same describe — malformed uuid 400 with empty publisher journal, patterned on the existing C1.8 test                                                                             | _(pending)_      |
-| B4     | _planned:_ existing suites stay green with shape-only updates (`Lobbies`, `GameCommands`, `EndToEndGame`, `SlamWindow`, `Auth`, `Topics`); no behavioral edits                              | _(pending)_      |
-| B5     | _planned:_ extended `EndToEndGame.test.ts` full-HTTP flow asserting names in lobby payloads and every player's view                                                                         | _(pending)_      |
+| Clause | Test (file + name)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | What is asserted                                                                                                                                                                                                                |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1     | `packages/contracts/test/GameView.test.ts` — "members are {id, name} objects and round-trip", "rejects the pre-C1 bare-uuid member array — regression pin"; `packages/domain/test/Lobby.test.ts` — "appends members, preserving join order (C1)", "joining twice is AlreadyInLobby — membership is by id, not by name", "any current member gets back the member IDS as the seat order — dealGame consumers stay id-typed"; `apps/api/test/Lobbies.test.ts` — "creates a lobby: 201 with the lobby view, version, and the caller's grants"; `apps/api/test/LobbyRepository.test.ts` — "lifecycle round-trips: create → join ×2 → leave → abandon, rows compacted (13a)"                                                                                                                                                                       | `LobbyView.members` is `{id, name}`; domain membership/refusals key on id; the wire carries display names end to end; `loadLobby` re-joins names from `users`                                                                   |
+| C2     | `packages/contracts/test/GameView.test.ts` — "every player carries a name and the view round-trips", "rejects a player without a name — regression pin for the pre-C2 shape"; `packages/application/test/ViewFor.test.ts` — "every player carries their public name, identical in every viewer's projection (C2)", "a player missing from the names map gets an empty-string name — defensive totality (C2)"; `packages/application/test/AdversarialProjection.test.ts` — "no player's view at any step contains an unentitled value; event projections stay channel-clean" (names threaded, identical-per-viewer invariant); `apps/api/test/UserRepository.test.ts` — "findManyById returns present users; missing and soft-deleted ids are simply absent (C2)", "findManyById of an empty id list is an empty result, no query needed (C2)" | `ViewPlayer.name` is on the wire; every viewer sees identical names; the batch lookup filters soft-deletes and omits missing ids; `?? ""` totality pinned                                                                       |
+| C3     | `packages/contracts/test/GameEvents.test.ts` — "round-trips through decode/encode", "the \_tag literal is fixed to LobbyUpdated", "rejects the pre-C3 bare-LobbyView payload (no \_tag, no version) — regression pin", "rejects a payload missing the version"; `apps/api/test/RealtimePublisher.test.ts` — "publishes the public lobby view on the room topic"; `apps/api/test/RealtimeIntegration.test.ts` — "publishLobby lands the public lobby view on the room topic"                                                                                                                                                                                                                                                                                                                                                                   | LobbyUpdated is a tagged struct carrying `{lobby, version}`; the published payload's event name equals `_tag`; the old bare-LobbyView shape no longer decodes                                                                   |
+| C4     | `packages/application/test/ViewFor.test.ts` — "exposes config.slamWindowMs from the state it received — the started-with value (C4)"; `packages/contracts/test/GameView.test.ts` — "carries the started-with slamWindowMs and round-trips", "rejects a view without config — the field is required, not optional"; `apps/api/test/Lobbies.test.ts` — "assembles GameConfig from AppConfig — the override lands in the persisted game"                                                                                                                                                                                                                                                                                                                                                                                                         | `viewFor` fills `config` from `state.config` for every viewer; the started view over HTTP reports the 7777 override the game was started with                                                                                   |
+| C5     | `apps/api/test/Lobbies.test.ts` — "a member gets 200 {lobby, version, grants} — own grants only, decodable through LobbyResponse (B1, C5)"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | GET-lobby 200 body decodes through the reused `LobbyResponse` schema — no new export                                                                                                                                            |
+| B1     | `apps/api/test/Lobbies.test.ts` — "a member gets 200 {lobby, version, grants} — own grants only, decodable through LobbyResponse (B1, C5)" and "401 without a session (B1's auth edge)"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | member 200 with exactly `{grants, version, lobby}` keys, grants match the join reply's, another member's private topic absent, 401 unauthenticated                                                                              |
+| B2     | `apps/api/test/Lobbies.test.ts` — "404s byte-identically for non-members, unknown ids, started and abandoned lobbies (B2)"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | raw `res.body` string equality across all four 404 causes — no existence leak down to the byte                                                                                                                                  |
+| B3     | `apps/api/test/Lobbies.test.ts` — "malformed :gameId is a 400 before any effect — empty publisher journal (B3)"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | 400 contract body, publisher journal empty — refused before any effect                                                                                                                                                          |
+| B4     | full backend suites through turbo — `Lobbies.test.ts`, `GameCommands.test.ts`, `EndToEndGame.test.ts`, `SlamWindow.test.ts`, `Auth.test.ts`, `Topics.test.ts`, `Lifecycle.test.ts`, `RoundTrip.test.ts` and the rest (api 118, application 86, domain 194, contracts 10)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | every pre-existing behavior green with payload-shape-only updates; no route/status/taxonomy behavior changed                                                                                                                    |
+| B5     | `apps/api/test/EndToEndGame.test.ts` — "plays a full game over HTTP; every reply and published payload is leak-free" (extended)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | every create/join lobby publish carries each member's `{id, name}`; the pre-start membership names both players; each player's GET-view snapshot names every seat identically; fixture names ≥3 chars per the leak-scanner note |
 
 ## Progress
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [ ] 2026-09-05 — backend child plan written; awaiting `/implement`
+- [x] 2026-09-05 — Step 1 done: contracts vitest harness (`vitest.config.ts`,
+      `test/` included in `tsconfig.json`), `LobbyUpdated` tagged struct +
+      helpers in `GameEvents.ts` (schema tests green), `publishLobby` port
+      gained the `version` argument (port, three lobby use cases, both stub
+      publishers, SlamTiming's hooked publisher, live adapter now sends the
+      tagged payload with event name = `_tag`), C4 landed TDD-first
+      (`ViewFor.test.ts` red → `PlayerGameView.config` + `viewFor` fill →
+      green; contracts pin + Lobbies 7777 pin). Suites: contracts 6,
+      application 84, api 112 — all green through turbo.
+- [x] 2026-09-05 — Step 2 done (C1 vertical): domain TDD
+      (`Lobby.test.ts` rewritten to `User` members, red 5 → green),
+      `Lobby.members: Schema.Array(User)` with id-keyed transitions and
+      `startSeats` returning ids; new `user(n)` fixture in
+      `@cambio/domain/testing` (name matches `ensureRosterUsers`);
+      `LobbyView.members` is `{id, name}` (`LobbyMember` schema + pins);
+      `CreateLobby` takes `{creator: User}`, `JoinLobby` feeds its lookup
+      into the transition, `lobbyView` maps names through; stub repo derives
+      deterministic started-lobby names; `loadLobby` LEFT JOINs `users` with
+      `COALESCE(user_name,'')`, `saveLobby` writes ids only; create route
+      passes the session user. Suites: domain 194, application 84, api 112 —
+      green.
+- [x] 2026-09-05 — Step 3 done (C2 vertical): `UserRepository.findManyById`
+      port + four stub updates; api adapter one `IN` query
+      (`sql.in("user_id", ids)`, empty-list short-circuit) with two new
+      `UserRepository.test.ts` pins; TDD on `ViewFor.test.ts` (3 red name
+      tests → green) — `viewFor(viewerId, state, names)` with the `?? ""`
+      totality arm; new `projection/PlayerNames.ts` (`playerNames(state)`),
+      exported from the index; `ViewPlayer.name` in contracts + pins; the
+      three route sites compose `playerNames` (GET view keeps
+      404-before-names via a `names: null` marker decided on `state` before
+      any lookup); adversarial sweep threads names and asserts the
+      identical-per-viewer invariant; `setupGame` returns `nameById` and
+      SlamWindow/EndToEndGame/GameCommands recompute `viewFor` with it.
+      Suites: contracts 10, domain 194, application 86, api 114 — green.
+- [x] 2026-09-05 — Step 4 done (C5 + B1–B3): `GET /lobbies/:gameId` in
+      `lobbies.ts` — read path composing `GameRepository.loadLobby` directly
+      (no actor, the GET-view precedent), member-of-open 200 reusing
+      `encodeLobbyResponse` with own grants, the typed GameNotFound 404
+      body via `typedErrorBody` for non-member/non-open, 400-before-effect on
+      malformed uuid; `LobbyResponse` doc comment names the GET (C5 by
+      reuse). New `Lobbies.test.ts` describe: member 200 + LobbyResponse
+      decode + grants isolation, byte-identical 404 quartet (non-member /
+      unknown / started / abandoned — raw-body equality), malformed-uuid
+      400 with empty journal, 401. api suite 118 — green.
+- [x] 2026-09-05 — Step 5 done (B4/B5 closure): `setupGame` snapshots the
+      create/join lobby publishes before its journal clear and returns
+      them; `EndToEndGame.test.ts` asserts every lobby publish carries
+      `{id, name}` members, the pre-start membership names both players,
+      and each player's GET-view snapshot names every seat identically
+      (fixture names ≥3 chars per the leak-scanner note). Closing gate:
+      `build typecheck test` filtered to the four backend packages — 12/12
+      tasks green (contracts 10, domain 194, application 86, api 118);
+      per-package `eslint .` green for all four. The `lint` turbo task's
+      repo-wide `//#format:check` dependency fails ONLY on
+      `packages/ui/src/components/app-shell.tsx` — the frontend lane's
+      in-flight file, outside this lane's boundary (see Surprises).
+- [x] 2026-09-05 18:45 — fix cycle (review findings F4–F9, backend lane):
+  - **F6** — `User` entity extracted to `packages/domain/src/User.ts`
+    (out of the port file, per architecture skill file-placement);
+    `UserRepository.ts` re-exports it and `Lobby.ts` imports from
+    `User.js`, so the Lobby → UserRepository → GameRepository → Lobby
+    module cycle no longer exists. Both statement-form `import type`
+    workarounds reverted to the repo's inline `{ type X }` style and the
+    stale cycle comments deleted; `User.js` added to the domain index.
+  - **F4** — shared `DisplayName` schema (Trim + min 1 + max 32) added to
+    `contracts/GamePrimitives.ts`; reused by `CreateUserRequest`,
+    `SessionUser`, `ViewPlayer.name`, `LobbyMember.name`. The
+    vanished-user fallback is now the loud-but-valid literal `"—"`
+    (decodes under `DisplayName`, where `""` would not) in both
+    producers: the `viewFor` totality arm and `loadLobby`'s COALESCE;
+    the false "1–32 by construction" docstring in `GameView.ts`
+    rewritten; the `ViewFor.test.ts` pin updated from `""` to `"—"`.
+  - **F5** — `viewForEffect(viewerId, state)` added to `ViewFor.ts`
+    (requires `UserRepository`; composes `playerNames` + the pure
+    `viewFor`, which stays exported as the test seam). The three route
+    composition sites (commands, GET view, start) now call it — no
+    per-handler names-map assembly remains.
+  - **F7** — GET view's null-sentinel + double-cast branch dissolved: a
+    non-participant now fails with the same typed `GameNotFound` the
+    unknown-game path produces, mapped by the existing `statusOf` route
+    to the byte-identical 404 (pin still green); membership is still
+    decided on `state` before any name lookup.
+  - **F8** — `WireGameConfig` (positive `slamWindowMs`) extracted to
+    `GamePrimitives.ts`, used by both `GameStarted.config` and
+    `PlayerGameView.config`; new contracts pin rejects 0 and negatives
+    (contracts suite 10 → 11).
+  - **F9** — Create/Join/LeaveLobby suites now assert the recorded
+    `publishLobby` journal entry's `version` equals the use case
+    result's version (with the result version pinned absolutely), so a
+    `newVersion`→`version` swap in any lobby use case's publish or
+    return fails a test.
+  - Gate: forced `turbo test` for the four backend packages green
+    (contracts 11, domain 194, application 86, api 118);
+    `build typecheck lint` — all 8 package tasks green; the repo-wide
+    `//#format:check` fails only on `design-system/references/tokens.md`,
+    an orchestrator-lane file outside this fix cycle's boundary.
 
 ## Surprises & notes for the root plan
 
@@ -379,6 +475,26 @@ grants }` is exactly `LobbyResponse`; the clause is satisfied by reuse
   `.env.example` / `turbo.json` `VITE_*` additions belong to the frontend
   child plan — this side must not edit them, avoiding a shared-file
   collision.
+- **Module cycle surprise (step 2):** importing `User` into `Lobby.ts`
+  closed a runtime cycle Lobby → UserRepository → GameRepository → Lobby
+  (with `verbatimModuleSyntax`, inline `{ type X }` imports keep a runtime
+  side-effect import), evaluating `Schema.Array(User)` before `User`
+  existed — 18 domain suites failed with `Cannot read properties of
+undefined (reading 'ast')`. Fixed by converting the two type-only edges
+  (`GameRepository.ts` → Lobby, `UserRepository.ts` → GameRepository) to
+  `import type` statements, which are fully elided; commented in both files.
+- **Cross-lane format:check collision (step 5):** the `lint` turbo task
+  depends on the repo-wide `//#format:check`, which is unfilterable — it
+  fails on `packages/ui/src/components/app-shell.tsx` while the frontend
+  lane edits it concurrently. Backend eslint was verified per package
+  (`pnpm --filter <pkg> lint`, all four green); the orchestrator's final
+  unfiltered gate after both lanes merge is the authoritative lint pass.
+- **Type-only import style matters for lint too (step 5):** after the C1
+  change, `UserId` in `Lobby.ts` became type-only and
+  `@typescript-eslint/consistent-type-imports` required the inline `type`
+  marker — the mirror image of the module-cycle fix above, which required
+  the statement form. Rule of thumb recorded: statement-form `import type`
+  when breaking a runtime edge, inline `{ type X }` otherwise.
 - **Reconciliation (root-plan owner, 2026-09-05):** `LobbyUpdated` gained
   `version` after the frontend plan flagged the bootstrap-vs-broadcast
   staleness race; the publisher port ripple (probe 3's

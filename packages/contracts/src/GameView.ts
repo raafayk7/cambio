@@ -1,5 +1,13 @@
 import { Schema } from "effect"
-import { CardSlug, Rank, SlotIndex, Timestamp, Uuid } from "./GamePrimitives.js"
+import {
+  CardSlug,
+  DisplayName,
+  Rank,
+  SlotIndex,
+  Timestamp,
+  Uuid,
+  WireGameConfig,
+} from "./GamePrimitives.js"
 
 /**
  * The `viewFor` output shape (CAM-6, ADR-0021): everything one player may see
@@ -16,6 +24,8 @@ import { CardSlug, Rank, SlotIndex, Timestamp, Uuid } from "./GamePrimitives.js"
 /** One seat: identity plus occupied slot indices — never card values. */
 export const ViewPlayer = Schema.Struct({
   id: Uuid,
+  /** Public display name (CAM-17 C2) — identical in every viewer's projection. */
+  name: DisplayName,
   /** Occupied slot indices, ascending. Holes stay holes (§4.3). */
   hand: Schema.Array(SlotIndex),
 })
@@ -104,16 +114,35 @@ export const PlayerGameView = Schema.Struct({
   /** Public by definition; index 0 is the top (§4.3). */
   discard: Schema.Array(CardSlug),
   phase: ViewPhase,
+  /**
+   * The game's fixed config, as started with (CAM-17 C4): sourced from the
+   * persisted state inside `viewFor`, never from the server's live env — a
+   * mid-game reload must scale its slam timer to the value the game actually
+   * runs on. The same `WireGameConfig` shape as the `GameStarted` event's
+   * `config` field.
+   */
+  config: WireGameConfig,
   /** Present iff `phase` is `Ended` (§1.8). */
   reveal: Schema.optional(Reveal),
 })
 export type PlayerGameView = typeof PlayerGameView.Type
 
+/**
+ * One lobby member (CAM-17 C1): id plus public display name — the label shown
+ * at the table. `name` is constrained by the shared `DisplayName` schema; a
+ * vanished (soft-deleted) user projects as the literal `"—"`.
+ */
+export const LobbyMember = Schema.Struct({
+  id: Uuid,
+  name: DisplayName,
+})
+export type LobbyMember = typeof LobbyMember.Type
+
 /** The lobby is fully public — one shape for every viewer (ADR-0019). */
 export const LobbyView = Schema.Struct({
   id: Uuid,
   /** Join order — and, at start, the seat order. */
-  members: Schema.Array(Uuid),
+  members: Schema.Array(LobbyMember),
   status: Schema.Literal("open", "abandoned", "started"),
 })
 export type LobbyView = typeof LobbyView.Type

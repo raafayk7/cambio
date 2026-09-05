@@ -89,8 +89,23 @@ describe("end-to-end scripted game (acceptance, C6.1)", () => {
   it("plays a full game over HTTP; every reply and published payload is leak-free", async () => {
     const { app, runtime } = await makeTestApp({ slamWindowMs: 1 })
     try {
-      const { gameId, players, byId, startRes } = await setupGame(app, ["Alice", "Bob"])
+      const { gameId, players, byId, nameById, startRes, lobbyPublishes } = await setupGame(app, [
+        "Alice",
+        "Bob",
+      ])
       const [alice, bob] = players
+
+      // B5 (names end to end, lobby half): every create/join publish carries
+      // every member's {id, name}; the final pre-start membership names both
+      // players. Fixture names stay ≥3 chars — the leak scanner matches
+      // whole strings against card slugs, so "AS" as a name would collide.
+      expect(lobbyPublishes.length).toBeGreaterThan(0)
+      for (const entry of lobbyPublishes) {
+        for (const member of entry.lobby.members) {
+          expect(member.name).toBe(nameById.get(member.id))
+        }
+      }
+      expect(lobbyPublishes.at(-1)!.lobby.members.map((m) => m.name)).toEqual(["Alice", "Bob"])
 
       // Local replay of the server's deal — pure, same seed, same game.
       const dealt = dealGame(
@@ -103,7 +118,22 @@ describe("end-to-end scripted game (acceptance, C6.1)", () => {
       let state = dealt.right[0]
 
       const startBody = startRes.json() as { view: PlayerGameView; version: number }
-      expect(normalize(startBody.view)).toEqual(normalize(viewFor(toUserId(alice!.userId), state)))
+      expect(normalize(startBody.view)).toEqual(
+        normalize(viewFor(toUserId(alice!.userId), state, nameById)),
+      )
+
+      // B5 (names end to end, view half): every player's snapshot names
+      // every seat, identically for both viewers.
+      for (const player of players) {
+        const vres = await app.inject({
+          method: "GET",
+          url: `/games/${gameId}/view`,
+          cookies: { cambio_session: player.cookie },
+        })
+        expect(vres.statusCode).toBe(200)
+        const vbody = vres.json() as { view: PlayerGameView }
+        expect(vbody.view.players.map((p) => p.name)).toEqual(["Alice", "Bob"])
+      }
 
       let at = 0
       let turns = 0
@@ -133,7 +163,7 @@ describe("end-to-end scripted game (acceptance, C6.1)", () => {
         const body = res.json() as { view: PlayerGameView; version: number }
         expect(Object.keys(body).sort(), "reply envelope shape").toEqual(["version", "view"])
         expect(normalize(body.view), `view after ${command._tag}`).toEqual(
-          normalize(viewFor(command.playerId, state)),
+          normalize(viewFor(command.playerId, state, nameById)),
         )
         expectNoLeak(body, entitledSlugs(state, command.playerId), `reply to ${command._tag}`)
       }
@@ -148,7 +178,7 @@ describe("end-to-end scripted game (acceptance, C6.1)", () => {
 
       // The final reply's reveal matches the pure scoring.
       const scores = gameScores(state)
-      const finalView = viewFor(toUserId(alice!.userId), state)
+      const finalView = viewFor(toUserId(alice!.userId), state, nameById)
       expect(finalView.reveal?.scores).toEqual(
         scores.map((s) => ({ playerId: s.playerId, total: s.total })),
       )
@@ -175,7 +205,7 @@ describe("a real Slam over HTTP (large window)", () => {
   it("a slam inside an open window round-trips with a leak-free reply", async () => {
     const { app, runtime } = await makeTestApp({ slamWindowMs: 60_000 })
     try {
-      const { gameId, players, byId } = await setupGame(app, ["Alice", "Bob"])
+      const { gameId, players, byId, nameById } = await setupGame(app, ["Alice", "Bob"])
       const [alice, bob] = players
 
       const dealt = dealGame(
@@ -221,7 +251,7 @@ describe("a real Slam over HTTP (large window)", () => {
       state = apply(state, slam!, inWindow)
 
       const body = res.json() as { view: PlayerGameView; version: number }
-      expect(normalize(body.view)).toEqual(normalize(viewFor(slam!.playerId, state)))
+      expect(normalize(body.view)).toEqual(normalize(viewFor(slam!.playerId, state, nameById)))
       expectNoLeak(body, entitledSlugs(state, slam!.playerId), "slam reply")
     } finally {
       await app.close()

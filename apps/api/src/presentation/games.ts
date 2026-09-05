@@ -1,6 +1,6 @@
-import { RoomRegistry, toDomainCommand, viewFor } from "@cambio/application"
+import { RoomRegistry, toDomainCommand, viewForEffect } from "@cambio/application"
 import { decodeWireCommandEither, encodeGameReply, encodeViewResponse } from "@cambio/contracts"
-import { GameId, GameRepository, seatOf } from "@cambio/domain"
+import { GameId, GameNotFound, GameRepository, seatOf } from "@cambio/domain"
 import { Effect, Either, Option, Redacted, type Runtime, Schema } from "effect"
 import type { FastifyInstance } from "fastify"
 
@@ -8,7 +8,7 @@ import type { AppConfig } from "../config.js"
 import { grantsFor } from "../infra/topics.js"
 import type { AppServices } from "../runtime.js"
 import { makeRequireSession } from "./auth.js"
-import { commandErrorStatus, errorBody, typedErrorBody } from "./errors.js"
+import { commandErrorStatus, errorBody } from "./errors.js"
 import { runRoute } from "./run.js"
 
 /**
@@ -46,11 +46,15 @@ export const gamesRoutes =
         const command = toDomainCommand(user.id, wire.right)
         return run(
           reply,
-          Effect.flatMap(RoomRegistry, (rooms) => rooms.execute(gameId.right, command)),
+          Effect.flatMap(RoomRegistry, (rooms) => rooms.execute(gameId.right, command)).pipe(
+            // The one projection every route uses (C2, F5).
+            Effect.flatMap(({ state, version }) =>
+              Effect.map(viewForEffect(user.id, state), (view) => ({ view, version })),
+            ),
+          ),
           {
             statusOf: commandErrorStatus,
-            onSuccess: ({ state, version }) =>
-              reply.send(encodeGameReply({ view: viewFor(user.id, state), version })),
+            onSuccess: ({ view, version }) => reply.send(encodeGameReply({ view, version })),
           },
         )
       },
@@ -69,22 +73,33 @@ export const gamesRoutes =
         // optimization, not the source of truth.
         return run(
           reply,
-          Effect.flatMap(GameRepository, (games) => games.load(gameId.right)),
+          Effect.flatMap(GameRepository, (games) => games.load(gameId.right)).pipe(
+            // 404-before-names (C2): membership is decided on the state
+            // FIRST — names of a game the caller cannot see are never
+            // fetched. A non-participant fails with the SAME typed
+            // `GameNotFound` the unknown-game path produces, so both take
+            // one route through `statusOf` to a byte-identical 404 body —
+            // no existence leak, no sentinel branch.
+            Effect.flatMap(({ state, version }) =>
+              Effect.gen(function* () {
+                if (Option.isNone(seatOf(state, user.id))) {
+                  return yield* Effect.fail(new GameNotFound({ gameId: gameId.right }))
+                }
+                const view = yield* viewForEffect(user.id, state)
+                return { view, version }
+              }),
+            ),
+          ),
           {
             statusOf: commandErrorStatus,
-            onSuccess: ({ state, version }) => {
-              if (Option.isNone(seatOf(state, user.id))) {
-                // Identical body to an unknown game — no existence leak.
-                return reply.code(404).send(typedErrorBody(404, { _tag: "GameNotFound" }))
-              }
-              return reply.send(
+            onSuccess: ({ view, version }) =>
+              reply.send(
                 encodeViewResponse({
-                  view: viewFor(user.id, state),
+                  view,
                   version,
                   grants: grantsFor(topicSecret, gameId.right, user.id),
                 }),
-              )
-            },
+              ),
           },
         )
       },

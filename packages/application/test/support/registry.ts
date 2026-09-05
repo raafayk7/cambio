@@ -8,7 +8,7 @@ import {
   type Lobby,
   Timestamp,
 } from "@cambio/domain"
-import { legalCandidates, uid } from "@cambio/domain/testing"
+import { legalCandidates, uid, user } from "@cambio/domain/testing"
 import { Effect, Layer } from "effect"
 import { RoomRegistry, RoomRegistryLive } from "../../src/room/RoomRegistry.js"
 import {
@@ -88,7 +88,7 @@ export const seedLobby = (lobby: Lobby) =>
 export const driveToSlamWindow = (gameId: GameId) =>
   Effect.gen(function* () {
     const registry = yield* RoomRegistry
-    yield* seedLobby({ id: gameId, members: [uid(0), uid(1)], status: "open" })
+    yield* seedLobby({ id: gameId, members: [user(0), user(1)], status: "open" })
     const started = yield* registry.start(gameId, { starterId: uid(0), config })
     let state = started.state
     for (let i = 0; i < 60 && state.phase._tag !== "SlamWindow"; i++) {

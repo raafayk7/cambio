@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { decodeGameConfig, type GameEvent } from "@cambio/domain"
-import { playerCountFor, seedPair, simulateGame } from "@cambio/domain/testing"
+import { playerCountFor, seedPair, simulateGame, user } from "@cambio/domain/testing"
 import { projectEvents } from "../src/projection/EventProjection.js"
 import { viewFor } from "../src/projection/ViewFor.js"
 import { entitledSlugs, expectNoLeak, slugsIn } from "./support/leaks.js"
@@ -56,6 +56,11 @@ describe(`adversarial projection sweep (${GAMES} games, seed base ${SEED_BASE})`
     let viewsChecked = 0
     for (let i = 0; i < GAMES; i++) {
       const [gameSeed, driverSeed] = seedPair(SEED_BASE, i)
+      // Names fixture (C2): the roster is uid(0..n-1) — the user(n) fixture
+      // mirrors the api harness's seeded names (≥3 chars for the leak scan).
+      const names = new Map(
+        Array.from({ length: playerCountFor(i) }, (_, n) => [user(n).id, user(n).name] as const),
+      )
       const run = simulateGame({
         gameSeed,
         driverSeed,
@@ -63,8 +68,18 @@ describe(`adversarial projection sweep (${GAMES} games, seed base ${SEED_BASE})`
         config,
         onStep: (state) => {
           statesChecked++
+          // The C2 half-invariant: names are public — every viewer's
+          // projection carries IDENTICAL name fields (the field leaks
+          // nothing and varies for no one).
+          const nameRows = state.players.map((p) =>
+            viewFor(p.id, state, names).players.map((v) => v.name),
+          )
+          for (const row of nameRows) {
+            expect(row, `game ${i}: names differ across viewers`).toEqual(nameRows[0])
+            expect(row).toEqual(state.players.map((p) => names.get(p.id)))
+          }
           for (const player of state.players) {
-            const view = viewFor(player.id, state)
+            const view = viewFor(player.id, state, names)
             expectNoLeak(view, entitledSlugs(state, player.id), `game ${i} viewer ${player.id}`)
             viewsChecked++
           }

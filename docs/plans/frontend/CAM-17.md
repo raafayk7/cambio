@@ -47,7 +47,8 @@ dependency, no `credentials: "include"` anywhere. This task builds it
   ADR-0032 — never `supabase-js`).
 - `design-system` — entered through `design-system/design-system.md`.
   Scenes per `patterns/scenes.md` (lobby → full illustrated courtyard;
-  room waiting → table + paving; forms → plain cream). Page states per
+  room waiting → table + paving; forms → paper panels, wash on pictorial
+  scenes — amended in the review fix cycle, F2). Page states per
   `patterns/screen-states.md` (the 8-state MVS row — ledger below).
   Forms per `patterns/forms.md` (field-scaffold, validate on submit,
   re-validate on blur, submit failure → alert above footer). Copy per
@@ -70,7 +71,7 @@ dependency, no `credentials: "include"` anywhere. This task builds it
 
 - `exactOptionalPropertyTypes` + `noUncheckedIndexedAccess` are ON —
   follow the conditional-spread idiom (see
-  `packages/ui/src/components/app-shell.tsx:44`).
+  the conditional spreads in `packages/ui/src/components/app-shell.tsx`).
 - No path aliases: relative imports with explicit `.js` extensions.
 - `envDir` is the repo root; Vite reads `.env` there.
 
@@ -116,7 +117,7 @@ as-built code. All paths under `apps/web/src/` unless noted.
 | `containers/lobby/parse-room-link.ts`      | new     | pure parser: room URL or bare UUID → gameId or null (unit-testable, no DOM)                                                                                                                        |
 | `containers/room/room-screen.tsx`          | new     | room container: bootstrap + join-on-visit, member seats, share/start/leave, live updates (R1–R5, R7)                                                                                               |
 | `containers/room/use-room.ts`              | new     | co-located hook: `GET /lobbies/:gameId` bootstrap, 404 → join fallback, `LobbyUpdated`/`GameStarted` subscription, refetch-on-reconnect (R2–R5)                                                    |
-| `routes/index.tsx`                         | replace | lobby page — picks `LobbyScreen`, declares the courtyard scene (L1, L3)                                                                                                                            |
+| `routes/index.tsx`                         | replace | lobby page — one-line picker for `LobbyScreen`; the container owns its AppShell + courtyard scene (deviation logged in Surprises) (L1, L3)                                                         |
 | `routes/room.$gameId.tsx`                  | new     | room page — `createFileRoute("/room/$gameId")`, picks `RoomScreen`                                                                                                                                 |
 | `routes/game.$gameId.tsx`                  | new     | placeholder game route: design-system-composed holding state (R6)                                                                                                                                  |
 | `packages/ui/src/components/app-shell.tsx` | edit    | S2 `relative` root; courtyard scene wiring after the gate round (L3)                                                                                                                               |
@@ -124,6 +125,8 @@ as-built code. All paths under `apps/web/src/` unless noted.
 | `packages/ui/src/styles.css`               | edit    | S1 comment sync, S2 `safe-area-shell` bottom inset, L3 `scene-courtyard` utility                                                                                                                   |
 | `.env.example`, `turbo.json`               | edit    | `VITE_REALTIME_URL`, `VITE_REALTIME_ANON_JWT` — env array of `@cambio/web#build` **and** dev `passThroughEnv` (ADR-0032)                                                                           |
 | `apps/web/package.json`                    | edit    | add `@supabase/realtime-js` (runtime dep; the only realtime package)                                                                                                                               |
+| `assets/table-top.webp`                    | new     | the painted table + benches (image11 regeneration, alpha shadows) — TableSurface's art layer (art-revision round)                                                                                  |
+| `packages/ui/src/assets/` (not apps/web)   | new     | `scene-courtyard.webp` (image9) + `scene-paving.webp` (image10) — the painted scene grounds (art-revision round)                                                                                   |
 
 Container/hook placement follows the co-location rule: `use-room.ts` sits
 beside its one consumer; `use-session.ts`/`use-connection.ts` are shared
@@ -207,12 +210,12 @@ M2 (B1) — coordinate with the backend lane before wiring the room screen.
    controls ≥ 44px.
 
 6. **S2 — AppShell execution fixes (packages/ui, no canon change).**
-   (a) The shell root (`packages/ui/src/components/app-shell.tsx:62`)
-   lacks `relative` while `state="game"` renders absolute controls —
+   (a) The shell root (`packages/ui/src/components/app-shell.tsx`)
+   lacked `relative` while `state="game"` renders absolute controls —
    add it, then delete the gallery's compensating `relative` wrapper on
-   the game StateCard (`apps/web/src/components/gallery/generic.tsx:635`)
+   the game StateCard (the game StateCard in `apps/web/src/components/gallery/generic.tsx`)
    so the fix is proven where the workaround lived. (b) The
-   `safe-area-shell` utility (`packages/ui/src/styles.css:336`) pads
+   `safe-area-shell` utility (`packages/ui/src/styles.css`) padded
    top/left/right only — add `padding-bottom: env(safe-area-inset-bottom)`
    per app-shell.md's own-hand dock rule. A jsdom test can pin (a)
    structurally (positioned root when game controls render); (b) is
@@ -224,7 +227,7 @@ M2 (B1) — coordinate with the backend lane before wiring the room screen.
    does not — AppShell's `courtyard` falls back to plain cream today.
    Procedure per the gate: **STOP**, name the gap (asset + a
    `scene-courtyard` ground utility + AppShell wiring; closest existing:
-   the `scene-paving` utility at `packages/ui/src/styles.css:328`), wait
+   the `scene-paving` utility in `packages/ui/src/styles.css`), wait
    for the user's explicit go, then produce the asset within scenes.md
    law — flat ink + paper grain, no photos, no gradients, no
    depth-of-field; dusk reserved for the dark theme; **scene art never
@@ -323,7 +326,7 @@ skipped.
 | ---------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | loaded           | built        | courtyard scene, identity block, create + join-by-link                                                                                                                            |
 | first-load       | built        | skeleton matching the identity/action layout while `GET /me` resolves (Loading's 300ms no-flash)                                                                                  |
-| first-use empty  | built        | the unauthenticated state IS first use: `NameForm` with onboarding energy + the primary action                                                                                    |
+| first-use empty  | built        | the unauthenticated state IS first use: a `wash` panel (panel.md r2) holding the h1 + `NameForm` over the courtyard painting's hero table (art-revision round)                    |
 | no-results empty | N/A          | no list, no filter — join is share-link only (root Decision Log); nothing can produce "no matches"                                                                                |
 | page error       | built        | `GET /me` network/5xx failure → full-region alarm alert + retry; shell stays                                                                                                      |
 | partial failure  | N/A          | single data region (`/me`); mutation failures are the forms.md submit-failure alert, not a page partial                                                                           |
@@ -381,31 +384,175 @@ only the Clause column and a planned-approach note are filled here; test
 file, name, and assertion phrase are written by `/implement` as each test
 lands — invented test titles become review findings.)_
 
-| Clause | Test (file + name)                                                                                                                                                                                                                                                                                                             | What is asserted         |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
-| W1     | _planned: service-level jsdom tests, mocked fetch — credentials option on every call; 2xx decode; error-body mapping; undecodable 2xx surfaces as an error. Plus the turbo.json env-declaration pin (step 1)_                                                                                                                  | _(filled by /implement)_ |
-| W2     | _planned: container tests — 401 renders the name form; valid submit POSTs and the UI flips to authenticated without remount/reload; 400 renders the field error per forms.md_                                                                                                                                                  | _(filled by /implement)_ |
-| W3     | _planned: fake-client injection tests — granted topics subscribed with the pinned channel pattern; unsubscribe on unmount; connection status exposed_                                                                                                                                                                          | _(filled by /implement)_ |
-| W4     | _planned: room container test — status forced to reconnecting renders the alert under the header while the member list stays rendered; recovery flips back and triggers a refetch. (AppShell's own reconnecting render is already pinned in packages/ui)_                                                                      | _(filled by /implement)_ |
-| L1     | _planned: lobby container tests per session state (form / greeting+actions); parse-room-link pure unit tests (full URL, bare UUID, garbage → null)_                                                                                                                                                                            | _(filled by /implement)_ |
-| L2     | _planned: container test — create success navigates to the new room route (memory router)_                                                                                                                                                                                                                                     | _(filled by /implement)_ |
-| L3     | _non-vitest: creation-gate round recorded in Progress + root Decision Log; visual verification via gallery/gate rendered pass; jsdom cannot see the asset_                                                                                                                                                                     | _(filled by /implement)_ |
-| L4     | _planned: the ledger above, held by the per-state container tests where mechanical (skeleton, error, no-access) and by this document for the N/A calls_                                                                                                                                                                        | _(filled by /implement)_ |
-| R1     | _planned: room container test — every C1 member rendered by name in join order, own seat marked, share/start/leave affordances present_                                                                                                                                                                                        | _(filled by /implement)_ |
-| R2     | _planned: container tests — GET 404 then join success renders the room; 409 full and 404 unknown render the no-access panel; 409 already-started with view-GET 200 navigates to the game route, with view-GET 404 renders no-access; unauthenticated visitor sees the name form on the room route (URL unchanged), then joins_ | _(filled by /implement)_ |
-| R3     | _planned: container test — mount with GET 200 renders the full room from the bootstrap alone (no join call); manual reload in the walkthrough_                                                                                                                                                                                 | _(filled by /implement)_ |
-| R4     | _planned: fake-client broadcast of a tagged LobbyUpdated updates the member list without refetch; a non-open status renders the room-closed panel_                                                                                                                                                                             | _(filled by /implement)_ |
-| R5     | _planned: start success navigates the starter; a GameStarted broadcast navigates a non-starter; a 422 BadPlayerCount renders the inline alert (2–5 copy)_                                                                                                                                                                      | _(filled by /implement)_ |
-| R6     | _planned: route/component test — the placeholder renders the holding state (registered components), not a 404_                                                                                                                                                                                                                 | _(filled by /implement)_ |
-| R7     | _planned: leave POSTs, drops subscriptions (fake-client spy), navigates to `/`_                                                                                                                                                                                                                                                | _(filled by /implement)_ |
-| S1     | _planned: non-vitest — button.md r2 + hardcheck rendered measurement ≥ 44px recorded in Progress; existing packages/ui + apps/web suites stay green as the regression pin_                                                                                                                                                     | _(filled by /implement)_ |
-| S2     | _planned: jsdom structural test for the positioned shell root under `state="game"`; the safe-area bottom inset is CSS-only — pinned by inspection + gate rendered pass, recorded in Progress_                                                                                                                                  | _(filled by /implement)_ |
+| Clause | Test (file + name)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | What is asserted                                                                                          |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| W1     | `apps/web/test/api.test.ts` — "sends credentials: include on every call", "JSON-encodes a POST body and sets the content-type header", "decodes a 2xx body through the contracts schema", "throws on an undecodable 2xx body — never silently-wrong state", "maps a non-2xx error body to a typed ApiError {status, tag, message}", "falls back to a generic ApiError when the error body is undecodable". Plus `apps/web/test/env-declaration.test.ts` — "declares VITE_API_URL / VITE_REALTIME_URL / VITE_REALTIME_ANON_JWT for the web build" | fetch init carries `credentials: "include"`; decoded value returned; ApiError fields; rejects on bad wire |
+| W2     | `apps/web/test/lobby-screen.test.tsx` — "renders the name form for an unauthenticated visitor (401 from /me)", "submits a valid name to POST /users and flips to authenticated without a reload", "rejects an empty name on submit with the field error — no request leaves", "surfaces a server 400 as the submit alert per forms.md"                                                                                                                                                                                                           | 401 → form; POST body `{name}`; greeting + Create room appear on the same mount; field/submit error copy  |
+| W3     | `apps/web/test/realtime.test.ts` — "subscribes the granted topic with the pinned channel pattern and delivers broadcasts", "returns an unsubscribe that closes the channel and stops event delivery", "exposes connection status: a drop flips to reconnecting, recovery flips back and fires onResubscribe", "resets to connected when the last subscription is dropped — no stale banner on idle screens"                                                                                                                                      | fake-client topic/on/subscribe wiring; unsubscribe spy; status source transitions                         |
+| W4     | `apps/web/test/room-screen.test.tsx` — "shows the reconnecting alert under the header while the seat view stays live, then refetches on recovery"                                                                                                                                                                                                                                                                                                                                                                                                | banner text `Reconnecting…` present with both seat names still rendered; one extra GET after recovery     |
+| L1     | `apps/web/test/lobby-screen.test.tsx` — "greets by name and offers create + join-by-link", "join-by-link rejects garbage with the voice.md field error and stays put"; `apps/web/test/parse-room-link.test.ts` — "accepts a full room URL", "accepts a scheme-less pasted link", "accepts a bare UUID, trimmed and case-normalized", "returns null for garbage"                                                                                                                                                                                  | greeting + create + join affordances per session state; parser accepts URL/UUID, nulls garbage            |
+| L2     | `apps/web/test/lobby-screen.test.tsx` — "create room POSTs /lobbies and navigates to the new room route"                                                                                                                                                                                                                                                                                                                                                                                                                                         | memory-router pathname becomes `/room/<id>` after the 201                                                 |
+| L3     | non-vitest: creation-gate round run and approved (Progress 11:30); the painted scene asset + utility + shell wiring + gallery card landed (art revision 17:00); gate rendered pass complete (Progress 15:40/16:00)                                                                                                                                                                                                                                                                                                                               | courtyard branch renders the asset (held by ui suite + step 12 rendered pass)                             |
+| L4     | `apps/web/test/lobby-screen.test.tsx` — "shows the first-load skeleton while /me resolves", "renders the page-error alert with retry when /me fails outright"; `apps/web/test/room-screen.test.tsx` — "shows the first-load skeleton while bootstrap resolves", "renders the page-error alert with retry on a bootstrap 5xx"; N/A calls held by the ledger above                                                                                                                                                                                 | skeleton after the 300ms no-flash; alarm alert + `Try again` per screen                                   |
+| R1     | `apps/web/test/room-screen.test.tsx` — "renders every member by name in join order from the GET alone — no join call"                                                                                                                                                                                                                                                                                                                                                                                                                            | both names at ascending `data-seat-index`; viewer's seat `data-own`; link/copy/start/leave present        |
+| R2     | `apps/web/test/room-screen.test.tsx` — "joins on a bootstrap 404 and renders the room from the join response", "renders the no-access panel when the room is full (409 LobbyFull)", "renders the no-access panel for an unknown room (join 404)", "redirects an already-started refusal to the game route when the view GET succeeds", "renders the no-access panel for an already-started outsider (view GET 404)", "shows the name form in-place for an unauthenticated visitor, then joins — URL unchanged"                                   | each refusal's panel title; game-route pathname on view 200; URL stays `/room/<id>` through identity      |
+| R3     | `apps/web/test/room-screen.test.tsx` — "renders every member by name in join order from the GET alone — no join call" (no `/join` in the recorded calls); manual reload in the walkthrough                                                                                                                                                                                                                                                                                                                                                       | full room from bootstrap alone; zero join calls                                                           |
+| R4     | `apps/web/test/room-screen.test.tsx` — "applies a newer LobbyUpdated broadcast to the member list without refetching", "discards a LobbyUpdated broadcast not newer than the last-seen version", "renders the room-closed panel when a broadcast closes the room"                                                                                                                                                                                                                                                                                | new member appears with zero extra GETs; stale version leaves both seats; `Room closed` panel             |
+| R5     | `apps/web/test/room-screen.test.tsx` — "navigates the starter to the game route on success", "auto-navigates a non-starter on the GameStarted room broadcast", "surfaces a 422 BadPlayerCount as the inline alert with the 2–5 copy"                                                                                                                                                                                                                                                                                                             | pathname `/game/<id>` both paths; inline alert copy while the seat view stays                             |
+| R6     | `apps/web/test/game-placeholder.test.tsx` — "renders the holding state — shell, loading object, flavor caption"                                                                                                                                                                                                                                                                                                                                                                                                                                  | shell header + status role + `shuffling…` caption render                                                  |
+| R7     | `apps/web/test/room-screen.test.tsx` — "POSTs leave, drops both subscriptions, and returns to the lobby"                                                                                                                                                                                                                                                                                                                                                                                                                                         | leave POST recorded; unsubscribe spy fired on room AND player channels; pathname `/`                      |
+| S1     | button.md r2 + `touch-floor` landed; ui suite green as the regression pin; hardcheck rendered measurement complete — shared text controls measure exactly 44px (Progress 15:40)                                                                                                                                                                                                                                                                                                                                                                  | canon + utility exist; suites green                                                                       |
+| S2     | `packages/ui/test/app-shell.test.tsx` — "the shell root is a positioned ancestor for the game state's floating controls" + "the game state renders the floating connection + settings controls"; bottom inset is CSS-only, pinned by inspection (Progress)                                                                                                                                                                                                                                                                                       | root className contains `relative`; game-state controls render by accessible label                        |
 
 ## Progress
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
-- [ ] 2026-09-05 — frontend child plan written; implementation not started
+- [x] 2026-09-05 — frontend child plan written
+- [x] 2026-09-05 11:20 — step 1 done (orchestrator): `@supabase/realtime-js`
+      2.112.4 in apps/web deps, `VITE_REALTIME_URL` + `VITE_REALTIME_ANON_JWT`
+      in `.env.example` (with the minting one-liner) and in both turbo.json
+      slots; pin test `apps/web/test/env-declaration.test.ts` green (3).
+- [x] 2026-09-05 11:21 — step 5 done (orchestrator): button.md r2 (44px
+      minimum control height, icon exempt), `touch-floor` utility in
+      styles.css, applied per text variant in button.tsx. ui suite green
+      (17). Rendered hardcheck re-run deferred to step 12 (needs a dev
+      server).
+- [x] 2026-09-05 11:22 — step 6 done (orchestrator): shell root `relative`,
+      gallery's compensating wrapper removed, `safe-area-shell` bottom
+      inset added; structural pin `packages/ui/test/app-shell.test.tsx`.
+- [x] 2026-09-05 11:30 — step 7 done (orchestrator): creation-gate round
+      run with the user — **full courtyard approved**. Asset at
+      `packages/ui/src/assets/scene-courtyard.svg` (flat ink, token
+      palette inlined by value with mapping documented in the SVG header,
+      edges busy / center calm), `scene-courtyard` utility, AppShell
+      courtyard branch wired, app-shell.md → r2, gallery courtyard
+      StateCard added, stale gallery note removed. Visually reviewed via
+      browser render; rendered gate pass happens in step 12.
+- [x] 2026-09-05 15:40 — step 12 audits ran (orchestrator): hardcheck on
+      the rendered lobby PASS (0 constraint fails; the CAM-15 43px button
+      advisory is gone — S1 verified, all room text buttons measure
+      exactly 44px). ai-tells scored the surface 1/30 ("invisible");
+      impeccable returned 8 execution findings, no structural issues.
+      Fix batch applied from the two audits: clipboard failure now
+      surfaces a fallback toast; toast ids use a counter; join-field
+      placeholder is origin-neutral; room gets an sr-only h1 + per-route
+      document titles (room/game); Alert owns its action-slot ink
+      upstream (both app-side overrides dropped); NameForm's maxLength=64
+      removed (validator is the only cap); lobby link-field blur
+      re-validates fully (matches NameForm); three error/helper strings
+      de-dashed to voice.md's two-sentence form. web 71 + ui 17 green
+      after the batch.
+- [x] 2026-09-05 16:00 — step 12 design-gate verdicts (full
+      decompose→map→judge pipeline per screen): **lobby flagged/0
+      blocking** (3 actionable: maxLength mismatch — already fixed;
+      43px text-field — surfaced as canon question; umbrella poles
+      ending mid-air — fixed, both poles now ground behind their
+      benches) and **room flagged/0 blocking** (4 accidental: seat-ring
+      vs bench-ring geometry — logged to CAM-18 with the judge's fix
+      options, the 42% radius was chosen for the game screen's hands;
+      URL clip — fixed with visible ellipsis; inert settings button —
+      fixed, AppShell now renders it only when a handler exists, new ui
+      test pins it, gallery passes explicit handlers; occupancy count —
+      fixed pre-verdict with the live "n seated" line). Slop convergence
+      0 on both screens; D7 personality positive with token-level
+      evidence on both. Final full gate green 25/25 (web 71, ui 18);
+      final state verified live (no settings control, sr-only h1,
+      ellipsis, live count, per-route titles).
+- [x] 2026-09-05 17:00 — art revision round (user-directed; the full
+      story is in the root plan's Decision Log): `scene-courtyard.webp`
+      (image9) replaces the SVG; `scene-paving.webp` (image10) replaces
+      the CSS checker; `table-top.webp` (image11, alpha) replaces
+      TableSurface's drawn scenery — overlays stay programmatic, disc
+      geometry measured at 54% of asset width. Panel gains the `wash`
+      variant (panel.md r2); lobby headings moved inside wash panels
+      (both branches), so the first-use ledger realization is now
+      "wash panel containing h1 + NameForm over the courtyard hero
+      table". Gallery gains a wash card; canon docs revised
+      (table-surface r2, app-shell r2 amended, scenes.md). Suites green
+      (71 web + 18 ui) after each step; screens re-rendered and
+      checkpointed to the user at every stage.
+- [x] 2026-09-05 12:00 — step 2 done: `apps/web/src/services/api.ts`
+      (`apiRequest` + typed `ApiError`; credentials on every call, contracts
+      decode at the edge, `decodeErrorBodyEither` on non-2xx with a generic
+      fallback). Six pins in `apps/web/test/api.test.ts`.
+- [x] 2026-09-05 12:00 — step 3 done: `apps/web/src/hooks/use-session.ts`
+      (`["me"]` query with 401-as-data, `POST /users` mutation seeding the
+      cache; `sessionErrorCopy` maps the 400) +
+      `apps/web/src/components/identity/name-form.tsx` (field-scaffold,
+      1–32 validate on submit / re-validate on blur, `Deal me in` primary,
+      submit alert above the footer). Pinned via the lobby container suite.
+- [x] 2026-09-05 12:01 — step 4 done: `apps/web/src/services/realtime.ts`
+      (lazy client from the ADR-0032 env vars, `subscribeTopic` in the
+      pinned channel pattern, connection-status store, `onResubscribe`
+      recovery signal, idle-reset, `setRealtimeClientForTests` injection
+      seam) + `apps/web/src/hooks/use-connection.ts`
+      (`useSyncExternalStore` adapter). Four pins in
+      `apps/web/test/realtime.test.ts`; fake client in
+      `apps/web/test/support/fake-realtime.ts`.
+- [x] 2026-09-05 12:03 — step 8 done: `routes/index.tsx` replaced (smoke
+      page gone), `containers/lobby/lobby-screen.tsx` +
+      `containers/lobby/parse-room-link.ts`. Session-state rendering
+      (skeleton / name form / greeting+actions), create → navigate,
+      join-by-link with voice.md field error. 10 tests in
+      `apps/web/test/lobby-screen.test.tsx`, 4 in
+      `apps/web/test/parse-room-link.test.ts`; memory-router harness in
+      `apps/web/test/support/harness.tsx`.
+- [x] 2026-09-05 12:04 — steps 9+10 done: `routes/room.$gameId.tsx`,
+      `containers/room/use-room.ts` (bootstrap → join-on-visit → denial
+      map with the LobbyNotJoinable → view-GET fallback; version-guarded
+      `LobbyUpdated` apply; `GameStarted` navigate; refetch-on-resubscribe;
+      start/leave mutations) + `containers/room/room-screen.tsx` (seating
+      TableSurface, share/copy toast, no-access recipes, reconnecting via
+      AppShell). 17 tests in `apps/web/test/room-screen.test.tsx`.
+- [x] 2026-09-05 12:04 — step 11 done: `routes/game.$gameId.tsx` holding
+      state (Loading, caption `shuffling…`); pinned by
+      `apps/web/test/game-placeholder.test.tsx` plus the R2/R5 navigation
+      tests that land on the route. Web suite: 13 files, 71 tests green
+      via `pnpm turbo test --filter @cambio/web`.
+- [x] 2026-09-05 12:09 — full gate green, run bare:
+      `pnpm turbo build typecheck lint test` → 25/25 tasks successful.
+      Suites: web 71, ui 17, api 118, domain 194, application 86,
+      contracts 10, config 16 — all passing. Coverage table above filled
+      with as-landed test names. Remaining for step 12 (orchestrator):
+      design-gate rendered pass + ai-tells + impeccable audits, S1
+      hardcheck re-measure, two-browser walkthrough.
+- [x] 2026-09-05 20:45 — review fix cycle, frontend findings (F1 code
+      half, F2 code half, F10–F13, F14a/b). **F1:** the room's identity
+      branch h1 moved inside its `default` Panel in
+      `containers/room/room-screen.tsx`, matching the lobby's
+      heading-inside-panel composition (wash rule scoped to pictorial
+      scenes; paving keeps `default` panels). **F2:** lobby-screen.tsx
+      file-header prose rewritten to the truth — forms float on `wash`
+      panels over the courtyard per panel.md r2 / amended forms.md.
+      **F10:** `services/realtime.ts` env guard now rejects
+      empty/whitespace values, `getClient` throws on SSR
+      (`window` undefined), and `subscribeTopic` catches getClient
+      failure — one console.error with the config message (no
+      topic/secret values), status listeners notified `reconnecting`,
+      no-op unsubscribe returned — so misconfiguration shows the W4
+      banner, not the router's default error page. New legibility test in
+      `apps/web/test/realtime.test.ts` (stubbed whitespace env, seam
+      cleared) kills the trim-check mutant. **F11:**
+      `apps/web/test/env-declaration.test.ts` now slices the
+      `@cambio/web#build` and `dev` task blocks out of turbo.json's raw
+      text and asserts the three VITE vars per slot (`env` and
+      `passThroughEnv` separately) — a var present in only one slot now
+      fails. **F12:** outsider denial copy merged truthfully — title "No
+      open seat", body covering started-or-closed; broadcast-path
+      `closed` copy unchanged; test updated. **F13:** sr-only room h1
+      hoisted from SeatedRoom to RoomScreen's wrapper for all branches
+      except the identity branch (which has its own visible h1); the
+      `Math.max(0, viewerIndex)` fallback got its
+      why-minus-one-is-unreachable comment. **F14a:** alert.md → r2
+      (action slot carries the variant's ink, inverse on alarm/success)
+      with revision entry; structural pin `packages/ui/test/alert.test.tsx`
+      (ADR-0030: role-based, ink verified by the rendered gate path).
+      **F14b:** stale `(r1)` citations in `app-shell.tsx` and
+      `app-shell.test.tsx` bumped to r2. Suites green through turbo:
+      web 75, ui 19; web+ui build/typecheck/eslint clean (repo-wide
+      format:check failing only on other fix-cycle agents' in-flight
+      files).
 
 ## Surprises & notes for the root plan
 
@@ -427,3 +574,58 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 - Reconciled against `docs/plans/backend/CAM-17.md` (2026-09-05): wire
   shapes in the table above match its frozen shape table, including the
   C3 version field and C5's reuse of `LobbyResponse`.
+- **Audit-round conflicts surfaced, not auto-fixed (step 12):**
+  (a) impeccable's error-prevention heuristic wants the solo-room Start
+  disabled below 2 members — left enabled per the plan's
+  server-decides rule; the 422 copy carries the explanation. (b) The
+  room's scene depth: scenes.md wants "table + paving with scene at the
+  edges" but AppShell offers no edge-scenery ground — the room uses the
+  canonical full-bleed paving; the missing edge treatment is a
+  design-system gap for CAM-18+, not this screen's defect. (c) The
+  lobby's two heading treatments (44px centered first-use vs 28px left
+  returning) read as deliberate register shift to ai-tells and as drift
+  to impeccable — left as-is, flagged for the reviewer. (d) The 43px
+  text-input height (touch-floor applies to buttons only) and the 36px
+  icon button are canon-consistent advisories, not fixed here — a
+  text-field canon revision would be its own design-system
+  conversation.
+- **Audit divergence recorded (maxLength):** impeccable said drop the
+  64-char maxLength and let the well-worded error do its job; the lobby
+  judge preferred maxLength=32 ("makes the limit felt"). We went with
+  impeccable's drop — a silent hard-stop gives no feedback about WHY
+  typing stops, the error copy does. Reviewer may re-litigate.
+- **Forward notes for CAM-18 from the room judge:** (1) seat-ring (42%)
+  vs bench-ring (~33%) geometry — reconcile from ONE radius source when
+  composing the game screen (the 42% was chosen to leave room for
+  hands); (2) the connection dot's C1 pass leans on the reconnecting
+  Alert bar — if that banner is ever made conditional, the dot becomes
+  a live color-alone failure; the judge's shape-redundancy fix (hollow
+  ring when disconnected, ~10-12px) closes it permanently and matters
+  in-game where connection state is load-bearing; (3) the tabletop's
+  decorative-exemption on the 1.54:1 paving contrast expires the moment
+  it carries the deck/discard.
+- **Containers own their AppShell** (small deviation from the module
+  table's "route picks LobbyScreen inside AppShell" phrasing): the
+  connection→shell-state wiring belongs to the surface, and the W4 test
+  must see the banner at the container seam. Routes stay one-line
+  container pickers, which is the layering rule's actual point. Evidence:
+  the W4 test renders `RoomScreen` and finds the shell's `Reconnecting…`
+  banner with the seat list still live.
+- **The two 409 join refusals are tag-distinguished, not
+  status-distinguished:** `LobbyFull` → full panel; `LobbyNotJoinable`
+  (covers started AND abandoned) → the view-GET fallback (200 → player
+  redirect, 404 → outsider panel — an abandoned lobby's game was never
+  dealt, so its view 404s into the same panel); `AlreadyInLobby`
+  (bootstrap/join race) → treated as membership, refetch the GET.
+  Evidence: `lobbyErrorStatus` in `apps/api/src/presentation/errors.ts`
+  maps all three to 409.
+- **A bootstrap 404 must not flash as a page error:** between the GET
+  erroring and the join effect firing there is a render where no mutation
+  is pending; classifying "room query failed" naively as page error
+  produced a one-frame alarm alert. `useRoom` therefore computes `failed`
+  excluding the 404 case — a 404 is the join trigger (R2), never an
+  error state.
+- `parseRoomLink` accepts scheme-less pastes (`localhost:3000/room/<id>`)
+  by prefixing `https://` before URL parsing — pasted links commonly lose
+  their scheme; nothing is ever navigated to, the parser only extracts
+  the UUID.

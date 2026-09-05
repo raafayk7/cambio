@@ -1,15 +1,17 @@
 import { Schema } from "effect"
+import { DisplayName } from "./GamePrimitives.js"
 
 /**
  * Request body of `POST /users` (CAM-4).
  *
- * The display-name rule lives here at the wire boundary, not in the database
- * (root plan decision): the value is trimmed first (a transform, so
- * `"  Raafay  "` decodes to `"Raafay"`), then must be non-empty and at most
- * 32 characters. Guest names are labels, not identities — no uniqueness.
+ * The display-name rule lives at the wire boundary, not in the database
+ * (root plan decision), as the shared `DisplayName` schema: the value is
+ * trimmed first (a transform, so `"  Raafay  "` decodes to `"Raafay"`), then
+ * must be non-empty and at most 32 characters. Guest names are labels, not
+ * identities — no uniqueness.
  */
 export const CreateUserRequest = Schema.Struct({
-  name: Schema.Trim.pipe(Schema.minLength(1), Schema.maxLength(32)),
+  name: DisplayName,
 })
 export type CreateUserRequest = typeof CreateUserRequest.Type
 
@@ -22,7 +24,7 @@ export type CreateUserRequest = typeof CreateUserRequest.Type
  */
 export const SessionUser = Schema.Struct({
   userId: Schema.UUID,
-  name: Schema.String,
+  name: DisplayName,
 })
 export type SessionUser = typeof SessionUser.Type
 

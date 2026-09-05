@@ -101,7 +101,10 @@ describe("illegal-command fuzzing", () => {
     }
   })
 
-  it("legalCommandKinds agrees with checkCommand (C4.2)", () => {
+  // ~14s solo; under a fully parallel forced-gate run (25 tasks competing
+  // for cores) it can exceed vitest's 30s default — an explicit long-test
+  // timeout, not a speedup, is the right fix (CAM-17 review fix cycle).
+  it("legalCommandKinds agrees with checkCommand (C4.2)", { timeout: 120_000 }, () => {
     const fuzzRng = makeDriverRng(777)
     // Record-keyed by every player-issued tag: a future Command case fails to
     // compile here instead of silently escaping the C4.2 cross-check.

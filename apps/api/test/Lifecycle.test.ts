@@ -11,7 +11,7 @@ import {
   joinLobby,
   type Lobby,
 } from "@cambio/domain"
-import { type GameRun, simulateGame, ts, uid } from "@cambio/domain/testing"
+import { type GameRun, simulateGame, ts, user } from "@cambio/domain/testing"
 
 import { ensureRosterUsers, makeTestRuntime } from "./support/db.js"
 
@@ -95,8 +95,8 @@ describe("lifecycle sweeps (CAM-8)", () => {
     const outcome = await runFx(
       Effect.gen(function* () {
         const sql = yield* SqlClient.SqlClient
-        yield* saveLobbyRow(idleLobby, createLobby(idleLobby, uid(0)), 0)
-        yield* saveLobbyRow(freshLobby, createLobby(freshLobby, uid(1)), 0)
+        yield* saveLobbyRow(idleLobby, createLobby(idleLobby, user(0)), 0)
+        yield* saveLobbyRow(freshLobby, createLobby(freshLobby, user(1)), 0)
         // A dealt game flipped to in_progress and backdated: the CHECK
         // exemption would accept abandoning it, so only the function's
         // status = 'lobby' scoping protects it (C1's sharpest edge).
@@ -141,14 +141,14 @@ describe("lifecycle sweeps (CAM-8)", () => {
       Effect.gen(function* () {
         const games = yield* GameRepository
         const sql = yield* SqlClient.SqlClient
-        const lobby = createLobby(gameId, uid(0))
+        const lobby = createLobby(gameId, user(0))
         const held = yield* saveLobbyRow(gameId, lobby, 0)
         yield* sql`
           UPDATE games SET updated_at = now() - interval '25 hours'
           WHERE game_id = ${gameId}
         `
         yield* expireLobbies
-        const joined = joinLobby(lobby, uid(1))
+        const joined = joinLobby(lobby, user(1))
         if (Either.isLeft(joined)) throw new Error("join should be pure-legal")
         const stale = yield* Effect.either(
           games.saveLobby({ gameId, lobby: joined.right, expectedVersion: held }),
@@ -264,7 +264,7 @@ describe("lifecycle sweeps (CAM-8)", () => {
           UPDATE games SET updated_at = now() - interval '40 days'
           WHERE game_id = ${dealtOld}
         `
-        yield* saveLobbyRow(freshLobby, createLobby(freshLobby, uid(2)), 0)
+        yield* saveLobbyRow(freshLobby, createLobby(freshLobby, user(2)), 0)
         yield* saveGame(recentEnded, 0, run.events)
         yield* sql`
           UPDATE games SET updated_at = now() - interval '10 days'
@@ -310,7 +310,7 @@ describe("lifecycle sweeps (CAM-8)", () => {
         `
         // A live seat for the referenced user (the load-bearing gate —
         // users.updated_at is dead, so this is what protects activity).
-        yield* saveLobbyRow(refLobby, createLobby(refLobby, uid(0)), 0)
+        yield* saveLobbyRow(refLobby, createLobby(refLobby, user(0)), 0)
         yield* sql`
           INSERT INTO game_players (game_id, user_id, seat_index)
           VALUES (${refLobby}, ${referenced}, 1)
@@ -384,7 +384,7 @@ describe("lifecycle sweeps (CAM-8)", () => {
         ] as const) {
           yield* sql`INSERT INTO users (user_id, user_name) VALUES (${id}, ${name})`
         }
-        yield* saveLobbyRow(gateLobby, createLobby(gateLobby, uid(0)), 0)
+        yield* saveLobbyRow(gateLobby, createLobby(gateLobby, user(0)), 0)
         yield* sql`
           INSERT INTO game_players (game_id, user_id, seat_index)
           VALUES (${gateLobby}, ${gatedUser}, 1)

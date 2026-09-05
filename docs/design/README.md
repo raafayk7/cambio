@@ -23,7 +23,14 @@ Four Pinterest-sourced sets:
 | `card-illustrations/` | Vintage matchbox labels, modernist decks, 60s book covers, minimalist poster art          | Style reference: limited flat-ink palettes, geometric suits, paper texture, bold display type |
 | `lums-photos/`        | The real Khoka courtyard at LUMS                                                          | Place reference                                                                               |
 | `lums-illustrated/`   | AI illustrations of the Khoka in the card-illustration style; includes the top-down table | The art direction itself; the top-down table is the game-board layout blueprint               |
-| `card-game-ui/`       | Classic card game UIs (MS Hearts, FreeCell, bridge app, pixel card)                       | **Layout reference only** — radial table arrangement, information clarity. Not style.         |
+
+Images 9–11 in `lums-illustrated/` are hi-res regenerations produced
+during CAM-17 as **production sources**: image9 (courtyard scene →
+`packages/ui/src/assets/scene-courtyard.webp`), image10 (top-down paving
+→ `packages/ui/src/assets/scene-paving.webp`), image11 (table + benches
+with alpha → `apps/web/src/assets/table-top.webp`). Regenerate at
+≥ these dimensions and re-compress if the art ever changes.
+| `card-game-ui/` | Classic card game UIs (MS Hearts, FreeCell, bridge app, pixel card) | **Layout reference only** — radial table arrangement, information clarity. Not style. |
 
 ## `resources/`
 

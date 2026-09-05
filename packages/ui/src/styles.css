@@ -179,7 +179,7 @@
   --color-surface-page: var(--cream-scene);
   --color-surface-raised: var(--cream-card);
   --color-surface-table: var(--green-table);
-  /* surface.warm is terracotta-led; the checkerboard pattern pairs it with
+  /* surface.warm is terracotta-led; the paving plaid pairs it with
    * tan-paving directly in scene CSS (theme-fixed, see Decision Log). */
   --color-surface-warm: var(--terracotta);
   --color-ink-primary: var(--ink);
@@ -294,6 +294,14 @@
   }
 }
 
+/* The 44px touch floor (button.md r2, CAM-17): minimum control height for
+ * text buttons. Spec-carried value citing its spec, like the other
+ * canon-carried constants — 44 is not on the spacing scale and must not
+ * become a token. The icon variant is exempt (its own square size). */
+@utility touch-floor {
+  min-height: 44px;
+}
+
 /* The papery press (button.md active state — the component's signature):
  * the element translates by the raised-shadow offset and the shadow
  * collapses, so it physically sits down. Never an opacity flash. */
@@ -323,20 +331,45 @@
 }
 
 /* Scene grounds (patterns/scenes.md — the app-shell owns these; screens
- * declare a depth, never paint their own). The checkered paving pairs the
- * warm role's two primitives directly: theme-fixed scene chrome. */
+ * declare a depth, never paint their own). Theme-fixed scene chrome on
+ * the warm primitives.
+ *
+ * Paving r3 (CAM-17 art revision): the painted top-down plaid itself —
+ * a regeneration of docs/design/moodboard/lums-illustrated/image10.png
+ * (tan tiles, terracotta banding, grout, grain, corner leaf shadows;
+ * strictly orthographic so it never fights the top-down table),
+ * compressed to WebP. The tan primitive stays underneath as the
+ * instant-paint fallback. */
 @utility scene-paving {
   background-color: var(--tan-paving);
-  background-image: repeating-conic-gradient(var(--terracotta) 0% 25%, var(--tan-paving) 0% 50%);
-  background-size: 64px 64px;
+  background-image: url("./assets/scene-paving.webp");
+  background-size: cover;
+  background-position: center;
+}
+
+/* The lobby's full illustrated courtyard (scenes.md lobby row, realized
+ * CAM-17 through the creation gate; r3: the illustration itself — a
+ * regeneration of docs/design/moodboard/lums-illustrated/image9.png in
+ * the moodboard's own painterly language, compressed to WebP. Raster is
+ * the right medium for painterly scene art; grain is baked into the
+ * painting itself. Content floats over it on wash panels (panel.md r2)
+ * so the hero table stays visible. */
+@utility scene-courtyard {
+  background-color: var(--tan-paving);
+  background-image: url("./assets/scene-courtyard.webp");
+  background-size: cover;
+  background-position: center;
 }
 
 /* Safe-area padding for the shell on notched compact devices
- * (app-shell.md: safe-area aware; the own-hand dock reserves the bottom). */
+ * (app-shell.md: safe-area aware; the own-hand dock reserves the bottom —
+ * which is why the bottom inset matters most: without it the dock sits
+ * under the home bar. Bottom inset added in CAM-17, S2). */
 @utility safe-area-shell {
   padding-top: env(safe-area-inset-top);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ---- Base ---------------------------------------------------------------- */

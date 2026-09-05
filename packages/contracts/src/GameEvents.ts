@@ -1,5 +1,16 @@
 import { Schema } from "effect"
-import { CardSlug, PowerKind, Rank, SlotIndex, SlotRef, Timestamp, Uuid } from "./GamePrimitives.js"
+import {
+  CardSlug,
+  GameVersion,
+  PowerKind,
+  Rank,
+  SlotIndex,
+  SlotRef,
+  Timestamp,
+  Uuid,
+  WireGameConfig,
+} from "./GamePrimitives.js"
+import { LobbyView } from "./GameView.js"
 
 /**
  * The realtime event contracts (CAM-6): every domain event, classified and
@@ -35,7 +46,7 @@ export const GameStarted = Schema.TaggedStruct("GameStarted", {
   players: Schema.Array(Uuid),
   firstDiscard: CardSlug,
   deckCount: Schema.Int.pipe(Schema.nonNegative()),
-  config: Schema.Struct({ slamWindowMs: Schema.Int }),
+  config: WireGameConfig,
 })
 
 export const CambioCalled = Schema.TaggedStruct("CambioCalled", {
@@ -213,9 +224,31 @@ export const PrivateCardPeeked = Schema.TaggedStruct("PrivateCardPeeked", {
 export const PlayerGameEvent = Schema.Union(PrivateCardDrawn, PrivateCardPeeked)
 export type PlayerGameEvent = typeof PlayerGameEvent.Type
 
+// ---------------------------------------------------------------------------
+// Room channel — the pre-game lobby broadcast (CAM-17 C3).
+// ---------------------------------------------------------------------------
+
+/**
+ * The lobby membership broadcast (ADR-0019 rows, not events): published on
+ * the room topic after every create/join/leave, tagged like the 24 in-game
+ * broadcasts (event name = `_tag`). Deliberately NOT part of `RoomGameEvent` —
+ * that union is the projection of the in-game domain events; this is the
+ * row-backed pre-game state. `version` is the room's persisted version so a
+ * client can discard a broadcast older than its last-seen bootstrap
+ * (root plan reconciliation: the bootstrap-vs-broadcast staleness race).
+ */
+export const LobbyUpdated = Schema.TaggedStruct("LobbyUpdated", {
+  lobby: LobbyView,
+  version: GameVersion,
+})
+export type LobbyUpdated = typeof LobbyUpdated.Type
+
 export const decodeRoomGameEvent = Schema.decodeUnknownSync(RoomGameEvent)
 export const encodeRoomGameEvent = Schema.encodeSync(RoomGameEvent)
 export const decodeRoomGameEventEither = Schema.decodeUnknownEither(RoomGameEvent)
 export const decodePlayerGameEvent = Schema.decodeUnknownSync(PlayerGameEvent)
 export const encodePlayerGameEvent = Schema.encodeSync(PlayerGameEvent)
 export const decodePlayerGameEventEither = Schema.decodeUnknownEither(PlayerGameEvent)
+export const decodeLobbyUpdated = Schema.decodeUnknownSync(LobbyUpdated)
+export const encodeLobbyUpdated = Schema.encodeSync(LobbyUpdated)
+export const decodeLobbyUpdatedEither = Schema.decodeUnknownEither(LobbyUpdated)

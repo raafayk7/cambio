@@ -1,6 +1,6 @@
 name: button
 status: draft
-version: 1
+version: 2
 extends: none
 
 Class: **Interactive**.
@@ -9,6 +9,10 @@ Class: **Interactive**.
 
 - `ui` 600, sentence case (voice.md), `2px` `ink.primary` border,
   `radius.sm`, padding `space.2` × `space.5`, `elevation.raised`.
+- Minimum control height `44px` (the touch floor, r2) — spec-carried
+  value, not a spacing token; padding stays `space.2` × `space.5` and the
+  floor absorbs the difference. The `icon` variant keeps its own square
+  size and is exempt.
 - Primary: `accent.action` ground, `ink.inverse` text.
 - Secondary: `surface.raised` ground, `ink.primary` text.
 - Ghost: transparent ground, no shadow, `ink.primary` text.
@@ -41,3 +45,9 @@ Class: **Interactive**.
 ## Revisions
 
 - r1: initial (CAM-13).
+- r2: 44px minimum control height added (CAM-17, user-approved). The r1
+  box measured ~43px (15px text × 1.5 line + 2 × `space.2` + 2 × 2px
+  border), one pixel under the design-gate's touch recommendation; a
+  min-height closes it exactly, where the next padding step (`space.3`)
+  would overshoot to ~50px. Icon variant deliberately exempt — separate
+  canon.
