@@ -33,6 +33,9 @@ rule, the rule belongs in the domain and its visible consequence in the
 - **Hard prohibitions carried over verbatim:** no Postgres Changes
   replication to clients, ever; and no Supabase anon-key database access
   from the browser — clients get no direct database access of any kind.
+  (`apps/web` DOES ship `@supabase/realtime-js` plus a public anon JWT
+  for the Broadcast socket — that is not database access; ADR-0032
+  explains why the narrow dependency keeps this prohibition structural.)
   All client data arrives via the API's projections and the Broadcast
   channels it publishes.
 
@@ -100,7 +103,12 @@ shallow — the token-proliferation warning in the Carbonteq reference's
 four-tier model (raw → primitive → semantic → component) applies, but
 Cambio's canonical vocabulary is the two layers in tokens.md, nothing
 more. **No hardcoded visual values anywhere** — an arbitrary-value
-utility (`bg-[#f6dcae]`, `p-[13px]`) is an audit flag. New tokens go
+utility (`bg-[#f6dcae]`, `p-[13px]`) is an audit flag, and so is a
+constant-valued inline `style={{}}` (a `style` prop is legitimate only
+for genuinely dynamic values like computed seat positions; a constant in
+one must be spec-carried and documented, and audits must grep for both
+forms — a CAM-17 review learned the class-only grep misses them). New
+tokens go
 through the design-system creation gate first (see the `design-system`
 skill), then the styles.
 

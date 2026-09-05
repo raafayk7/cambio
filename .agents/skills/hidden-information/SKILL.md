@@ -60,7 +60,8 @@ event.
   turns ago" — that's game logic, not a row predicate.
 - **No Supabase anon-key database access from the browser.** The service key
   lives only in `apps/api`; clients get no direct database access of any
-  kind.
+  kind. (The browser's `@supabase/realtime-js` + public anon JWT are the
+  Broadcast socket only, not database access — ADR-0032.)
 - **`apps/web` never imports `domain` or `application`** (compile-enforced) —
   the domain types themselves contain full state. Client-visible shapes are
   designed in `contracts`, which means every client-visible field is an

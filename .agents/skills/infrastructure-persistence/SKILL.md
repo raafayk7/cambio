@@ -56,6 +56,13 @@ NULL`. A plain unique index starts rejecting inserts once soft-deleted
 2. **The `deleted_at IS NULL` filter lives in the repository layer, always.**
    The domain must never know soft-delete exists. If a repository method can
    return a soft-deleted row, that method is wrong.
+3. **Joined tables are the third case** (learned in CAM-17): when an
+   anchor row references a soft-deletable row (a lobby member's `users`
+   record), filter the JOIN side (`LEFT JOIN … AND joined.deleted_at IS
+NULL`) but never drop the anchor row — and represent the absent side
+   as an explicit, deliberately chosen value the projection can render
+   (CAM-17 uses a decodable `"—"`), never an empty string
+   indistinguishable from a bug.
 
 ## The event log
 
