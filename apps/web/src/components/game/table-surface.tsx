@@ -57,7 +57,14 @@ export function TableSurface({
       <div
         key={seatIndex}
         data-seat-index={seatIndex}
-        className="regular:absolute regular:-translate-x-1/2 regular:-translate-y-1/2"
+        // Hazard 1 (CAM-18 root plan): opponent wrappers sit earlier in DOM
+        // order than the art container below, which is ALSO
+        // `regular:absolute` — with both at the implicit z-index:auto,
+        // paint order falls back to DOM order and the art (later) occludes
+        // them. An explicit z-index wins over `auto` regardless of DOM
+        // order, so it applies uniformly to opponent AND own wrappers
+        // (own already happened to paint on top by DOM order alone).
+        className="regular:absolute regular:z-10 regular:-translate-x-1/2 regular:-translate-y-1/2"
         style={{ left: `${position?.xPct ?? 50}%`, top: `${position?.yPct ?? 50}%` }}
       >
         {seats[seatIndex]}
