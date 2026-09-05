@@ -1,4 +1,4 @@
-import type { PlayerGameView, SlotIndex, SlotRef, ViewPhase } from "@cambio/contracts"
+import type { PlayerGameView, Rank, SlotIndex, SlotRef, ViewPhase } from "@cambio/contracts"
 import { Alert, AppShell, Button, Link as UiLink, Modal, Panel, Skeleton } from "@cambio/ui"
 import { Link as RouterLink } from "@tanstack/react-router"
 import * as React from "react"
@@ -10,10 +10,11 @@ import { FlightLayer } from "../../components/game/flight/flight-layer.js"
 import { Hand, type HandFace } from "../../components/game/hand.js"
 import { HeldCard } from "../../components/game/held-card.js"
 import { Seat } from "../../components/game/seat.js"
+import { SlamTimer } from "../../components/game/slam-timer.js"
 import { handArc, seatArc, type RadialPosition } from "../../components/game/table-geometry.js"
 import { TableSurface } from "../../components/game/table-surface.js"
 import { TurnIndicator } from "../../components/game/turn-indicator.js"
-import { affordancesFor, type Affordances } from "./affordances.js"
+import { affordancesFor, slamGiveSlotRequired, type Affordances } from "./affordances.js"
 import { useConnection } from "../../hooks/use-connection.js"
 import { sessionErrorCopy } from "../../hooks/use-session.js"
 import { useGame } from "./use-game.js"
@@ -70,6 +71,16 @@ function GameSkeleton() {
 interface TurnStatus {
   state: "your-turn" | "other-turn" | "slam-window" | "game-over"
   activePlayerId: string
+  /** SL1: the rank the window is matching — fully public
+   * (`ViewSlamWindow.rank`), so it's safe straight in the indicator copy. */
+  rank?: Rank
+}
+
+/** `Rank`'s wire encoding is `"T"` for ten (`GamePrimitives.ts` WIRE_RANKS) —
+ * the one rank that needs spelling out for display; every other rank is
+ * already its own label. */
+function rankLabel(rank: Rank): string {
+  return rank === "T" ? "10" : rank
 }
 
 /** Reads which player is acting straight off `ViewPhase` — structural field
@@ -85,15 +96,16 @@ function turnStatus(phase: ViewPhase, viewerId: string | undefined): TurnStatus 
         activePlayerId: phase.playerId,
       }
     case "SlamWindow":
-      return { state: "slam-window", activePlayerId: phase.turnPlayerId }
+      return { state: "slam-window", activePlayerId: phase.turnPlayerId, rank: phase.rank }
     case "Ended":
       return { state: "game-over", activePlayerId: phase.calledBy }
   }
 }
 
 /** voice.md register: player language, sentence case for functional copy —
- * `turnIndicatorCopy`'s game-over/slam-window strings get the poster/rank
- * detail T5/E1/SL1 add later; this is the minimal naming step 8 owns. */
+ * the indicator pairs with `SlamTimer` rather than replacing it
+ * (turn-indicator.md), so this only names what's being matched; the "SLAM!"
+ * shout itself lives on the timer in poster caps. */
 function turnStatusCopy(status: TurnStatus, activePlayerName: string): string {
   switch (status.state) {
     case "your-turn":
@@ -101,7 +113,9 @@ function turnStatusCopy(status: TurnStatus, activePlayerName: string): string {
     case "other-turn":
       return `${activePlayerName}'s turn`
     case "slam-window":
-      return "Slam window open"
+      return status.rank === undefined
+        ? "Slam window open"
+        : `Slam window open — match the ${rankLabel(status.rank)}`
     case "game-over":
       return `${activePlayerName} called Cambio`
   }
@@ -244,6 +258,9 @@ function GameTable({
   actingPlayerId,
   fizzleMessage,
   commandError,
+  slamReveal,
+  awaitingGive,
+  slamBeatMessage,
 }: {
   view: PlayerGameView
   viewerId: string
@@ -253,6 +270,9 @@ function GameTable({
   actingPlayerId: ReturnType<typeof useGame>["actingPlayerId"]
   fizzleMessage: ReturnType<typeof useGame>["fizzleMessage"]
   commandError: ReturnType<typeof useGame>["commandError"]
+  slamReveal: ReturnType<typeof useGame>["slamReveal"]
+  awaitingGive: ReturnType<typeof useGame>["awaitingGive"]
+  slamBeatMessage: ReturnType<typeof useGame>["slamBeatMessage"]
 }) {
   const [tableRoot, setTableRoot] = React.useState<HTMLElement | null>(null)
   const [confirmCambioOpen, setConfirmCambioOpen] = React.useState(false)
@@ -271,6 +291,9 @@ function GameTable({
   const status = turnStatus(view.phase, viewerId)
   const indicatorState = status.state === "slam-window" ? "slam-window" : status.state
   const affordances = affordancesFor(view, viewerId)
+  // SL1: fully public, phase-gated (not turn-gated) — every viewer may slam
+  // while this is non-null, holder or not.
+  const slamPhase = view.phase._tag === "SlamWindow" ? view.phase : undefined
 
   // T3/T4: two-pick target selection (7/8/9/10 peeks are single-click and
   // never touch this; J and the Queen's second step are two distinct
@@ -281,9 +304,39 @@ function GameTable({
   const phaseKey = `${view.phase._tag}:${"playerId" in view.phase ? view.phase.playerId : ""}`
   const [selection, setSelection] = React.useState<ReadonlyArray<SlotRef>>([])
   const [selectionPhaseKey, setSelectionPhaseKey] = React.useState(phaseKey)
+  // SL1: the slammer's own occupied slots become the give-target selection
+  // once an opponent-slam's give is owed (H1 `slamGiveSlotRequired`) — reset
+  // on the same phase transitions as the power-targeting selection above.
+  const [slamPendingGive, setSlamPendingGive] = React.useState<SlotRef | null>(null)
   if (selectionPhaseKey !== phaseKey) {
     setSelectionPhaseKey(phaseKey)
     setSelection([])
+    setSlamPendingGive(null)
+  }
+
+  const handleSlamClick = (ref: SlotRef) => {
+    if (slamPendingGive !== null) {
+      // Only the slammer's own occupied slots resolve the pending give; any
+      // other click while a give is owed is a no-op (the Cancel button is
+      // the only other way out — SL1 "keep it minimal").
+      if (ref.playerId !== viewerId) return
+      sendCommand.mutate({ _tag: "Slam", target: slamPendingGive, giveSlot: ref.slotIndex })
+      setSlamPendingGive(null)
+      return
+    }
+    if (ref.playerId === viewerId) {
+      // Own card: no give ever follows a correct own-slam (cambio-rules).
+      sendCommand.mutate({ _tag: "Slam", target: ref, giveSlot: null })
+      return
+    }
+    const viewerHand = view.players.find((player) => player.id === viewerId)?.hand ?? []
+    if (slamGiveSlotRequired(viewerId, ref.playerId, viewerHand)) {
+      setSlamPendingGive(ref)
+    } else {
+      // Zero-card slammer (ADR-0009): the server draws-then-gives, unseen —
+      // `giveSlot` stays null even though a give still happens.
+      sendCommand.mutate({ _tag: "Slam", target: ref, giveSlot: null })
+    }
   }
 
   const handleSelectTarget = (ref: SlotRef) => {
@@ -329,12 +382,24 @@ function GameTable({
   const heldIsHolder = heldPhase !== undefined && heldPhase.playerId === viewerId
 
   const drawing = flights.active.some((flight) => flight.originId === "deck")
+  const reshuffling = flights.active.some(
+    (flight) => flight.originId === "discard" && flight.destinationId === "deck",
+  )
   const receiving = flights.active.some((flight) => flight.destinationId === "discard")
 
-  const facesFor = (playerId: string): ReadonlyArray<HandFace> =>
-    peek !== null && peek.target.playerId === playerId
-      ? [{ slotIndex: peek.target.slotIndex, card: peek.card, peeking: true }]
-      : []
+  const facesFor = (playerId: string): ReadonlyArray<HandFace> => {
+    const faces: HandFace[] = []
+    if (peek !== null && peek.target.playerId === playerId) {
+      faces.push({ slotIndex: peek.target.slotIndex, card: peek.card, peeking: true })
+    }
+    // SL2: both a correct and an incorrect slam reveal (§1.5) — a plain "up"
+    // face, never "peeking" (that state is the private memory-fidelity
+    // hold; this reveal is public).
+    if (slamReveal !== null && slamReveal.target.playerId === playerId) {
+      faces.push({ slotIndex: slamReveal.target.slotIndex, card: slamReveal.card })
+    }
+    return faces
+  }
 
   const seatNodes = view.players.map((player, index) => {
     const own = index === viewerSeatIndex
@@ -351,12 +416,28 @@ function GameTable({
       onSelectTarget: handleSelectTarget,
       onSwapHeld: handleSwapHeld,
     })
+    // SL1: slamming is phase-gated only — every viewer may slam any
+    // face-down card in any hand while the window is open, turn or no turn.
+    // A pending give narrows clicks to the slammer's own hand (the Cancel
+    // affordance below is the only other way out of that sub-state).
+    const slamOnSlotClick =
+      slamPhase !== undefined && (slamPendingGive === null || player.id === viewerId)
+        ? (slotIndex: SlotIndex) => handleSlamClick({ playerId: player.id, slotIndex })
+        : undefined
     const seatState =
       player.id === actingPlayerId
         ? "acting"
         : status.activePlayerId === player.id
           ? "active-turn"
           : "default"
+    // SL2: the slot a correct opponent-slam vacated renders as a vacancy
+    // (Hand's `awaitingGiveSlot` ring only applies to the empty-slot branch)
+    // until the give lands and the refetch catches occupancy up — the
+    // client-side snapshot is otherwise untouched (ADR-0033).
+    const handSlots =
+      awaitingGive !== null && awaitingGive.playerId === player.id
+        ? player.hand.filter((slotIndex) => slotIndex !== awaitingGive.slotIndex)
+        : player.hand
     return (
       <SeatWithHand
         key={player.id}
@@ -374,11 +455,19 @@ function GameTable({
           <Hand
             variant={own ? "own" : "opponent"}
             playerId={player.id}
-            slots={player.hand}
+            slots={handSlots}
             faces={facesFor(player.id)}
-            inert={!wiring.interactive}
+            inert={!wiring.interactive && slamOnSlotClick === undefined}
             selectedSlots={wiring.selectedSlots}
-            {...(wiring.onSlotClick !== undefined ? { onSlotClick: wiring.onSlotClick } : {})}
+            {...(slamPhase !== undefined ? { slamWindow: true } : {})}
+            {...(awaitingGive !== null && awaitingGive.playerId === player.id
+              ? { awaitingGiveSlot: awaitingGive.slotIndex }
+              : {})}
+            {...(slamOnSlotClick !== undefined
+              ? { onSlotClick: slamOnSlotClick }
+              : wiring.onSlotClick !== undefined
+                ? { onSlotClick: wiring.onSlotClick }
+                : {})}
           />
         }
       />
@@ -390,6 +479,27 @@ function GameTable({
       <TurnIndicator state={indicatorState}>
         {turnStatusCopy(status, playerName(status.activePlayerId))}
       </TurnIndicator>
+      {slamPhase !== undefined ? (
+        // SL1/SL2: pairs with the indicator above, never replaces it
+        // (turn-indicator.md) — `resolving` pauses the drain visually while
+        // a slam's public reveal plays; the drain math itself never resets
+        // (ADR-0011 fixed `closesAt`, unaffected by `resolving`).
+        <SlamTimer
+          window={{ closesAt: slamPhase.closesAt, durationMs: view.config.slamWindowMs }}
+          resolving={slamReveal !== null}
+        />
+      ) : null}
+      {slamPendingGive !== null ? (
+        <div className="flex items-center gap-2">
+          <p className="font-ui text-sm text-ink-primary">Pick a card to give</p>
+          <Button variant="ghost" onClick={() => setSlamPendingGive(null)}>
+            Cancel
+          </Button>
+        </div>
+      ) : null}
+      {slamBeatMessage !== null ? (
+        <p className="font-ui text-sm text-ink-muted">{slamBeatMessage}</p>
+      ) : null}
       {affordances.phase === "AwaitingDraw" && affordances.holder ? (
         <Button variant="danger" onClick={() => setConfirmCambioOpen(true)}>
           Call Cambio
@@ -426,7 +536,11 @@ function GameTable({
             <div className="flex items-center gap-3">
               <DrawDeck
                 count={view.deckCount}
-                {...(drawing ? { state: "draw" as const } : {})}
+                {...(reshuffling
+                  ? { state: "reshuffling" as const }
+                  : drawing
+                    ? { state: "draw" as const }
+                    : {})}
                 {...(affordances.phase === "AwaitingDraw" &&
                 affordances.holder &&
                 affordances.drawFromDeck
@@ -437,6 +551,7 @@ function GameTable({
                 {...(discardTop !== undefined ? { top: discardTop } : {})}
                 underCount={discardUnderCount}
                 receiving={receiving}
+                {...(slamPhase !== undefined ? { slamTarget: true } : {})}
                 {...(affordances.phase === "AwaitingDraw" &&
                 affordances.holder &&
                 affordances.takeDiscard
@@ -506,6 +621,9 @@ export function GameScreen({ gameId }: { gameId: string }) {
     actingPlayerId,
     fizzleMessage,
     commandError,
+    slamReveal,
+    awaitingGive,
+    slamBeatMessage,
   } = useGame(gameId)
 
   let content: React.ReactNode
@@ -561,6 +679,9 @@ export function GameScreen({ gameId }: { gameId: string }) {
         actingPlayerId={actingPlayerId}
         fizzleMessage={fizzleMessage}
         commandError={commandError}
+        slamReveal={slamReveal}
+        awaitingGive={awaitingGive}
+        slamBeatMessage={slamBeatMessage}
       />
     )
   } else {

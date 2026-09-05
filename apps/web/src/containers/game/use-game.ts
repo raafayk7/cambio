@@ -63,6 +63,26 @@ interface PeekReveal {
   readonly card: CardSlug
 }
 
+/**
+ * SL2: the slam reveal beat — `SlamSucceeded`/`SlamFailed` both carry the
+ * slammed card (cambio-rules §1.5: every slam attempt publicly reveals the
+ * card, correct or not) and show it at its slot for this long before any
+ * flight moves. No canon token exists for a *public* reveal (`duration.peek`
+ * is explicitly the *private*, memory-fidelity hold — wrong semantics here);
+ * scaled off `duration.track` (340ms, `packages/ui/src/styles.css`) at
+ * roughly 3.5x, long enough to read a rank+suit at a glance, short next to
+ * the peek's deliberate memorization window.
+ */
+const SLAM_REVEAL_MS = 1200
+
+/** SL2: one slam's public reveal — the target slot and the revealed card,
+ * shown via `Hand.faces` exactly like a peek but with `peeking` unset (a
+ * plain "up" face — this is public, not a memory-fidelity private state). */
+interface SlamReveal {
+  readonly target: SlotRef
+  readonly card: CardSlug
+}
+
 /** T5: a 422's tag mapped to voice.md-register inline copy. Every tag not
  * listed here (this milestone doesn't reach slam/endgame tags) falls back
  * to a generic sentence — the table has already been refreshed either way. */
@@ -192,13 +212,71 @@ export function useGame(gameId: string) {
   // toast (toast.md law). Cleared at the start of every new attempt.
   const [commandError, setCommandError] = React.useState<string | null>(null)
 
+  // SL2: the slam reveal beat. `revealActiveRef` mirrors `slamReveal !==
+  // null` synchronously (a plain ref, not derived from state) so events
+  // arriving in the same batch — the give/penalty/skip that follows a
+  // Slam(Suc|Fail)ceeded in the very same emit — can be told to wait for the
+  // reveal to clear without racing React's render cycle.
+  const [slamReveal, setSlamReveal] = React.useState<SlamReveal | null>(null)
+  const slamRevealTimeoutRef = React.useRef<number | null>(null)
+  const revealActiveRef = React.useRef(false)
+  const pendingAfterRevealRef = React.useRef<Array<() => void>>([])
+
+  // SL2: the slot a correct opponent-slam vacated, awaiting the slammer's
+  // blind give (`CardGivenFromHand`/`CardGivenFromDeck`) — cleared the
+  // moment that event (or its ADR-0011 skip) arrives, never left dangling
+  // past the window (also cleared on `SlamWindowClosed`, belt-and-suspenders).
+  const [awaitingGive, setAwaitingGive] = React.useState<SlotRef | null>(null)
+
+  // SL2: `DrawSkipped`'s public "nothing to give/no penalty possible" beat —
+  // its own state (not `fizzleMessage`) so it can never collide with T3's
+  // PowerFizzled copy.
+  const [slamBeatMessage, setSlamBeatMessage] = React.useState<string | null>(null)
+  const slamBeatTimeoutRef = React.useRef<number | null>(null)
+
   React.useEffect(() => {
     return () => {
       if (peekTimeoutRef.current !== null) window.clearTimeout(peekTimeoutRef.current)
       if (actingTimeoutRef.current !== null) window.clearTimeout(actingTimeoutRef.current)
       if (fizzleTimeoutRef.current !== null) window.clearTimeout(fizzleTimeoutRef.current)
+      if (slamRevealTimeoutRef.current !== null) window.clearTimeout(slamRevealTimeoutRef.current)
+      if (slamBeatTimeoutRef.current !== null) window.clearTimeout(slamBeatTimeoutRef.current)
     }
   }, [])
+
+  /**
+   * Starts (or restarts, for a second slam in the same window) the SL2
+   * reveal beat: `target`'s slot shows `card` face-up for `SLAM_REVEAL_MS`,
+   * `SlamTimer` goes `resolving` for the same span — the bar's drain math is
+   * untouched (`SlamTimer` only pauses visually; ADR-0011's fixed `closesAt`
+   * never moves). Whatever the caller queued via `runAfterReveal` while this
+   * was showing fires once it clears.
+   */
+  function startSlamReveal(target: SlotRef, card: CardSlug) {
+    if (slamRevealTimeoutRef.current !== null) window.clearTimeout(slamRevealTimeoutRef.current)
+    revealActiveRef.current = true
+    setSlamReveal({ target, card })
+    slamRevealTimeoutRef.current = window.setTimeout(() => {
+      slamRevealTimeoutRef.current = null
+      revealActiveRef.current = false
+      setSlamReveal(null)
+      const pending = pendingAfterRevealRef.current
+      pendingAfterRevealRef.current = []
+      pending.forEach((thunk) => thunk())
+    }, SLAM_REVEAL_MS)
+  }
+
+  /** Runs `thunk` now, or queues it for the moment the active reveal clears
+   * — every slam-outcome event that follows a Slam(Succeeded|Failed) in the
+   * same batch (the give, the penalty, a skip) goes through this so it never
+   * renders on top of the reveal it's a consequence of. */
+  function runAfterReveal(thunk: () => void) {
+    if (revealActiveRef.current) {
+      pendingAfterRevealRef.current.push(thunk)
+    } else {
+      thunk()
+    }
+  }
 
   function pulseSeat(playerId: string) {
     if (actingTimeoutRef.current !== null) window.clearTimeout(actingTimeoutRef.current)
@@ -306,6 +384,122 @@ export function useGame(gameId: string) {
         }, PEEK_DURATION_MS)
         break
       }
+      // ---- SL2: slam resolutions, driven from these events only — viewFor
+      // never re-sends a slam's card (root plan wire survey) ---------------
+      case "SlamSucceeded": {
+        const { target, card, slammerId } = event
+        startSlamReveal(target, card)
+        const isOwnSlam = slammerId === target.playerId
+        runAfterReveal(() => {
+          const slot = slotAnchorId(target.playerId, target.slotIndex)
+          flights.enqueue({
+            id: nextFlightId(),
+            face: { face: "up", card },
+            originId: slot,
+            destinationId: "discard",
+          })
+          // Own-correct: the slot's outline just stays empty once the
+          // refetch lands (cambio-rules) — no give follows. Opponent-
+          // correct: the vacated slot now awaits the slammer's blind give.
+          if (!isOwnSlam) setAwaitingGive(target)
+        })
+        break
+      }
+      case "SlamFailed": {
+        // Incorrect slams reveal too (§1.5) — the penalty itself is a
+        // separate `PenaltyDrawn` event, handled below once this reveal
+        // clears (it's what makes the "wrong guess, then the penalty
+        // lands" beat legible instead of instantaneous).
+        startSlamReveal(event.target, event.card)
+        break
+      }
+      case "PenaltyDrawn": {
+        const { playerId, slotIndex } = event
+        runAfterReveal(() => {
+          flights.enqueue({
+            id: nextFlightId(),
+            // Unseen by everyone, including the slammer (ADR-0022) — never
+            // a `face: "up"` spec, structurally, same as the wire itself.
+            face: { face: "down" },
+            originId: "deck",
+            destinationId: slotAnchorId(playerId, slotIndex),
+          })
+        })
+        break
+      }
+      case "CardGivenFromHand": {
+        const { slammerId, fromSlot, to } = event
+        runAfterReveal(() => {
+          flights.enqueue({
+            id: nextFlightId(),
+            // Value-free by construction (the event carries no card) — the
+            // slammer's own choice of slot is blind even to them.
+            face: { face: "down" },
+            originId: slotAnchorId(slammerId, fromSlot),
+            destinationId: slotAnchorId(to.playerId, to.slotIndex),
+          })
+          setAwaitingGive(null)
+        })
+        break
+      }
+      case "CardGivenFromDeck": {
+        const { to } = event
+        runAfterReveal(() => {
+          flights.enqueue({
+            id: nextFlightId(),
+            face: { face: "down" },
+            originId: "deck",
+            destinationId: slotAnchorId(to.playerId, to.slotIndex),
+          })
+          setAwaitingGive(null)
+        })
+        break
+      }
+      case "DrawSkipped": {
+        const { playerId, kind } = event
+        runAfterReveal(() => {
+          // ADR-0011: a give/penalty draw impossible even after reshuffle is
+          // skipped outright — nothing is coming, so any pending give
+          // treatment clears with it rather than waiting forever.
+          if (kind === "give") setAwaitingGive(null)
+          const name = playersRef.current.find((player) => player.id === playerId)?.name
+          const what = kind === "penalty" ? "penalty card" : "give"
+          if (slamBeatTimeoutRef.current !== null) window.clearTimeout(slamBeatTimeoutRef.current)
+          setSlamBeatMessage(`No cards left to draw — ${name ?? "a player"}'s ${what} was skipped.`)
+          slamBeatTimeoutRef.current = window.setTimeout(() => {
+            slamBeatTimeoutRef.current = null
+            setSlamBeatMessage(null)
+          }, SLAM_REVEAL_MS)
+        })
+        break
+      }
+      case "SlamWindowClosed": {
+        // SL3: the client never closes the window itself — this only wipes
+        // this milestone's local display state so nothing lingers into the
+        // next phase. The refetch that moves play on is the generic one
+        // already scheduled by the subscription handler below.
+        if (slamRevealTimeoutRef.current !== null) window.clearTimeout(slamRevealTimeoutRef.current)
+        slamRevealTimeoutRef.current = null
+        revealActiveRef.current = false
+        pendingAfterRevealRef.current = []
+        setSlamReveal(null)
+        setAwaitingGive(null)
+        break
+      }
+      // ---- CH2: the reshuffle moment -------------------------------------
+      case "DeckReshuffled":
+        // One representative flight stands in for "the pile minus its
+        // retained top" (root plan CH2 note) — the overlay design shows one
+        // moving card per spec, and the top staying put is already true by
+        // construction: broadcasts never touch the snapshot (ADR-0033), so
+        // `view.discard[0]` is untouched until the refetch lands.
+        flights.enqueue({
+          id: nextFlightId(),
+          face: { face: "down" },
+          originId: "discard",
+          destinationId: "deck",
+        })
+        break
       default:
         break
     }
@@ -429,5 +623,8 @@ export function useGame(gameId: string) {
     actingPlayerId,
     fizzleMessage,
     commandError,
+    slamReveal,
+    awaitingGive,
+    slamBeatMessage,
   }
 }

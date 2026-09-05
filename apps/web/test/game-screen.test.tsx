@@ -105,6 +105,19 @@ const gameBootstrap = () =>
     [GET_VIEW]: json(200, twoPlayerView),
   })
 
+/** A `SlamWindow` phase view (SL1-SL3) — `turnPlayerId` defaults to ME to
+ * mirror the other fixtures, but slamming itself is never turn-gated. */
+const slamWindowView = (rank: string, closesAt: number, turnPlayerId: string = ME.userId) =>
+  viewResponse({
+    players: [
+      { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+      { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+    ],
+    deckCount: 37,
+    discard: ["KH"],
+    phase: { _tag: "SlamWindow", turnPlayerId, closesAt, rank },
+  })
+
 describe("bootstrap (C1)", () => {
   it("renders the table from the snapshot — seats by name, deck count, discard top, both topics subscribed", async () => {
     const fake = setupFake()
@@ -731,5 +744,404 @@ describe("powers + peeks (T3/T4)", () => {
         document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"] button`),
       ).not.toBeNull()
     })
+  })
+})
+
+describe("slam window rendering + targeting (SL1)", () => {
+  it("renders the slam timer from closesAt + config.slamWindowMs only in the SlamWindow phase", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const bar = screen.getByRole("progressbar", { name: "Slam window" })
+    expect(bar).toHaveAttribute("aria-valuemax", "8000")
+  })
+
+  it("renders no slam timer outside the SlamWindow phase (ADR-0012, empty discard pile)", async () => {
+    setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(screen.queryByRole("progressbar", { name: "Slam window" })).not.toBeInTheDocument()
+  })
+
+  it("clicking an own face-down card slams it immediately, sending giveSlot null", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { handlers, fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    handlers[POST_COMMANDS] = json(200, twoPlayerView)
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(slotButton(ME.userId, 0))
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([
+        { _tag: "Slam", target: { playerId: ME.userId, slotIndex: 0 }, giveSlot: null },
+      ])
+    })
+  })
+
+  it("slamming an opponent's card with a non-empty hand requires a give pick, then sends exactly one Slam command", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { handlers, fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    handlers[POST_COMMANDS] = json(200, twoPlayerView)
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(slotButton(FRIEND.id, 0))
+    expect(await screen.findByText("Pick a card to give")).toBeInTheDocument()
+    expect(postedCommands(fetchMock)).toEqual([])
+
+    fireEvent.click(slotButton(ME.userId, 1))
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([
+        {
+          _tag: "Slam",
+          target: { playerId: FRIEND.id, slotIndex: 0 },
+          giveSlot: 1,
+        },
+      ])
+    })
+    expect(screen.queryByText("Pick a card to give")).not.toBeInTheDocument()
+  })
+
+  it("a zero-card slammer's opponent slam sends giveSlot null immediately — no give pick (ADR-0009)", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { handlers, fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+          ],
+          discard: ["KH"],
+          phase: { _tag: "SlamWindow", turnPlayerId: ME.userId, closesAt, rank: "7" },
+        }),
+      ),
+    })
+    handlers[POST_COMMANDS] = json(200, twoPlayerView)
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(slotButton(FRIEND.id, 0))
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([
+        { _tag: "Slam", target: { playerId: FRIEND.id, slotIndex: 0 }, giveSlot: null },
+      ])
+    })
+    expect(screen.queryByText("Pick a card to give")).not.toBeInTheDocument()
+  })
+
+  it("marks every face-down card slam-eligible for a viewer who isn't the turn player — slamming isn't turn-gated", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt, FRIEND.id)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    expect(
+      document.querySelector(
+        `[data-flight-anchor="slot:${ME.userId}:0"] [data-slam-eligible="true"]`,
+      ),
+    ).not.toBeNull()
+    expect(
+      document.querySelector(
+        `[data-flight-anchor="slot:${FRIEND.id}:0"] [data-slam-eligible="true"]`,
+      ),
+    ).not.toBeNull()
+  })
+})
+
+describe("slam resolution display (SL2)", () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("SlamSucceeded reveals the slammed card and holds the timer at resolving, then clears without re-rendering", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+
+    vi.useFakeTimers()
+
+    act(() => {
+      room.emit("SlamSucceeded", {
+        _tag: "SlamSucceeded",
+        slammerId: ME.userId,
+        target: { playerId: ME.userId, slotIndex: 0 },
+        card: "7H",
+      })
+    })
+    expect(screen.getByText("7")).toBeInTheDocument()
+    expect(document.querySelector('[data-state="resolving"]')).not.toBeNull()
+
+    act(() => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(screen.queryByText("7")).not.toBeInTheDocument()
+    expect(document.querySelector('[data-state="resolving"]')).toBeNull()
+  })
+
+  it("SlamFailed also reveals the slammed card before its penalty lands (§1.5 — both outcomes reveal)", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+
+    vi.useFakeTimers()
+
+    act(() => {
+      room.emit("SlamFailed", {
+        _tag: "SlamFailed",
+        slammerId: ME.userId,
+        target: { playerId: FRIEND.id, slotIndex: 0 },
+        card: "9S",
+      })
+    })
+    expect(screen.getByText("9")).toBeInTheDocument()
+
+    act(() => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(screen.queryByText("9")).not.toBeInTheDocument()
+  })
+
+  it("PenaltyDrawn never renders a card value, even once its reveal-gated flight lands (C5 extension, ADR-0022)", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+    const faceUpBefore = document.querySelectorAll('[data-face="up"]').length
+
+    vi.useFakeTimers()
+
+    act(() => {
+      room.emit("SlamFailed", {
+        _tag: "SlamFailed",
+        slammerId: ME.userId,
+        target: { playerId: FRIEND.id, slotIndex: 0 },
+        card: "9S",
+      })
+      room.emit("PenaltyDrawn", { _tag: "PenaltyDrawn", playerId: ME.userId, slotIndex: 4 })
+    })
+    act(() => {
+      vi.advanceTimersByTime(1200)
+    })
+
+    expect(screen.queryByText("9")).not.toBeInTheDocument()
+    // The reveal cleared and the penalty's own flight is face-down by
+    // construction — no new face-up card ever appeared on the table.
+    expect(document.querySelectorAll('[data-face="up"]')).toHaveLength(faceUpBefore)
+  })
+
+  it("an opponent-correct slam's give arrives face-down and value-free; the vacated slot shows the awaiting-give treatment until it lands", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+
+    vi.useFakeTimers()
+
+    act(() => {
+      room.emit("SlamSucceeded", {
+        _tag: "SlamSucceeded",
+        slammerId: ME.userId,
+        target: { playerId: FRIEND.id, slotIndex: 0 },
+        card: "9S",
+      })
+    })
+    act(() => {
+      vi.advanceTimersByTime(1200)
+    })
+    // The removal flight is queued once the reveal clears — the vacated
+    // slot renders as unoccupied (Hand's awaiting-give ring is only painted
+    // on the empty-slot branch).
+    expect(document.querySelector(`[data-flight-anchor="slot:${FRIEND.id}:0"]`)).toHaveAttribute(
+      "data-occupied",
+      "false",
+    )
+
+    act(() => {
+      room.emit("CardGivenFromHand", {
+        _tag: "CardGivenFromHand",
+        slammerId: ME.userId,
+        fromSlot: 0,
+        to: { playerId: FRIEND.id, slotIndex: 0 },
+      })
+    })
+    expect(document.querySelector(`[data-flight-anchor="slot:${FRIEND.id}:0"]`)).toHaveAttribute(
+      "data-occupied",
+      "true",
+    )
+    // Blind even to the slammer — the event carries no card, ever.
+    expect(screen.queryByText("9")).not.toBeInTheDocument()
+  })
+})
+
+describe("late slams and window close (SL3)", () => {
+  it("a 422 SlamTooLate surfaces inline copy without breaking the table", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { handlers, calls } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+    const getsBefore = calls.filter((call) => call === GET_VIEW).length
+
+    handlers[POST_COMMANDS] = json(422, errorBody("SlamTooLate", "illegal move"))
+    fireEvent.click(slotButton(ME.userId, 0))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The slam window had already closed — the table has been refreshed.",
+    )
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBeGreaterThan(getsBefore)
+    })
+    expect(screen.getByText(ME.name)).toBeInTheDocument()
+    expect(screen.getByText(FRIEND.name)).toBeInTheDocument()
+  })
+
+  it("SlamWindowClosed + TurnAdvanced arrive as one batch: one refetch moves play on and slam display state is swept", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { handlers, calls } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+    const getsBefore = calls.filter((call) => call === GET_VIEW).length
+
+    // A slam reveal still showing when the window closes must not linger
+    // past its own timer — SlamWindowClosed sweeps it outright.
+    act(() => {
+      room.emit("SlamSucceeded", {
+        _tag: "SlamSucceeded",
+        slammerId: ME.userId,
+        target: { playerId: ME.userId, slotIndex: 0 },
+        card: "7H",
+      })
+    })
+    expect(screen.getByText("7")).toBeInTheDocument()
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        deckCount: 37,
+        discard: ["7H"],
+        phase: { _tag: "AwaitingDraw", playerId: FRIEND.id },
+        version: 5,
+      }),
+    )
+    act(() => {
+      room.emit("SlamWindowClosed", { _tag: "SlamWindowClosed" })
+      room.emit("TurnAdvanced", { _tag: "TurnAdvanced", playerId: FRIEND.id })
+    })
+    expect(screen.queryByText("7")).not.toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsBefore + 1)
+    })
+    expect(await screen.findByText(`${FRIEND.name}'s turn`)).toBeInTheDocument()
+  })
+})
+
+describe("reshuffle choreography (CH2)", () => {
+  // `reshuffling`'s own rendering (data-state on DrawDeck) is pinned at the
+  // component level (draw-deck.test.tsx) — at this integration layer the
+  // enqueued flight auto-cancels synchronously against jsdom's degenerate
+  // getBoundingClientRect (flight-layer.test.tsx: "a degenerate rect...
+  // also cancels", asserted with no `waitFor` at all), so the boolean it
+  // drives is never observably true from outside an `act()` boundary here.
+  // What IS testable, and what CH2 actually promises structurally, is the
+  // one thing ADR-0033 already guarantees for free: broadcasts never touch
+  // the snapshot, so the retained top survives untouched until the refetch
+  // — that's the assertion below.
+  it("keeps the discard top visibly unchanged through a DeckReshuffled broadcast, updating the deck only once the refetch lands", async () => {
+    const fake = setupFake()
+    const { handlers } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+
+    expect(screen.getByLabelText("37 cards in the draw deck")).toBeInTheDocument()
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        deckCount: 25,
+        discard: ["KH"], // the retained top (cambio-rules: reshuffle keeps it)
+        version: 5,
+      }),
+    )
+    act(() => {
+      room.emit("DeckReshuffled", { _tag: "DeckReshuffled", deckCount: 25 })
+    })
+    // Synchronously after the broadcast — before the debounced refetch can
+    // possibly have landed — the retained top is exactly as it was.
+    expect(screen.getByText("K").closest('[data-face="up"]')).not.toBeNull()
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("25 cards in the draw deck")).toBeInTheDocument()
+    })
+    // Still the same retained top after the refetch too.
+    expect(screen.getByText("K").closest('[data-face="up"]')).not.toBeNull()
   })
 })
