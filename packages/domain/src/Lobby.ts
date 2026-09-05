@@ -1,6 +1,6 @@
 import { Data, Either, Schema } from "effect"
 import { GameId, type UserId } from "./Ids.js"
-import { User } from "./UserRepository.js"
+import { User } from "./User.js"
 
 /**
  * The pre-game lobby (ADR-0019): a pure model deliberately OUTSIDE the rules

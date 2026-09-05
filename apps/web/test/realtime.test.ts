@@ -16,6 +16,8 @@ import { FakeRealtimeClient } from "./support/fake-realtime.js"
 
 afterEach(() => {
   setRealtimeClientForTests(null)
+  vi.unstubAllEnvs()
+  vi.restoreAllMocks()
 })
 
 describe("subscribeTopic (W3)", () => {
@@ -69,6 +71,40 @@ describe("subscribeTopic (W3)", () => {
     expect(getConnectionStatus()).toBe("connected")
     expect(onResubscribe).toHaveBeenCalledTimes(1)
     expect(statusChanges).toEqual(["reconnecting", "connected"])
+    stopListening()
+  })
+
+  it("degrades legibly on empty/whitespace env — no throw, one config error, reconnecting reported (F10)", () => {
+    // Clear the injection seam so getClient really runs its env guard —
+    // with a fake injected the guard is never reached.
+    setRealtimeClientForTests(null)
+    // .env.example ships the JWT blank; whitespace on the URL pins the trim
+    // half of the guard. If the `url.trim() === ""` check were removed
+    // (the mutant), getClient would construct a real client from junk env,
+    // never throw, and neither assertion below could pass.
+    vi.stubEnv("VITE_REALTIME_URL", "   ")
+    vi.stubEnv("VITE_REALTIME_ANON_JWT", "anon-jwt")
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const statusChanges: string[] = []
+    const stopListening = onConnectionStatusChange(() => statusChanges.push(getConnectionStatus()))
+
+    let unsubscribe: (() => void) | undefined
+    expect(() => {
+      unsubscribe = subscribeTopic("room:secret:g1", { onEvent: vi.fn() })
+    }).not.toThrow()
+
+    // One legible diagnostic: the config message, never the topic value.
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    const logged = String(errorSpy.mock.calls[0]![0])
+    expect(logged).toContain("realtime env missing")
+    expect(logged).not.toContain("room:secret:g1")
+
+    // The listeners were notified — the screen shows the truthful W4 banner.
+    expect(getConnectionStatus()).toBe("reconnecting")
+    expect(statusChanges).toEqual(["reconnecting"])
+
+    // The no-op unsubscribe is safe to call.
+    expect(() => unsubscribe!()).not.toThrow()
     stopListening()
   })
 

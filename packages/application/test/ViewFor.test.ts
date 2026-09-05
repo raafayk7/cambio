@@ -120,10 +120,10 @@ describe("structure (C2.1–C2.3, C2.6)", () => {
     }
   })
 
-  it("a player missing from the names map gets an empty-string name — defensive totality (C2)", () => {
+  it("a player missing from the names map gets the loud-but-valid '—' — defensive totality (C2)", () => {
     const state = makeState({ _tag: "AwaitingDraw", playerId: p0 })
     const view = viewFor(p0, state, new Map([[p0, "sim-player-0"]]))
-    expect(view.players.map((p) => p.name)).toEqual(["sim-player-0", ""])
+    expect(view.players.map((p) => p.name)).toEqual(["sim-player-0", "—"])
   })
 })
 

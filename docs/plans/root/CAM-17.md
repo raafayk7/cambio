@@ -353,6 +353,26 @@ timestamp each entry)_
 - 2026-09-05 — S1 mechanism: 44px **minimum control height** in the
   button canon, padding untouched — user call at sign-off. Rejected:
   `space.3` vertical padding (~50px box, larger visual shift).
+- 2026-09-05 — (review fix cycle) **F1 resolved by scoping, not by
+  washing the room**: the wash rule applies to PICTORIAL scenes (a
+  painting with subjects — the courtyard); TEXTURE grounds (the paving
+  plaid) have no subject to occlude, so the room keeps opaque panels.
+  Headings still never sit bare on artwork — the room identity branch's
+  h1 moves inside its panel. Rejected: wash everywhere on illustrated
+  grounds (would dilute the wash's purpose and change a screen the user
+  approved as-is).
+- 2026-09-05 — (review fix cycle) **F4's vanished-user projection is the
+  literal "—"**, decodable under the new shared DisplayName schema, in
+  both producers (viewFor fallback, loadLobby COALESCE) — loud-but-valid
+  totality instead of an empty string indistinguishable from a bug.
+  Rejected: optional name (ripples every consumer for an FK-unreachable
+  arm).
+- 2026-09-05 — (review fix cycle) **F12's outsider denial copy merges
+  truthfully**: the wire cannot distinguish started-without-you from
+  abandoned for a non-member (join 409 + view 404), so the panel says
+  both ("This room started without you or has closed."). Rejected: a new
+  denial-reason wire signal (contract change out of proportion to the
+  copy defect).
 - 2026-09-05 — (implement) soft-deleted users mid-lobby keep their row
   via LEFT JOIN + COALESCE to an empty name, and viewFor names fall back
   to an empty string — deliberate totality decisions flagged for the
@@ -565,3 +585,75 @@ route has no head title while room/game do.
 walkthrough (browser + second cookie-jar session) run this cycle
 including reconnect kill/restart and started-room redirect. No timing
 findings arose, so no timing probe was required.
+
+### Fix cycle 2026-09-05 — all findings RESOLVED
+
+- **F1 RESOLVED (canon scoped + code)**: scenes.md wash rule scoped to
+  pictorial scenes; room keeps opaque panels; the room identity-branch
+  h1 moved inside its panel. Branch: canon amended (with the room
+  composition kept), not wash-everywhere.
+- **F2 RESOLVED (claim amended everywhere, by sweep)**: forms.md amended
+  with the wash exception (inline amendment note); lobby-screen.tsx
+  prose rewritten; frontend plan laws line and step-8 prose amended.
+  Sweep re-run across all phrasings — remaining hits are only the
+  finding records themselves.
+- **F3 RESOLVED**: table-surface.md Anatomy rewritten for the painted
+  asset; tokens.md surface.table + tan-paving + surface.warm
+  descriptions and the styles.css surface.warm comment updated
+  (checkerboard sweep clean).
+- **F4 RESOLVED (test/schema strengthened + claim corrected)**: shared
+  `DisplayName` schema in GamePrimitives, reused by
+  CreateUserRequest/SessionUser/ViewPlayer/LobbyMember; vanished-user
+  fallback is the decodable "—" in both producers; the false docstring
+  rewritten; backend plan shape-table instance amended with note;
+  "1–32 by construction" sweep clean.
+- **F5 RESOLVED**: `viewForEffect` is the single projection entry; all
+  three route sites use it; pure `viewFor` kept as the test seam.
+- **F6 RESOLVED (structural)**: `User` extracted to its own domain
+  module; the cycle no longer exists; the statement-form import-type
+  workarounds reverted to house style and their now-stale cycle
+  comments deleted (no claim ⇒ no enforcement test owed).
+- **F7 RESOLVED**: the GET view refusal is a typed `GameNotFound`
+  failure inside the effect (Effect.gen), no sentinel, no casts;
+  byte-identical-404 pin stayed green; 404-before-names preserved.
+- **F8 RESOLVED (schema strengthened)**: `WireGameConfig` with
+  `Schema.positive()` used by both GameStarted.config and
+  PlayerGameView.config; contracts pin rejects 0/−1 (contracts 10→11).
+- **F9 RESOLVED (tests strengthened)**: all three lobby use-case suites
+  assert the published version equals the result version (Join/Leave
+  also pin the absolute post-save value) — the newVersion→version swap
+  mutant now fails in either direction.
+- **F10 RESOLVED (hardened + tested)**: env guard rejects
+  empty/whitespace; SSR guard throws before construction; misconfigured
+  subscribe reports `reconnecting` (one config-only console.error, no-op
+  unsubscribe) instead of crashing to the router error page. Mutant
+  (trim-check removal) killed by the new realtime test.
+- **F11 RESOLVED (test strengthened)**: env-declaration test slices the
+  `@cambio/web#build` and `dev` blocks and asserts each slot's array
+  separately — a var in only one slot now fails (both one-slot mutants
+  killed).
+- **F12 RESOLVED (claim-truthful copy)**: outsider denial reads "No
+  open seat / This room started without you or has closed…" — the wire
+  cannot distinguish; broadcast-path `closed` copy unchanged.
+- **F13 RESOLVED**: sr-only page h1 hoisted to the RoomScreen wrapper
+  for every branch except the identity branch (own visible h1);
+  Math.max fallback comment added (advisory A5 folded in).
+- **F14 RESOLVED**: (a) alert.md → r2 with the action-slot ink rule +
+  structural pin (ink verified by the rendered gate path per ADR-0030);
+  (b) r1→r2 citations fixed; (c) L3/S1 rows updated to completed; (d)
+  B5 row reworded to what is actually asserted; (e) B4 row points at
+  the enumerated pins; (f) R4/W3 rows reworded.
+- **Skill staleness SS1–SS3**: fixed on `main` per ADR-0028 and merged
+  down (see the fix-cycle Progress entry).
+- **Discovery during the cycle**: the C4.2 fuzz test
+  (packages/domain/test/sim/Fuzz.test.ts) timed out at vitest's 30s
+  default under a fully parallel `--force` gate (~14s solo) — a latent
+  CAM-2-era load flake surfaced by this review's forced run, fixed with
+  an explicit 120s long-test timeout, not a speedup.
+- **Advisories**: remain deferred as logged (A5 was folded into F13);
+  the playerNames-into-GameStarted idea stands as the named CAM-18
+  candidate.
+
+Re-verified after the cycle: forced full gate 25/25 (0 cached), suite
+totals contracts 11 / domain 194 / application 86 / api 118 / ui 19 /
+web 75 / config 16 = 519.

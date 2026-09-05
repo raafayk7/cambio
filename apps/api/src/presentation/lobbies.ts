@@ -1,4 +1,4 @@
-import { createLobby, lobbyView, playerNames, RoomRegistry, viewFor } from "@cambio/application"
+import { createLobby, lobbyView, RoomRegistry, viewForEffect } from "@cambio/application"
 import { encodeGameReply, encodeLeaveLobbyResponse, encodeLobbyResponse } from "@cambio/contracts"
 import { GameId, GameRepository } from "@cambio/domain"
 import { Effect, Either, Redacted, type Runtime, Schema } from "effect"
@@ -158,16 +158,15 @@ export const lobbiesRoutes =
               config: { slamWindowMs: config.slamWindowMs },
             }),
           ).pipe(
-            // C2: names ride beside the state for viewFor's projection.
+            // The one projection every route uses (C2, F5).
             Effect.flatMap(({ state, version }) =>
-              Effect.map(playerNames(state), (names) => ({ state, version, names })),
+              Effect.map(viewForEffect(user.id, state), (view) => ({ view, version })),
             ),
           ),
           {
             statusOf: lobbyErrorStatus,
             // The reply is {view, version} — never the raw GameAdvanced (C6.1).
-            onSuccess: ({ state, version, names }) =>
-              reply.send(encodeGameReply({ view: viewFor(user.id, state, names), version })),
+            onSuccess: ({ view, version }) => reply.send(encodeGameReply({ view, version })),
           },
         )
       },

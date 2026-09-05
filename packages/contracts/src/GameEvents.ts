@@ -8,6 +8,7 @@ import {
   SlotRef,
   Timestamp,
   Uuid,
+  WireGameConfig,
 } from "./GamePrimitives.js"
 import { LobbyView } from "./GameView.js"
 
@@ -45,7 +46,7 @@ export const GameStarted = Schema.TaggedStruct("GameStarted", {
   players: Schema.Array(Uuid),
   firstDiscard: CardSlug,
   deckCount: Schema.Int.pipe(Schema.nonNegative()),
-  config: Schema.Struct({ slamWindowMs: Schema.Int }),
+  config: WireGameConfig,
 })
 
 export const CambioCalled = Schema.TaggedStruct("CambioCalled", {

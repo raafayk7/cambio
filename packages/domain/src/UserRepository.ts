@@ -1,19 +1,16 @@
-import { Context, Data, type Effect, Schema } from "effect"
-// Type-only statement (not inline) so no runtime edge to GameRepository
-// exists — see the cycle note in GameRepository.ts (CAM-17).
-import type { StorageError } from "./GameRepository.js"
-import { UserId } from "./Ids.js"
+import { Context, Data, type Effect } from "effect"
+import { type StorageError } from "./GameRepository.js"
+import { type UserId } from "./Ids.js"
+import { type User } from "./User.js"
 
 /**
  * The users port (§4.3 `users`): minimal on purpose — temporary/anonymous
- * users are a name and an id. CAM-4 (temp-user auth) builds on this.
+ * users are a name and an id. CAM-4 (temp-user auth) builds on this. The
+ * `User` entity itself lives in `User.ts`; re-exported here so existing
+ * importers keep working.
  */
 
-export const User = Schema.Struct({
-  id: UserId,
-  name: Schema.String,
-})
-export type User = typeof User.Type
+export { User } from "./User.js"
 
 export class UserNotFound extends Data.TaggedError("UserNotFound")<{
   readonly userId: UserId

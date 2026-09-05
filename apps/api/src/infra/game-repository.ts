@@ -423,9 +423,10 @@ export const GameRepositoryLive = Layer.effect(
           // LEFT JOIN + COALESCE, deliberately (CAM-17 C1): a member row must
           // never vanish because its user was soft-deleted mid-lifecycle — the
           // usual filter-soft-deletes convention is applied to the JOINED
-          // table by blanking the name, not by dropping the member.
+          // table by projecting the name as the loud-but-valid '—' (the
+          // contracts DisplayName totality value), not by dropping the member.
           const members = yield* sql<{ user_id: string; user_name: string }>`
-            SELECT gp.user_id, COALESCE(u.user_name, '') AS user_name
+            SELECT gp.user_id, COALESCE(u.user_name, '—') AS user_name
             FROM game_players gp
             LEFT JOIN users u
               ON u.user_id = gp.user_id AND u.deleted_at IS NULL

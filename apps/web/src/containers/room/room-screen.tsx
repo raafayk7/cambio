@@ -39,9 +39,13 @@ const DENIAL_COPY: Record<RoomDenial, { title: string; body: string }> = {
     title: "No room here",
     body: "This link doesn't lead to a room. Check the link you were sent, or create a room of your own.",
   },
+  // Outsider denial after a LobbyNotJoinable + view 404 — the wire cannot
+  // distinguish a started room from an abandoned one for a non-member, so
+  // the copy covers both truthfully (review F12). Members watching a room
+  // die still get the distinct `closed` copy via the broadcast path.
   started: {
-    title: "Game already started",
-    body: "This game started without you. Ask for a fresh room link, or create your own.",
+    title: "No open seat",
+    body: "This room started without you or has closed. Ask for a fresh room link, or create a room of your own.",
   },
   closed: {
     title: "Room closed",
@@ -129,9 +133,11 @@ function SeatedRoom({
 
   return (
     <div className="flex w-full flex-col gap-5">
-      <h1 className="sr-only">Room</h1>
       <TableSurface
         state="seating"
+        // -1 is unreachable: the bootstrap only renders SeatedRoom for a
+        // member, and viewerId came from the same response's session — the
+        // Math.max is a type-level fallback, not a live branch.
         viewerSeatIndex={Math.max(0, viewerIndex)}
         seats={lobby.members.map((member, index) => (
           <Seat
@@ -195,6 +201,10 @@ export function RoomScreen({ gameId }: { gameId: string }) {
     useRoom(gameId)
 
   let content: React.ReactNode
+  // Every branch gets a page h1. Most render the sr-only "Room" heading in
+  // the wrapper below; the identity branch carries its own visible h1, so
+  // it opts out to avoid a double heading (review F13).
+  let ownHeading = false
   if (denial !== null) {
     content = <NoAccessPanel reason={denial} />
   } else if (failed) {
@@ -217,16 +227,23 @@ export function RoomScreen({ gameId }: { gameId: string }) {
     content = <RoomSkeleton />
   } else if (session.data?.state === "unauthenticated") {
     // Identity in-place (R2): the route never changes, so the target room
-    // is never lost — once named, the bootstrap joins automatically.
+    // is never lost — once named, the bootstrap joins automatically. The
+    // heading sits inside the panel, matching the lobby's composition —
+    // display type never lands bare on the painted paving (review F1).
+    // Paving is a texture ground, not a pictorial scene, so the room keeps
+    // `default` panels rather than `wash` (scenes.md wash rule scope).
+    ownHeading = true
     content = (
       <div className="mx-auto flex w-full max-w-md flex-col gap-5">
-        <h1 className="text-center font-display text-3xl">pull up a chair</h1>
         <Panel>
-          <NameForm
-            onSubmit={(name) => createUser.mutate(name)}
-            submitting={createUser.isPending}
-            submitError={sessionErrorCopy(createUser.error)}
-          />
+          <div className="flex flex-col gap-4">
+            <h1 className="text-center font-display text-3xl">pull up a chair</h1>
+            <NameForm
+              onSubmit={(name) => createUser.mutate(name)}
+              submitting={createUser.isPending}
+              submitError={sessionErrorCopy(createUser.error)}
+            />
+          </div>
         </Panel>
       </div>
     )
@@ -257,7 +274,10 @@ export function RoomScreen({ gameId }: { gameId: string }) {
       connection={connection}
       state={connection === "reconnecting" ? "reconnecting" : "default"}
     >
-      <div className="flex w-full flex-1 flex-col justify-center gap-5 p-5">{content}</div>
+      <div className="flex w-full flex-1 flex-col justify-center gap-5 p-5">
+        {ownHeading ? null : <h1 className="sr-only">Room</h1>}
+        {content}
+      </div>
     </AppShell>
   )
 }

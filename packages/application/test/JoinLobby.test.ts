@@ -51,6 +51,10 @@ describe("joinLobby (clause 2)", () => {
         expect(result.lobby.members).toEqual([user(0), user(1)])
         expect(result.version).toBe(2)
         expect(opsOf(journal)).toEqual(["loadLobby", "saveLobby", "publishLobby"])
+        // C3: the publish carries the just-persisted version — the one the
+        // use case returns, not the version it loaded (kills a
+        // newVersion→version swap in the publish).
+        expect(journal[2]).toMatchObject({ op: "publishLobby", version: result.version })
       }),
       Effect.provide(layers(journal, repo)),
     )

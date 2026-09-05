@@ -16,38 +16,38 @@ Sampled from the moodboard by dominant-color extraction (CAM-13 session).
 Values keep the board's warm cast deliberately — print, not screen, is the
 reference.
 
-| Primitive      | Value     | Sampled from                          |
-| -------------- | --------- | ------------------------------------- |
-| `cream-scene`  | `#f6dcae` | illustrated sky / paper ground        |
-| `cream-card`   | `#eee9d2` | card faces, suit-chrome frames        |
-| `tan-paving`   | `#d3a266` | courtyard checkerboard light squares  |
-| `terracotta`   | `#b3613a` | paving warm squares                   |
-| `brick-deep`   | `#8e4224` | building shadow side                  |
-| `brick-bright` | `#be5d2e` | building lit side                     |
-| `green-table`  | `#36634a` | tabletop (top-down reference, image7) |
-| `green-deep`   | `#27311e` | furniture shadow, dark foliage        |
-| `olive`        | `#5d5d31` | tree canopy midtone                   |
-| `red-card`     | `#a52418` | suit wallpaper red                    |
-| `red-bright`   | `#e03322` | matchbox label field                  |
-| `ink`          | `#0d0d08` | suit black, outlines                  |
-| `mustard`      | `#f8ba66` | striped card backs, khoka lamp light  |
+| Primitive      | Value     | Sampled from                                                            |
+| -------------- | --------- | ----------------------------------------------------------------------- |
+| `cream-scene`  | `#f6dcae` | illustrated sky / paper ground                                          |
+| `cream-card`   | `#eee9d2` | card faces, suit-chrome frames                                          |
+| `tan-paving`   | `#d3a266` | paving-plaid field tiles (the painted paving asset's light tile family) |
+| `terracotta`   | `#b3613a` | paving warm squares                                                     |
+| `brick-deep`   | `#8e4224` | building shadow side                                                    |
+| `brick-bright` | `#be5d2e` | building lit side                                                       |
+| `green-table`  | `#36634a` | tabletop (top-down reference, image7)                                   |
+| `green-deep`   | `#27311e` | furniture shadow, dark foliage                                          |
+| `olive`        | `#5d5d31` | tree canopy midtone                                                     |
+| `red-card`     | `#a52418` | suit wallpaper red                                                      |
+| `red-bright`   | `#e03322` | matchbox label field                                                    |
+| `ink`          | `#0d0d08` | suit black, outlines                                                    |
+| `mustard`      | `#f8ba66` | striped card backs, khoka lamp light                                    |
 
 ## Color — semantic roles
 
-| Role                | Primitive                 | Used for                                      |
-| ------------------- | ------------------------- | --------------------------------------------- |
-| `surface.page`      | `cream-scene`             | app background outside the table              |
-| `surface.raised`    | `cream-card`              | cards, panels, modals, chrome frames          |
-| `surface.table`     | `green-table`             | the play surface                              |
-| `surface.warm`      | `terracotta`/`tan-paving` | scene chrome, checkerboard pattern, banners   |
-| `ink.primary`       | `ink`                     | text, outlines, black suits                   |
-| `ink.muted`         | `olive`                   | secondary text, captions                      |
-| `ink.inverse`       | `cream-card`              | text on green/red/brick surfaces              |
-| `accent.action`     | `green-table`             | primary buttons, links, affirmative energy    |
-| `accent.alarm`      | `red-bright`              | slam window, destructive acts, errors (large) |
-| `accent.alarm-deep` | `red-card`                | alarm surfaces carrying small text            |
-| `accent.suit-red`   | `red-card`                | hearts & diamonds pips — never UI meaning     |
-| `accent.focus`      | `mustard`                 | focus rings, active-turn highlight            |
+| Role                | Primitive                 | Used for                                                                                                                                                      |
+| ------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `surface.page`      | `cream-scene`             | app background outside the table                                                                                                                              |
+| `surface.raised`    | `cream-card`              | cards, panels, modals, chrome frames                                                                                                                          |
+| `surface.table`     | `green-table`             | the table-green family (the play surface itself ships as a painted asset since table-surface r2; the role still grounds card demos and table-adjacent chrome) |
+| `surface.warm`      | `terracotta`/`tan-paving` | scene chrome, the paving-plaid pairing, banners                                                                                                               |
+| `ink.primary`       | `ink`                     | text, outlines, black suits                                                                                                                                   |
+| `ink.muted`         | `olive`                   | secondary text, captions                                                                                                                                      |
+| `ink.inverse`       | `cream-card`              | text on green/red/brick surfaces                                                                                                                              |
+| `accent.action`     | `green-table`             | primary buttons, links, affirmative energy                                                                                                                    |
+| `accent.alarm`      | `red-bright`              | slam window, destructive acts, errors (large)                                                                                                                 |
+| `accent.alarm-deep` | `red-card`                | alarm surfaces carrying small text                                                                                                                            |
+| `accent.suit-red`   | `red-card`                | hearts & diamonds pips — never UI meaning                                                                                                                     |
+| `accent.focus`      | `mustard`                 | focus rings, active-turn highlight                                                                                                                            |
 
 Decisions and rationales (CAM-13 interview):
 

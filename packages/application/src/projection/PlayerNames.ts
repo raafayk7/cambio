@@ -3,12 +3,13 @@ import { type GameState, type StorageError, type UserId, UserRepository } from "
 
 /**
  * The names companion to `viewFor` (CAM-17 C2): one batch lookup turning a
- * `GameState` into the `names` map the projection embeds. Composed at the
- * three route sites that call `viewFor` (start, commands, view) — names live
- * in the `users` table, never in the fold-rebuilt state, so the snapshot
- * path fetches them per request (one `IN` query for ≤5 rows, accepted v0).
+ * `GameState` into the `names` map the projection embeds. Composed with the
+ * pure `viewFor` by `viewForEffect` — the one projection every route uses —
+ * because names live in the `users` table, never in the fold-rebuilt state,
+ * so the snapshot path fetches them per request (one `IN` query for ≤5 rows,
+ * accepted v0).
  *
- * Missing ids are simply absent from the map — `viewFor`'s `?? ""` arm
+ * Missing ids are simply absent from the map — `viewFor`'s `?? "—"` arm
  * handles the (unreachable-by-FK) soft-deleted edge.
  */
 export const playerNames = (

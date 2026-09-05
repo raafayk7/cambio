@@ -22,7 +22,12 @@ describe("leaveLobby (clause 3)", () => {
       Effect.map((result) => {
         expect(result.lobby.members).toEqual([user(0), user(2)])
         expect(result.lobby.status).toBe("open")
+        expect(result.version).toBe(2)
         expect(opsOf(journal)).toEqual(["loadLobby", "saveLobby", "publishLobby"])
+        // C3: the publish carries the just-persisted version — the one the
+        // use case returns, not the version it loaded (kills a
+        // newVersion→version swap in the publish).
+        expect(journal[2]).toMatchObject({ op: "publishLobby", version: result.version })
       }),
       Effect.provide(Layer.mergeAll(repo.layer, makePublisherStub(journal).layer)),
     )
@@ -51,10 +56,13 @@ describe("leaveLobby (clause 3)", () => {
       Effect.andThen(leaveLobby({ gameId: gid(1), userId: uid(0) })),
       Effect.map((result) => {
         expect(result.lobby).toEqual({ id: gid(1), members: [], status: "abandoned" })
+        expect(result.version).toBe(2)
         expect(opsOf(journal)).toEqual(["loadLobby", "saveLobby", "publishLobby"])
         expect(journal[2]).toMatchObject({
           op: "publishLobby",
           lobby: { status: "abandoned" },
+          // C3: the abandonment publish still carries the persisted version.
+          version: result.version,
         })
       }),
       Effect.provide(Layer.mergeAll(repo.layer, makePublisherStub(journal).layer)),

@@ -40,6 +40,14 @@ describe("PlayerGameView.config (C4)", () => {
     const { config: _config, ...withoutConfig } = view
     expect(Either.isLeft(decodePlayerGameViewEither(withoutConfig))).toBe(true)
   })
+
+  it("rejects zero and negative slamWindowMs — WireGameConfig is positive, like the domain", () => {
+    for (const slamWindowMs of [0, -1]) {
+      expect(Either.isLeft(decodePlayerGameViewEither({ ...view, config: { slamWindowMs } }))).toBe(
+        true,
+      )
+    }
+  })
 })
 
 describe("ViewPlayer.name (C2)", () => {

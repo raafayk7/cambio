@@ -48,6 +48,15 @@ export const SlotRef = Schema.Struct({
 })
 export type SlotRef = typeof SlotRef.Type
 
+/**
+ * A public display name on the wire (CAM-17): trimmed, then 1–32 chars — the
+ * one rule for every name-carrying field (`CreateUserRequest`, `SessionUser`,
+ * `ViewPlayer`, `LobbyMember`). A vanished (soft-deleted) user projects as
+ * the literal `"—"`, which decodes under this schema.
+ */
+export const DisplayName = Schema.Trim.pipe(Schema.minLength(1), Schema.maxLength(32))
+export type DisplayName = typeof DisplayName.Type
+
 /** Absolute epoch milliseconds — timers are never the authority (§6). */
 export const Timestamp = Schema.Int
 export type Timestamp = typeof Timestamp.Type
@@ -55,3 +64,13 @@ export type Timestamp = typeof Timestamp.Type
 /** Optimistic-concurrency version of a game (§4.3), for client staleness checks. */
 export const GameVersion = Schema.Int.pipe(Schema.nonNegative())
 export type GameVersion = typeof GameVersion.Type
+
+/**
+ * The game's fixed config on the wire (CAM-17 C4): one shape for the
+ * `GameStarted` event and `PlayerGameView.config`. Positive, matching the
+ * domain's `GameConfig` — a zero or negative slam window is not a game.
+ */
+export const WireGameConfig = Schema.Struct({
+  slamWindowMs: Schema.Int.pipe(Schema.positive()),
+})
+export type WireGameConfig = typeof WireGameConfig.Type

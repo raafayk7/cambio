@@ -5,7 +5,7 @@ import { MarkCheck, MarkX } from "../lib/marks.js"
 import { cn } from "../lib/utils.js"
 
 /**
- * Alert — design-system/components/core/alert.md (r1).
+ * Alert — design-system/components/core/alert.md (r2).
  * Class: Async/data (support).
  *
  * Inline persistent notice: alerts persist while true; toasts announce

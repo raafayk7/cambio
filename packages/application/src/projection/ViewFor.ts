@@ -4,9 +4,13 @@ import {
   type GameState,
   type Lobby,
   type Phase,
+  type StorageError,
   type UserId,
+  type UserRepository,
   winnersOf,
 } from "@cambio/domain"
+import { Effect } from "effect"
+import { playerNames } from "./PlayerNames.js"
 
 /**
  * The single server-side projection (§5, ADR-0021): everything one player may
@@ -80,11 +84,13 @@ const revealOf = (state: GameState): Contracts.Reveal => {
 }
 
 /**
- * `names` (CAM-17 C2): the players' public display names, composed by the
- * caller via `playerNames` — names live in the `users` table, never in the
- * fold-rebuilt `GameState`. The `?? ""` arm is defensive totality for the
- * soft-deleted-user edge (FK + `game_players` guarantee coverage in every
- * reachable game); names are public labels, identical for every viewer.
+ * The pure projection, kept exported as the test seam (routes compose it via
+ * `viewForEffect`). `names` (CAM-17 C2): the players' public display names —
+ * they live in the `users` table, never in the fold-rebuilt `GameState`. The
+ * `?? "—"` arm is FK-unreachable (`game_players` FKs to `users` in every
+ * reachable game); `"—"` is the loud-but-valid totality value — it decodes
+ * under the contracts `DisplayName` schema where `""` would not. Names are
+ * public labels, identical for every viewer.
  */
 export const viewFor = (
   viewerId: UserId,
@@ -93,7 +99,7 @@ export const viewFor = (
 ): Contracts.PlayerGameView => ({
   players: state.players.map((p) => ({
     id: p.id,
-    name: names.get(p.id) ?? "",
+    name: names.get(p.id) ?? "—",
     hand: p.hand.map((s) => s.slotIndex),
   })),
   deckCount: state.deck.length,
@@ -104,6 +110,19 @@ export const viewFor = (
   config: { slamWindowMs: state.config.slamWindowMs },
   ...(state.phase._tag === "Ended" ? { reveal: revealOf(state) } : {}),
 })
+
+/**
+ * THE projection every route uses (CAM-17 F5): one self-contained Effect —
+ * fetch the players' names via `playerNames`, then run the pure `viewFor`.
+ * Routes never assemble the names map themselves; per-handler assembly is
+ * exactly the scattered-redaction shape hidden-information §viewFor exists
+ * to prevent. The pure 3-arg `viewFor` above stays exported as the test seam.
+ */
+export const viewForEffect = (
+  viewerId: UserId,
+  state: GameState,
+): Effect.Effect<Contracts.PlayerGameView, StorageError, UserRepository> =>
+  Effect.map(playerNames(state), (names) => viewFor(viewerId, state, names))
 
 /** The lobby is fully public (ADR-0019) — one shape for every viewer. */
 export const lobbyView = (lobby: Lobby): Contracts.LobbyView => ({

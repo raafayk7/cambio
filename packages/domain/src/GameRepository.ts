@@ -2,11 +2,7 @@ import { Context, Data, type Effect } from "effect"
 import { type GameEvent } from "./GameEvent.js"
 import { type GameState } from "./GameState.js"
 import { type GameId, type GameVersion, type Timestamp } from "./Ids.js"
-// A TYPE-ONLY import statement, deliberately (CAM-17): with
-// `verbatimModuleSyntax` an inline `{ type Lobby }` would keep a runtime
-// side-effect import, closing the Lobby → UserRepository → GameRepository →
-// Lobby module cycle and evaluating `Schema.Array(User)` before `User` exists.
-import type { Lobby } from "./Lobby.js"
+import { type Lobby } from "./Lobby.js"
 
 /**
  * The aggregate repository port (ADR-0015): the game — `games`,

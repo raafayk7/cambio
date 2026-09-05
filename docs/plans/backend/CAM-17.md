@@ -132,7 +132,7 @@ already broadcast to the whole room inside `GameStarted`).
 
 | Clause | Shape (advisory sketch — coverage table is what gets reconciled)                                                                                                                                                                                                                                                                                                                                     |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1     | `LobbyView.members: Array({ id: Uuid, name: String })` (name is 1–32 by construction at `POST /users`; responses carry it as plain `Schema.String`, the `SessionUser` precedent)                                                                                                                                                                                                                     |
+| C1     | `LobbyView.members: Array({ id: Uuid, name: String })` (name constrained by the shared `DisplayName` schema — amended in the review fix cycle, F4: the plan-time claim "1–32 by construction, plain Schema.String" became false once `"—"` fallbacks and wire validation landed)                                                                                                                     |
 | C2     | `ViewPlayer` gains `name: Schema.String`; identical value in every viewer's projection                                                                                                                                                                                                                                                                                                               |
 | C3     | `LobbyUpdated = Schema.TaggedStruct("LobbyUpdated", { lobby: LobbyView, version: GameVersion })` exported from `GameEvents.ts` with decode/encode helpers; **not** added to `RoomGameEvent` (that union is the projection of the 22 in-game domain events; `LobbyUpdated` is the pre-game row-backed broadcast). `version` added at root-plan reconciliation — the client's staleness guard needs it |
 | C4     | `PlayerGameView` gains `config: Schema.Struct({ slamWindowMs: Schema.Int })` — mirrors the `GameStarted` event's `config` field verbatim                                                                                                                                                                                                                                                             |
@@ -411,6 +411,46 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       repo-wide `//#format:check` dependency fails ONLY on
       `packages/ui/src/components/app-shell.tsx` — the frontend lane's
       in-flight file, outside this lane's boundary (see Surprises).
+- [x] 2026-09-05 18:45 — fix cycle (review findings F4–F9, backend lane):
+  - **F6** — `User` entity extracted to `packages/domain/src/User.ts`
+    (out of the port file, per architecture skill file-placement);
+    `UserRepository.ts` re-exports it and `Lobby.ts` imports from
+    `User.js`, so the Lobby → UserRepository → GameRepository → Lobby
+    module cycle no longer exists. Both statement-form `import type`
+    workarounds reverted to the repo's inline `{ type X }` style and the
+    stale cycle comments deleted; `User.js` added to the domain index.
+  - **F4** — shared `DisplayName` schema (Trim + min 1 + max 32) added to
+    `contracts/GamePrimitives.ts`; reused by `CreateUserRequest`,
+    `SessionUser`, `ViewPlayer.name`, `LobbyMember.name`. The
+    vanished-user fallback is now the loud-but-valid literal `"—"`
+    (decodes under `DisplayName`, where `""` would not) in both
+    producers: the `viewFor` totality arm and `loadLobby`'s COALESCE;
+    the false "1–32 by construction" docstring in `GameView.ts`
+    rewritten; the `ViewFor.test.ts` pin updated from `""` to `"—"`.
+  - **F5** — `viewForEffect(viewerId, state)` added to `ViewFor.ts`
+    (requires `UserRepository`; composes `playerNames` + the pure
+    `viewFor`, which stays exported as the test seam). The three route
+    composition sites (commands, GET view, start) now call it — no
+    per-handler names-map assembly remains.
+  - **F7** — GET view's null-sentinel + double-cast branch dissolved: a
+    non-participant now fails with the same typed `GameNotFound` the
+    unknown-game path produces, mapped by the existing `statusOf` route
+    to the byte-identical 404 (pin still green); membership is still
+    decided on `state` before any name lookup.
+  - **F8** — `WireGameConfig` (positive `slamWindowMs`) extracted to
+    `GamePrimitives.ts`, used by both `GameStarted.config` and
+    `PlayerGameView.config`; new contracts pin rejects 0 and negatives
+    (contracts suite 10 → 11).
+  - **F9** — Create/Join/LeaveLobby suites now assert the recorded
+    `publishLobby` journal entry's `version` equals the use case
+    result's version (with the result version pinned absolutely), so a
+    `newVersion`→`version` swap in any lobby use case's publish or
+    return fails a test.
+  - Gate: forced `turbo test` for the four backend packages green
+    (contracts 11, domain 194, application 86, api 118);
+    `build typecheck lint` — all 8 package tasks green; the repo-wide
+    `//#format:check` fails only on `design-system/references/tokens.md`,
+    an orchestrator-lane file outside this fix cycle's boundary.
 
 ## Surprises & notes for the root plan
 

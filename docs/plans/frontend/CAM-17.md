@@ -47,7 +47,8 @@ dependency, no `credentials: "include"` anywhere. This task builds it
   ADR-0032 — never `supabase-js`).
 - `design-system` — entered through `design-system/design-system.md`.
   Scenes per `patterns/scenes.md` (lobby → full illustrated courtyard;
-  room waiting → table + paving; forms → plain cream). Page states per
+  room waiting → table + paving; forms → paper panels, wash on pictorial
+  scenes — amended in the review fix cycle, F2). Page states per
   `patterns/screen-states.md` (the 8-state MVS row — ledger below).
   Forms per `patterns/forms.md` (field-scaffold, validate on submit,
   re-validate on blur, submit failure → alert above footer). Copy per
@@ -391,7 +392,7 @@ lands — invented test titles become review findings.)_
 | W4     | `apps/web/test/room-screen.test.tsx` — "shows the reconnecting alert under the header while the seat view stays live, then refetches on recovery"                                                                                                                                                                                                                                                                                                                                                                                                | banner text `Reconnecting…` present with both seat names still rendered; one extra GET after recovery     |
 | L1     | `apps/web/test/lobby-screen.test.tsx` — "greets by name and offers create + join-by-link", "join-by-link rejects garbage with the voice.md field error and stays put"; `apps/web/test/parse-room-link.test.ts` — "accepts a full room URL", "accepts a scheme-less pasted link", "accepts a bare UUID, trimmed and case-normalized", "returns null for garbage"                                                                                                                                                                                  | greeting + create + join affordances per session state; parser accepts URL/UUID, nulls garbage            |
 | L2     | `apps/web/test/lobby-screen.test.tsx` — "create room POSTs /lobbies and navigates to the new room route"                                                                                                                                                                                                                                                                                                                                                                                                                                         | memory-router pathname becomes `/room/<id>` after the 201                                                 |
-| L3     | non-vitest: creation-gate round run and approved (Progress 11:30); asset + utility + shell wiring + gallery card landed; _gate rendered pass pending step 12_                                                                                                                                                                                                                                                                                                                                                                                    | courtyard branch renders the asset (held by ui suite + step 12 rendered pass)                             |
+| L3     | non-vitest: creation-gate round run and approved (Progress 11:30); the painted scene asset + utility + shell wiring + gallery card landed (art revision 17:00); gate rendered pass complete (Progress 15:40/16:00)                                                                                                                                                                                                                                                                                                                               | courtyard branch renders the asset (held by ui suite + step 12 rendered pass)                             |
 | L4     | `apps/web/test/lobby-screen.test.tsx` — "shows the first-load skeleton while /me resolves", "renders the page-error alert with retry when /me fails outright"; `apps/web/test/room-screen.test.tsx` — "shows the first-load skeleton while bootstrap resolves", "renders the page-error alert with retry on a bootstrap 5xx"; N/A calls held by the ledger above                                                                                                                                                                                 | skeleton after the 300ms no-flash; alarm alert + `Try again` per screen                                   |
 | R1     | `apps/web/test/room-screen.test.tsx` — "renders every member by name in join order from the GET alone — no join call"                                                                                                                                                                                                                                                                                                                                                                                                                            | both names at ascending `data-seat-index`; viewer's seat `data-own`; link/copy/start/leave present        |
 | R2     | `apps/web/test/room-screen.test.tsx` — "joins on a bootstrap 404 and renders the room from the join response", "renders the no-access panel when the room is full (409 LobbyFull)", "renders the no-access panel for an unknown room (join 404)", "redirects an already-started refusal to the game route when the view GET succeeds", "renders the no-access panel for an already-started outsider (view GET 404)", "shows the name form in-place for an unauthenticated visitor, then joins — URL unchanged"                                   | each refusal's panel title; game-route pathname on view 200; URL stays `/room/<id>` through identity      |
@@ -400,7 +401,7 @@ lands — invented test titles become review findings.)_
 | R5     | `apps/web/test/room-screen.test.tsx` — "navigates the starter to the game route on success", "auto-navigates a non-starter on the GameStarted room broadcast", "surfaces a 422 BadPlayerCount as the inline alert with the 2–5 copy"                                                                                                                                                                                                                                                                                                             | pathname `/game/<id>` both paths; inline alert copy while the seat view stays                             |
 | R6     | `apps/web/test/game-placeholder.test.tsx` — "renders the holding state — shell, loading object, flavor caption"                                                                                                                                                                                                                                                                                                                                                                                                                                  | shell header + status role + `shuffling…` caption render                                                  |
 | R7     | `apps/web/test/room-screen.test.tsx` — "POSTs leave, drops both subscriptions, and returns to the lobby"                                                                                                                                                                                                                                                                                                                                                                                                                                         | leave POST recorded; unsubscribe spy fired on room AND player channels; pathname `/`                      |
-| S1     | button.md r2 + `touch-floor` landed; ui suite green (17) as the regression pin; _hardcheck rendered measurement ≥ 44px pending step 12_                                                                                                                                                                                                                                                                                                                                                                                                          | canon + utility exist; suites green                                                                       |
+| S1     | button.md r2 + `touch-floor` landed; ui suite green as the regression pin; hardcheck rendered measurement complete — shared text controls measure exactly 44px (Progress 15:40)                                                                                                                                                                                                                                                                                                                                                                  | canon + utility exist; suites green                                                                       |
 | S2     | `packages/ui/test/app-shell.test.tsx` — "the shell root is a positioned ancestor for the game state's floating controls" + "the game state renders the floating connection + settings controls"; bottom inset is CSS-only, pinned by inspection (Progress)                                                                                                                                                                                                                                                                                       | root className contains `relative`; game-state controls render by accessible label                        |
 
 ## Progress
@@ -516,6 +517,42 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       with as-landed test names. Remaining for step 12 (orchestrator):
       design-gate rendered pass + ai-tells + impeccable audits, S1
       hardcheck re-measure, two-browser walkthrough.
+- [x] 2026-09-05 20:45 — review fix cycle, frontend findings (F1 code
+      half, F2 code half, F10–F13, F14a/b). **F1:** the room's identity
+      branch h1 moved inside its `default` Panel in
+      `containers/room/room-screen.tsx`, matching the lobby's
+      heading-inside-panel composition (wash rule scoped to pictorial
+      scenes; paving keeps `default` panels). **F2:** lobby-screen.tsx
+      file-header prose rewritten to the truth — forms float on `wash`
+      panels over the courtyard per panel.md r2 / amended forms.md.
+      **F10:** `services/realtime.ts` env guard now rejects
+      empty/whitespace values, `getClient` throws on SSR
+      (`window` undefined), and `subscribeTopic` catches getClient
+      failure — one console.error with the config message (no
+      topic/secret values), status listeners notified `reconnecting`,
+      no-op unsubscribe returned — so misconfiguration shows the W4
+      banner, not the router's default error page. New legibility test in
+      `apps/web/test/realtime.test.ts` (stubbed whitespace env, seam
+      cleared) kills the trim-check mutant. **F11:**
+      `apps/web/test/env-declaration.test.ts` now slices the
+      `@cambio/web#build` and `dev` task blocks out of turbo.json's raw
+      text and asserts the three VITE vars per slot (`env` and
+      `passThroughEnv` separately) — a var present in only one slot now
+      fails. **F12:** outsider denial copy merged truthfully — title "No
+      open seat", body covering started-or-closed; broadcast-path
+      `closed` copy unchanged; test updated. **F13:** sr-only room h1
+      hoisted from SeatedRoom to RoomScreen's wrapper for all branches
+      except the identity branch (which has its own visible h1); the
+      `Math.max(0, viewerIndex)` fallback got its
+      why-minus-one-is-unreachable comment. **F14a:** alert.md → r2
+      (action slot carries the variant's ink, inverse on alarm/success)
+      with revision entry; structural pin `packages/ui/test/alert.test.tsx`
+      (ADR-0030: role-based, ink verified by the rendered gate path).
+      **F14b:** stale `(r1)` citations in `app-shell.tsx` and
+      `app-shell.test.tsx` bumped to r2. Suites green through turbo:
+      web 75, ui 19; web+ui build/typecheck/eslint clean (repo-wide
+      format:check failing only on other fix-cycle agents' in-flight
+      files).
 
 ## Surprises & notes for the root plan
 

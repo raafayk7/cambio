@@ -7,12 +7,17 @@ The play surface — the top-down khoka table. Class: **Game object**.
 
 ## Anatomy
 
-- Round `surface.table` tabletop with a `green-deep` rim, `elevation.float`
-  offset shadow, on the checkered `surface.warm` paving (the game screen's
-  scene depth, per the CAM-13 scene map).
-- Four curved `green-deep` benches around it — always four, from the
-  reference furniture.
-- Center: draw-deck + discard-pile. Seats arranged radially at the rim.
+- The table and its four curved benches render as ONE painted asset (r2):
+  the moodboard's own top-down khoka table — weathered green planks,
+  umbrella hole, cast shadows baked into the alpha — on the painted plaid
+  paving ground (scenes.md). The greens in the painting are the
+  `surface.table` / `green-deep` family by regeneration prompt, not by
+  CSS token reference.
+- Always four benches, from the reference furniture — scenery, never a
+  constraint.
+- Center: draw-deck + discard-pile, overlaid programmatically on the
+  tabletop disc (54% of the asset width, measured from the alpha). Seats
+  arranged radially around the asset.
 - The viewer's own seat is always at the bottom; the table rotates per
   viewer.
 

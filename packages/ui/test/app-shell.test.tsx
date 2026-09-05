@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest"
 import { AppShell } from "../src/components/app-shell.js"
 
 /**
- * app-shell.md (r1) — S2 structural fix (CAM-17 root plan): the game
+ * app-shell.md (r2) — S2 structural fix (CAM-17 root plan): the game
  * state renders absolutely-positioned floating controls, so the shell
  * root must be their positioned ancestor. Before the fix they anchored
  * to whatever ancestor happened to be positioned (the gallery carried a

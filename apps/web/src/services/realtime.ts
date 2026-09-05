@@ -47,12 +47,22 @@ let injected: RealtimeClientLike | null = null
 
 function getClient(): RealtimeClientLike {
   if (injected !== null) return injected
+  // The singleton must never construct server-side: TanStack Start SSRs the
+  // first render, and a server-built socket would outlive the request and be
+  // shared across users. Subscriptions live in effects, which never run on
+  // the server — reaching this guard means that discipline broke.
+  if (typeof window === "undefined") {
+    throw new Error("realtime client requested during SSR — subscribe from browser effects only")
+  }
   if (client === null) {
     const url: string | undefined = import.meta.env.VITE_REALTIME_URL
     const jwt: string | undefined = import.meta.env.VITE_REALTIME_ANON_JWT
-    if (url === undefined || jwt === undefined) {
+    // Empty/whitespace counts as missing: .env.example ships
+    // VITE_REALTIME_ANON_JWT= blank, and `""` would pass an undefined-only
+    // check, then fail the handshake with no diagnostic (review F10).
+    if (url === undefined || url.trim() === "" || jwt === undefined || jwt.trim() === "") {
       throw new Error(
-        "realtime env missing — VITE_REALTIME_URL and VITE_REALTIME_ANON_JWT must be set (ADR-0032)",
+        "realtime env missing — VITE_REALTIME_URL and VITE_REALTIME_ANON_JWT must be set and non-empty (ADR-0032)",
       )
     }
     // The anon JWT is public by design (ADR-0032): it gates the socket
@@ -113,7 +123,20 @@ export interface TopicHandlers {
 let activeSubscriptions = 0
 
 export function subscribeTopic(topic: string, handlers: TopicHandlers): () => void {
-  const channel = getClient().channel(topic)
+  let resolvedClient: RealtimeClientLike
+  try {
+    resolvedClient = getClient()
+  } catch (error) {
+    // Misconfiguration must be legible, not a crash: without this catch the
+    // throw surfaces inside a subscription effect and the router's default
+    // error page replaces the screen. Instead the console names the fix and
+    // the screen shows the truthful W4 reconnecting banner. Only the config
+    // message is logged — never the topic (a capability) or any env value.
+    console.error(error instanceof Error ? error.message : String(error))
+    setStatus("reconnecting")
+    return () => {}
+  }
+  const channel = resolvedClient.channel(topic)
   let dropped = false
   let active = true
   activeSubscriptions += 1

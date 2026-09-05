@@ -179,7 +179,7 @@
   --color-surface-page: var(--cream-scene);
   --color-surface-raised: var(--cream-card);
   --color-surface-table: var(--green-table);
-  /* surface.warm is terracotta-led; the checkerboard pattern pairs it with
+  /* surface.warm is terracotta-led; the paving plaid pairs it with
    * tan-paving directly in scene CSS (theme-fixed, see Decision Log). */
   --color-surface-warm: var(--terracotta);
   --color-ink-primary: var(--ink);

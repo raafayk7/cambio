@@ -144,7 +144,7 @@ describe("join-on-visit (R2)", () => {
     })
   })
 
-  it("renders the no-access panel for an already-started outsider (view GET 404)", async () => {
+  it("renders the merged no-seat panel for an outsider (view GET 404) — started and abandoned are indistinguishable on the wire", async () => {
     setupFake()
     stubApi({
       "GET /me": json(200, ME),
@@ -154,7 +154,7 @@ describe("join-on-visit (R2)", () => {
     })
     renderApp(`/room/${GAME_ID}`)
 
-    expect(await screen.findByText("Game already started")).toBeInTheDocument()
+    expect(await screen.findByText("No open seat")).toBeInTheDocument()
   })
 
   it("shows the name form in-place for an unauthenticated visitor, then joins — URL unchanged", async () => {

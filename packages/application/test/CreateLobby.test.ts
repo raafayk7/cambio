@@ -22,7 +22,13 @@ describe("createLobby (clause 1)", () => {
           expect(result.version).toBe(1)
           // Persist before publish, and nothing else.
           expect(opsOf(journal)).toEqual(["saveLobby", "publishLobby"])
-          expect(journal[1]).toMatchObject({ op: "publishLobby", gameId: gid(0) })
+          // C3: the publish carries the just-persisted version — the one the
+          // use case returns (kills a newVersion→version swap in the publish).
+          expect(journal[1]).toMatchObject({
+            op: "publishLobby",
+            gameId: gid(0),
+            version: result.version,
+          })
         }),
         Effect.provide(
           Layer.mergeAll(makeIdsStub(gid), repo.layer, makePublisherStub(journal).layer),

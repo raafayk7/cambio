@@ -13,8 +13,9 @@ import { parseRoomLink } from "./parse-room-link.js"
 /**
  * The lobby (CAM-17 L1, L2, L4): identity, create room, join-by-link — on
  * the courtyard scene (scenes.md: lobby = full illustrated courtyard),
- * with the forms on plain cream panels ON that ground (forms.md: no scene
- * art behind fields). Join is share-link only (root Decision Log): no room
+ * with every form floating on `wash` panels over the painting (panel.md
+ * r2; forms.md as amended: the fields sit on translucent paper, never on
+ * bare artwork). Join is share-link only (root Decision Log): no room
  * list, no short codes.
  */
 

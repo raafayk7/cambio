@@ -1,6 +1,6 @@
 name: alert
 status: draft
-version: 1
+version: 2
 extends: none
 
 Inline persistent notice (page-level errors, reconnecting banner). Class:
@@ -28,7 +28,12 @@ Inline persistent notice (page-level errors, reconnecting banner). Class:
 
 - Alerts persist while true; toasts announce moments. Pick by duration of
   truth, not by severity.
+- The action slot carries the variant's ink: on the dark `alarm` and
+  `success` grounds the ghost action renders `ink.inverse`. The component
+  owns this — never per-call-site overrides.
 
 ## Revisions
 
 - r1: initial (CAM-13).
+- r2: action slot carries the variant's ink (inverse on `alarm`/`success`)
+  — canonizes the shipped CAM-17 audit fix (review F14a).
