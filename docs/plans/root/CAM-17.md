@@ -403,5 +403,165 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+**Review 2026-09-05 — verdict: fix-then-ship.** Four reviewers (contract
+
+- architecture per side) + independent verification.
+
+### What passed
+
+- **Every functional-contract clause satisfied** on both sides (C1–C5,
+  B1–B5, W1–W4, L1–L4, R1–R7, S1–S2) with test-body-verified coverage —
+  no contract violations, no unrequested endpoints/fields/side effects.
+- **Zero hidden-information findings**: grants never rendered / logged /
+  persisted / dehydrated; adversarial sweep asserts names identical per
+  viewer; 404 byte-identity real (same `typedErrorBody`, same cookie
+  behavior); nothing new on per-player channels.
+- Import boundaries clean everywhere (all new imports checked, both
+  sides); domain purity holds; ports placed correctly; publisher/viewFor
+  ripples complete with zero stale call sites; ADR-0030/0032 conformant;
+  ai-tells sweeps clean; new copy conforms to voice.md.
+- Verification actually ran: forced full gate **25/25, 0 cached**
+  (1m40s, live Postgres + Realtime); `VIEW_GAMES=40` adversarial pass
+  green; suite counts independently recomputed (web 71, ui 18, api 118,
+  domain 194, application 86, contracts 10, config 16); live two-session
+  walkthrough executed this cycle.
+
+### Findings (fix cycle works from THIS list)
+
+Tier 1 — canon/doc contradicts shipped code (all introduced this task):
+
+- **F1 — scenes.md r2's wash rule vs the room screen.** scenes.md:26–28
+  (new) says content on an illustrated scene floats on wash with
+  headings inside — but paving is now an illustrated scene and the room
+  uses opaque `default` panels throughout, with a bare display h1 on the
+  artwork in its identity branch (room-screen.tsx:223). Resolve one way:
+  scope the rule to the courtyard/lobby, or apply wash + heading-inside
+  on the room. Surfaced canon decision, not an auto-fix.
+- **F2 — forms.md contradicted by the wash forms; multi-instance
+  claim.** forms.md:14 "no scene art behind the fields" vs both lobby
+  forms on wash over the painting. Instances found by sweep (re-run the
+  sweep before closing): design-system/patterns/forms.md:14;
+  apps/web/src/containers/lobby/lobby-screen.tsx:14–18 (prose documents
+  the superseded behavior beside code doing the opposite);
+  docs/plans/frontend/CAM-17.md:50 and :251. Amend forms.md
+  deliberately (wash exception, r2) and fix every instance.
+- **F3 — table-surface.md Anatomy describes the deleted
+  implementation** (surface.table disc + green-deep rim +
+  elevation.float + drawn benches; r2 updated Revisions only). Also
+  tokens.md:41 still calls `surface.table` "the play surface" — now
+  only true of the gallery wrapper. Reconcile Anatomy + token
+  description.
+- **F4 — false docstring: "name is 1–32 chars by construction".**
+  `""` is producible (game-repository COALESCE arm; ViewFor `?? ""`).
+  Instances: packages/contracts/src/GameView.ts:123 (+ dist copies);
+  docs/plans/backend/CAM-17.md:135 (shape table). Preferred fix:
+  extract a `DisplayName` schema (Trim + min 1 + max 32 — the idiom in
+  contracts User.ts:12) and reuse across CreateUserRequest/SessionUser/
+  ViewPlayer/LobbyMember, then decide the vanished-user projection
+  explicitly instead of `""`; otherwise amend the claim everywhere.
+
+Tier 2 — architecture discipline (backend):
+
+- **F5 — viewFor is no longer the single self-contained projection.**
+  `viewFor(viewer, state, names)` with the names map assembled by
+  copy-paste at three route sites (games.ts:52, :88, lobbies.ts:163) —
+  the per-handler-assembly shape hidden-information §viewFor exists to
+  prevent (no leak today; names public). Fix: `viewForEffect(viewer,
+state)` requiring UserRepository, pure 3-arg kept as a test seam.
+- **F6 — domain module cycle defused only by comments.**
+  Lobby→UserRepository→GameRepository→Lobby broken via statement-form
+  `import type` with no enforcement (no import/no-cycle rule; no
+  eslint.base.test pin) while the repo's own `fixStyle:
+"inline-type-imports"` autofix is exactly the style that reintroduces
+  it. Fix: extract `User` to packages/domain/src/User.ts (entity out of
+  the port file, per architecture skill §file-placement) — or add the
+  enforcement test.
+- **F7 — null-sentinel entitlement branch.** games.ts:81–98 encodes the
+  404-vs-200 refusal in a nullable data field with two `as` casts on a
+  security-relevant branch. Dissolves naturally under F5's
+  viewForEffect; otherwise use a tagged result.
+- **F8 — `config.slamWindowMs` wire schema weaker than domain +
+  duplicated.** GameView.ts:115 drops `Schema.positive()` and repeats
+  the anonymous struct already at GameEvents.ts:48. Extract one
+  `WireGameConfig` (positive) in GamePrimitives and use in both.
+
+Tier 3 — coverage and robustness:
+
+- **F9 — C3's "carries the room's version" has no end-to-end pin.**
+  No test asserts a use case publishes the just-persisted version;
+  swapping `newVersion`→`version` in JoinLobby would silently kill live
+  membership with a green gate. Add
+  `toMatchObject({op:"publishLobby", version: result.version})` in
+  CreateLobby/JoinLobby/LeaveLobby suites (stub journal already records
+  it).
+- **F10 — realtime env failure modes.** realtime.ts:53 guards
+  `undefined` only, while .env.example ships `VITE_REALTIME_ANON_JWT=`
+  empty → `""` passes, handshake fails, room pins to reconnecting with
+  no diagnostic; a genuinely absent var throws inside the subscription
+  effect and (no errorComponent exists) replaces the room with the
+  router's default error page instead of the W4 state. Harden: trim
+  check + caught subscribe; also add the cheap SSR guard (throw when
+  `window` undefined) so the singleton can never construct server-side.
+- **F11 — env-declaration test weaker than its coverage row and
+  ADR-0032.** Raw `toContain` can't distinguish the build `env` array
+  from dev `passThroughEnv`; a var declared in only one slot passes.
+  Scope the assertion to the `@cambio/web#build` env array (both slots).
+- **F12 — abandoned rooms tell outsiders "Game already started".**
+  use-room.ts denial resolution maps abandoned (LobbyNotJoinable +
+  view-404) to `started`; the correct `closed` copy is reachable only
+  via the broadcast path. Distinguishing data is absent on the wire —
+  fix is either copy that covers both truthfully, or (bigger) a
+  denial-reason signal; choose deliberately.
+- **F13 — no page h1 on the room's denial and page-error branches**
+  (the sr-only h1 lives inside SeatedRoom). Hoist to RoomScreen's
+  wrapper.
+- **F14 — doc/coverage-row precision batch.** (a) alert.tsx action-ink
+  change is uncanonized: alert.md still v1, no revision entry, no test —
+  bump r2 + pin; (b) stale r1 citations at app-shell.tsx:9 and
+  packages/ui/test/app-shell.test.tsx:8; (c) frontend coverage rows for
+  L3 and S1 still read "pending step 12" though Progress 15:40 records
+  completion; (d) backend B5 row overstates (publish half asserts the
+  domain lobby via the test publisher, not an encoded wire payload —
+  reword; wire shape is pinned by the realtime suites); (e) B4 row
+  names no test — point it at the enumerated pins; (f) frontend R4 row
+  says "both seats" where the body asserts the friend only; W3 row's
+  "pinned channel pattern" is type-enforced, not asserted — reword or
+  strengthen.
+
+Skill staleness (harness fixes — land on main per ADR-0028, merge down):
+
+- **SS1** infrastructure-persistence §soft-delete needs a third bullet
+  naming the joined-table case (filter the join, keep the anchor row,
+  represent the absent side explicitly — not `""`).
+- **SS2** frontend-architecture + hidden-information "no Supabase
+  anon-key access" sentences need a clause pointing at ADR-0032 (the
+  realtime-js dependency + bundled anon JWT read as a contradiction
+  cold).
+- **SS3** frontend-architecture's hardcoded-value audit sentence should
+  add constant-valued inline `style={{}}` to the flag list (the
+  TABLE_DISC_PCT shape is invisible to the current greps).
+
+Advisory (defer allowed; log only): ADR-0030 class-name assertion in
+app-shell.test.tsx (positioned-ancestor claim belongs to the rendered
+path; CAM-15 precedent exists); game.$gameId route owns logic (CAM-18
+replaces it); Math.max(0, viewerIndex) hides a projection disagreement —
+comment why -1 is unreachable; TABLE_DISC_PCT as inline style vs a
+custom utility (form question); styles.css:35–38 comment overstates the
+primitive wipe (bg-(--var) routes around it); findManyById's documented
+absence contract vs the `?? ""` deferral; playerNames N+1 on three hot
+routes — CAM-18 candidate: embed names in GameStarted + fold into state,
+dissolving F5/F7 permanently; domain testing fixture docstring coupled
+to an api test-harness literal; leak scanner now scans player names (≥3
+char fixture convention is comment-enforced across three files);
+LobbyView "started" status has no room-screen branch (unreachable today
+— nothing pins that StartGame never publishes lobby updates); lobby
+route has no head title while room/game do.
+
+### Verification record
+
+`pnpm turbo build typecheck lint test --force` → 25/25, 0 cached.
+`VIEW_GAMES=40 VIEW_SEED=1717 pnpm turbo test --filter
+@cambio/application --force` → 86 green, adversarial 1 test 2.2s. Live
+walkthrough (browser + second cookie-jar session) run this cycle
+including reconnect kill/restart and started-room redirect. No timing
+findings arose, so no timing probe was required.
