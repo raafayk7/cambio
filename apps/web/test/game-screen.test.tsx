@@ -460,9 +460,7 @@ describe("turn flow — command failures never break the table (T5)", () => {
     handlers[POST_COMMANDS] = json(422, errorBody("NotYourTurn", "illegal move"))
     fireEvent.click(screen.getByRole("button", { name: "Draw a card" }))
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "It's not your turn — the table has been refreshed.",
-    )
+    expect(await screen.findByRole("alert")).toHaveTextContent("It's not your turn.")
     await waitFor(() => {
       expect(calls.filter((call) => call === GET_VIEW).length).toBeGreaterThan(getsBefore)
     })
@@ -1040,7 +1038,7 @@ describe("late slams and window close (SL3)", () => {
     fireEvent.click(slotButton(ME.userId, 0))
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "The slam window had already closed — the table has been refreshed.",
+      "Too slow. The slam window had already closed.",
     )
     await waitFor(() => {
       expect(calls.filter((call) => call === GET_VIEW).length).toBeGreaterThan(getsBefore)

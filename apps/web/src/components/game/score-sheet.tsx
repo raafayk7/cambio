@@ -36,6 +36,11 @@ export interface ScoreSheetProps {
    * sheet is `data-state="revealing"` for `SCORE_REVEAL_MS`, then flips
    * every card up at once and settles to `data-state="final"`. */
   revealing?: boolean
+  /** Renders inside the panel below the rows (score-sheet.md r2): the
+   * sheet's single exit action lives ON the panel surface so it groups
+   * with the scores — a detached chip over the card backs did not (CAM-18
+   * gate finding, D2). */
+  footer?: React.ReactNode
   className?: string
 }
 
@@ -49,7 +54,13 @@ export function formatScore(total: number): string {
  * `PEEK_DURATION_MS` is in `use-game.ts`. */
 const SCORE_REVEAL_MS = 340
 
-export function ScoreSheet({ reveal, playerName, revealing = false, className }: ScoreSheetProps) {
+export function ScoreSheet({
+  reveal,
+  playerName,
+  revealing = false,
+  footer,
+  className,
+}: ScoreSheetProps) {
   // Starts settled unless a genuine entrance was requested — the flip is a
   // one-shot beat on mount, never re-triggered by a later re-render (a
   // refetch landing after the reveal already settled must not re-flip it).
@@ -114,6 +125,9 @@ export function ScoreSheet({ reveal, playerName, revealing = false, className }:
           )
         })}
       </ul>
+      {footer !== undefined ? (
+        <div className="flex justify-center border-t border-ink-primary/25 pt-3">{footer}</div>
+      ) : null}
     </div>
   )
 }

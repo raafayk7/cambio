@@ -62,4 +62,8 @@ A player's slot grid. Class: **Game object**.
 - r2 (CAM-18, T2/T3): `selectedSlots` (targeting picks — 7/8/9/10 peeks,
   J/Q swaps, the swap-held action) and `emptySlotsClickable` (the slam
   give-target case, step 13) land as props; every slot, occupied or not,
-  now carries its flight anchor.
+  now carries its flight anchor. Amended same day (gate fix cycle): the
+  dashed vacancy outline renders only for indices that are genuinely
+  empty in game state — the grid's even-rounding filler cell beyond
+  every real signal is an invisible spacer, never a painted vacancy
+  (one mark, one meaning).

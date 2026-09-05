@@ -278,29 +278,44 @@ imports (lint-enforced).
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes, run bare (no
-      pipes).
-- [ ] Full live game (round-1 user decision): two sessions
-      (in-app browser + second cookie-jar session or second browser)
-      play a real game to a Cambio call against `pnpm dev` — covering
-      draws, at least one power of each dealt class, at least one
-      slam (with a give or penalty), the reshuffle if reached, and
-      the score sheet → back-to-lobby exit. Reconnect kill/restart
-      shows the in-game reconnecting treatment and a correct table
-      after recovery.
-- [ ] The 8-state MVS ledger answered in the frontend child plan
-      (built or justified N/A), including the partial-failure N/A
-      with its surfaced canon conflict.
-- [ ] Hidden-information sweep: jsdom tests assert face-down renders
-      carry no value anywhere in the DOM, peeked values disappear
-      after the reveal and never re-render, and the screen makes no
-      requests beyond the view GET + commands POST.
-- [ ] Design-gate pipeline (decompose→map→judge) on the game screen
-      with zero blocking findings; `ai-tells` on the new surfaces;
-      impeccable audit run; canon conflicts surfaced, never
-      auto-fixed. Reduced-motion pass verified in the rendered path.
-- [ ] All canon revisions from the approved batch landed as proper
-      r-revisions in `design-system/` alongside their code.
+- [x] `pnpm turbo build typecheck lint test` passes, run bare (no
+      pipes) — forced, 25/25 tasks, 0 cached: api 118, domain 194,
+      application 86, contracts 11, config 16, ui 25, web 185 = 635
+      tests.
+- [x] Full live game executed (in-app browser + cookie-jar HTTP
+      session): create → join-on-visit → start → played to a Cambio
+      call. Covered: draws both ways; every DEALT power class (9/10
+      peeks, Queen two-step with a cross-player swap, J two-pick from
+      the browser — 7/8 never drawn, so per "if dealt" satisfied); a
+      failed slam → penalty (closesAt fixed through the attempt,
+      ADR-0011 live); reshuffle not reached (deck never emptied — "if
+      reached"); confirm-modal call → CAMBIO! indicator → score sheet
+      byte-identical to the server reveal → back to lobby; ended-game
+      reload re-renders the sheet. Realtime kill/restart mid-game
+      showed the in-game reconnecting treatment and a correct table on
+      recovery.
+- [x] The 8-state MVS ledger answered in the frontend child plan
+      (5 built with branch tests, 3 N/A justified), including the
+      partial-failure N/A with its surfaced canon conflict.
+- [x] Hidden-information sweep green: face-down renders carry no
+      value anywhere in the DOM, penalty values never exist
+      client-side, peeked values disappear after the reveal and never
+      re-render, and recorded calls are limited to the view GET +
+      commands POST (+ /me).
+- [x] Design-gate pipeline (decompose→map→judge) run on live
+      authenticated renders (mid-game, ended, compact): hard checks
+      PASS everywhere (0 constraint fails), verdict flagged with 6
+      accidental default-tier points and ZERO blocking findings — all
+      six fixed in the same cycle and re-verified rendered (child plan
+      step-15 Progress); 5 further findings judged controlled/allowed
+      and left as-is. `ai-tells` 1/30 (invisible; its one finding
+      fixed); impeccable deterministic detector clean on all changed
+      UI files. Reduced-motion verified: flight-layer structural tests + a clean render under emulated prefers-reduced-motion.
+- [x] All canon revisions landed as r-revisions alongside their code:
+      tokens.md r2 (duration.peek), playing-card.md r2, hand.md r2
+      (+amendment), draw-deck.md r2, discard-pile.md r2, held-card.md
+      r1 (new), score-sheet.md r2 (+footer amendment), app-shell.md
+      r3, table-surface.md r3.
 
 ## Plan of work
 
@@ -373,6 +388,32 @@ _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
 - [x] 2026-09-05 — plan written
+- [x] 2026-09-05 17:00–17:30 — M1 (flight layer + one-radius geometry +
+      duration.peek 2800ms) and M2 (AppShell orthogonal reconnecting +
+      hollow-ring dot, app-shell.md r3) complete, parallel lanes.
+- [x] 2026-09-05 18:00 — M3 complete: game container per ADR-0033
+      (refetch authority, version guard, debounced batch refetch),
+      harness render path, MVS branches, route swap. web 111.
+- [x] 2026-09-05 19:00 — M4 complete: H1 helpers + affordances, canon
+      interaction extensions (hand.md/draw-deck.md/discard-pile.md r2,
+      held-card.md r1), Cambio confirm modal, memory-faithful peeks,
+      Queen two-step. web 164.
+- [x] 2026-09-05 20:00–20:30 — M5 (slam window SL1–SL3 + reshuffle
+      CH2) and M6 endgame (E1–E3, score-sheet revealing, sibling
+      overlay, back-to-lobby) complete. web 185.
+- [x] 2026-09-06 02:00 — M6 close: full forced gate 25/25 (635 tests);
+      live two-session full game to a Cambio call (details in the
+      child plan step-15 Progress); ai-tells 1/30; impeccable detector
+      clean; design-gate pipeline on live authenticated renders —
+      hard checks PASS (mid-game, ended, compact), verdict flagged 6
+      accidental / 0 blocking.
+- [x] 2026-09-06 02:45 — gate fix cycle: all six flagged points
+      resolved (seat edge-anchoring + viewer-dock exception, Call
+      Cambio docked by the viewer, full-region game-over rest,
+      score-sheet footer slot, phantom-slot spacer, badge clearance)
+      plus the ai-tells copy finding and the CAMBIO! pill overflow;
+      canon r3/amendments landed with the code; re-rendered and
+      re-verified; final forced full gate 25/25 green.
 
 ## Decision log
 
@@ -419,6 +460,33 @@ timestamp each entry)_
   refetches on `GameEnded`. Rejected: adding hands to the `GameEnded`
   event (legal — endgame is public — but a contract change with no
   v0 need).
+- 2026-09-06 — (gate fix cycle) **Seat anchoring is asymmetric by
+  design**: non-viewer seats edge-anchor at the ring point growing
+  inward (fixes the chrome occlusion — the judged top defect); the
+  viewer's dock stays centered because an own-size hand grown inward
+  covers the deck/discard (caught in the first fix re-render). The
+  hands-over-benches read the judge ruled a controlled break is kept.
+  table-surface.md r3.
+- 2026-09-06 — (gate fix cycle) **Call Cambio docks at the stage's
+  bottom-right at regular** — it is the viewer's action and lives by
+  their hand; removing it from the top band is also what brings the
+  viewer's own seat inside the fold mid-game. Compact keeps it in
+  flow.
+- 2026-09-06 — (gate fix cycle) **Game-over dims the whole surface**:
+  a full-region green-deep rest above the seat layer joins the disc
+  scrim (which the score sheet almost entirely covered) —
+  table-surface.md r3. The ended state's own-hand tail below the fold
+  is accepted as an authored scroll (no countdown post-game; child
+  plan Surprises).
+- 2026-09-06 — (gate fix cycle) **The game-over "CAMBIO!" drops the
+  poster text-shadow** — at the indicator's 15px it muddied and
+  overflowed the pill; the display face alone carries the shout. The
+  shadow stays for the big display moments (SCORES, SLAM!).
+- 2026-09-06 — (audit) ai-tells' one finding (the five-peat error-copy
+  suffix) fixed by varying copy per voice.md's error formula; the
+  judge's five controlled/allowed reads (hands-over-benches, face-down
+  hands at ended, score-row stagger, wide flanks, deck-under-panel)
+  deliberately left as-is.
 - 2026-09-05 — (plan reconciliation) **Game-over composition: the
   score sheet renders as a screen-level sibling overlay above
   TableSurface** (which takes `state="game-over"` for the dim);

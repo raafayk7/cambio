@@ -56,3 +56,8 @@ None.
   (table-surface.md: "table is ground, not HUD"; the disc-sized scrim
   cannot contain a full sheet on compact). The turn-indicator's game-over
   announcement ("X called Cambio") always precedes this entrance.
+  Amended same day (gate fix cycle): the sheet gains a `footer` slot —
+  its single exit action renders ON the panel surface below the rows,
+  separated by the row hairline, so the action groups with the scores;
+  a detached chip floating over the card backs did not (gate D2
+  finding).

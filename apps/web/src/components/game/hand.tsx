@@ -99,6 +99,24 @@ export function Hand({
         const face = faceBySlot.get(slotIndex)
         const awaiting = awaitingGiveSlot === slotIndex
         const anchor = slotAnchorId(playerId, slotIndex)
+        // Even-rounding grid padding beyond every real signal is NOT a
+        // vacancy — a dashed outline there would announce an empty slot
+        // that never held a card (CAM-18 gate finding). It renders as an
+        // invisible spacer that only keeps the grid rhythm.
+        const isFiller = slotIndex > highest
+
+        if (isFiller) {
+          return (
+            <span
+              key={slotIndex}
+              aria-hidden
+              className={cn(
+                "invisible block card-frame",
+                variant === "own" ? "card-lg" : "card-md",
+              )}
+            />
+          )
+        }
 
         if (inFlightSlot === slotIndex) {
           return (

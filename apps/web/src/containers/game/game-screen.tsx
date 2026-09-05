@@ -12,7 +12,7 @@ import { HeldCard } from "../../components/game/held-card.js"
 import { ScoreSheet } from "../../components/game/score-sheet.js"
 import { Seat } from "../../components/game/seat.js"
 import { SlamTimer } from "../../components/game/slam-timer.js"
-import { handArc, seatArc, type RadialPosition } from "../../components/game/table-geometry.js"
+import { inwardSide, seatArc, type InwardSide } from "../../components/game/table-geometry.js"
 import { TableSurface } from "../../components/game/table-surface.js"
 import { TurnIndicator } from "../../components/game/turn-indicator.js"
 import { affordancesFor, slamGiveSlotRequired, type Affordances } from "./affordances.js"
@@ -127,9 +127,13 @@ function turnStatusCopy(status: TurnStatus, activePlayerName: string): React.Rea
         ? "Slam window open"
         : `Slam window open — match the ${rankLabel(status.rank)}`
     case "game-over":
+      // The shout word takes the display face only — the poster shadow
+      // reads as mud at the pill's 15px size and pushed the glyphs over
+      // the pill's frame (gate fix cycle); the shadow belongs to the big
+      // display moments (SCORES, SLAM!), not to inline indicator copy.
       return (
         <>
-          {activePlayerName} called <span className="font-display text-shadow-poster">CAMBIO!</span>
+          {activePlayerName} called <span className="font-display">CAMBIO!</span>
         </>
       )
   }
@@ -222,20 +226,13 @@ function handSlotWiring(params: {
 
 // ---- hand placement (radial axis toward the table, root plan step 8) ----
 
-type RadialSide = "top" | "bottom" | "left" | "right"
-
-/** Which side of the seat marker the hand sits on, derived from the shared
- * seat/hand rings (table-geometry.ts): the hand ring sits strictly inside
- * the seat ring at the same angle, so the dominant axis of the delta
- * between the two points is the radial direction toward the table center.
- * Exact pixel placement is tuned against the rendered table (step 15,
- * ADR-0030) — this only orders the two nodes toward the center. */
-function handSide(seat: RadialPosition, hand: RadialPosition): RadialSide {
-  const dx = hand.xPct - seat.xPct
-  const dy = hand.yPct - seat.yPct
-  if (Math.abs(dy) >= Math.abs(dx)) return dy < 0 ? "top" : "bottom"
-  return dx < 0 ? "left" : "right"
-}
+/** The hand sits on the seat's inward side (`inwardSide`, table-geometry) —
+ * the shared radial-direction source, paired with TableSurface's
+ * `seatAnchor="edge"` so the whole seat+hand group grows from the ring
+ * point toward the table center (CAM-18 gate fix: a centered group escaped
+ * the container and occluded the chrome above it). Exact pixel placement
+ * is tuned against the rendered table (step 15, ADR-0030). */
+type RadialSide = InwardSide
 
 const SIDE_FLEX_CLASS: Record<RadialSide, string> = {
   top: "flex-col-reverse",
@@ -299,7 +296,6 @@ function GameTable({
   // type-level fallback, not a live branch (room-screen precedent).
   const viewerSeatIndex = Math.max(0, viewerIndex)
   const seatPositions = seatArc(view.players.length, viewerSeatIndex)
-  const handPositions = handArc(view.players.length, viewerSeatIndex)
 
   const playerName = (id: string): string =>
     view.players.find((player) => player.id === id)?.name ?? ""
@@ -428,9 +424,7 @@ function GameTable({
   const seatNodes = view.players.map((player, index) => {
     const own = index === viewerSeatIndex
     const seatPos = seatPositions[index]
-    const handPos = handPositions[index]
-    const side =
-      seatPos !== undefined && handPos !== undefined ? handSide(seatPos, handPos) : "bottom"
+    const side = seatPos !== undefined ? inwardSide(seatPos) : "bottom"
     const wiring = handSlotWiring({
       affordances,
       playerId: player.id,
@@ -499,7 +493,9 @@ function GameTable({
   })
 
   return (
-    <div className="flex w-full flex-col items-center gap-4">
+    // `regular:relative`: the positioned ancestor for the docked Call
+    // Cambio affordance below (bottom-right of the whole stage column).
+    <div className="flex w-full flex-col items-center gap-4 regular:relative">
       <TurnIndicator state={indicatorState}>
         {turnStatusCopy(status, playerName(status.activePlayerId))}
       </TurnIndicator>
@@ -528,9 +524,16 @@ function GameTable({
         <p className="font-ui text-sm text-ink-muted">{slamBeatMessage}</p>
       ) : null}
       {affordances.phase === "AwaitingDraw" && affordances.holder ? (
-        <Button variant="danger" onClick={() => setConfirmCambioOpen(true)}>
-          Call Cambio
-        </Button>
+        // The call affordance docks at the stage's bottom corner at
+        // regular — it is the VIEWER's action, so it lives by their hand,
+        // and taking it out of the top band keeps the chrome to one
+        // indicator (gate fix: the tall top stack pushed the viewer's own
+        // seat below the fold). Compact keeps it in flow, thumb-reachable.
+        <div className="regular:absolute regular:right-5 regular:bottom-5 regular:z-20 regular:self-end">
+          <Button variant="danger" onClick={() => setConfirmCambioOpen(true)}>
+            Call Cambio
+          </Button>
+        </div>
       ) : null}
       {affordances.phase === "HoldingCard" && affordances.holder ? (
         <div className="flex items-center justify-center gap-2">
@@ -559,8 +562,9 @@ function GameTable({
           state={ended ? "game-over" : "in-game"}
           viewerSeatIndex={viewerSeatIndex}
           seats={seatNodes}
+          seatAnchor="edge"
           center={
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <DrawDeck
                 count={view.deckCount}
                 {...(reshuffling
@@ -611,18 +615,19 @@ function GameTable({
           // so it paints above the whole table without needing to fight
           // TableSurface's own internal `regular:z-10` seat layer.
           <div className="absolute inset-0 z-30 flex items-center justify-center overflow-y-auto p-4">
-            <div className="flex max-h-full flex-col items-center gap-4">
-              <ScoreSheet
-                reveal={view.reveal}
-                playerName={playerName}
-                revealing
-                className="max-h-full overflow-y-auto"
-              />
-              {/* Exactly one exit (E3, v0 decision): back to the lobby. */}
-              <Button asChild variant="secondary">
-                <RouterLink to="/">Back to the lobby</RouterLink>
-              </Button>
-            </div>
+            <ScoreSheet
+              reveal={view.reveal}
+              playerName={playerName}
+              revealing
+              className="max-h-full overflow-y-auto"
+              // Exactly one exit (E3, v0 decision), ON the panel surface so
+              // it groups with the scores (gate D2 fix).
+              footer={
+                <Button asChild variant="secondary">
+                  <RouterLink to="/">Back to the lobby</RouterLink>
+                </Button>
+              }
+            />
           </div>
         ) : null}
       </div>
@@ -743,7 +748,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
 
   return (
     <AppShell scene="paving" state="game" connection={connection}>
-      <div className="flex w-full flex-1 flex-col justify-center gap-5 p-5">
+      <div className="flex w-full flex-1 flex-col justify-center gap-4 p-4">
         {ownHeading ? null : <h1 className="sr-only">Game</h1>}
         {content}
       </div>

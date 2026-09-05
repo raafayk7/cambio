@@ -83,22 +83,25 @@ interface SlamReveal {
   readonly card: CardSlug
 }
 
-/** T5: a 422's tag mapped to voice.md-register inline copy. Every tag not
- * listed here (this milestone doesn't reach slam/endgame tags) falls back
- * to a generic sentence — the table has already been refreshed either way. */
+/** T5: a 422's tag mapped to voice.md-register inline copy — what went
+ * wrong, then how to fix, per the error formula. The refreshed table
+ * already shows the current state, so most tags need no resync clause
+ * (the ai-tells audit flagged the repeated suffix); only the generic
+ * fallback keeps it, since there the copy can't say what went wrong. */
 const COMMAND_ERROR_COPY: Record<string, string> = {
-  NotYourTurn: "It's not your turn — the table has been refreshed.",
-  WrongPhase: "That move isn't available right now — the table has been refreshed.",
-  SlamTooLate: "The slam window had already closed — the table has been refreshed.",
+  NotYourTurn: "It's not your turn.",
+  WrongPhase: "That move isn't available right now.",
+  SlamTooLate: "Too slow. The slam window had already closed.",
 }
 
 function commandErrorCopy(error: unknown): string {
   if (error instanceof ApiError) {
     return (
-      COMMAND_ERROR_COPY[error.tag] ?? "That move didn't go through — the table has been refreshed."
+      COMMAND_ERROR_COPY[error.tag] ??
+      "That move didn't go through. The table shows where things stand."
     )
   }
-  return "That move didn't go through — the table has been refreshed."
+  return "That move didn't go through. The table shows where things stand."
 }
 
 const gameQueryKey = (gameId: string) => ["game", gameId] as const

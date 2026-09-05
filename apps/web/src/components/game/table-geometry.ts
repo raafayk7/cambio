@@ -94,6 +94,19 @@ function ringPositions(
   })
 }
 
+/** The side of a ring point that faces the table center — the direction a
+ * seat's content (its hand, its growth) should extend. Derived from the
+ * dominant axis of the vector toward (50, 50), so it is exact for the
+ * compass seats and stable for the diagonal ones. */
+export type InwardSide = "top" | "bottom" | "left" | "right"
+
+export function inwardSide(position: RadialPosition): InwardSide {
+  const dx = 50 - position.xPct
+  const dy = 50 - position.yPct
+  if (Math.abs(dy) >= Math.abs(dx)) return dy < 0 ? "top" : "bottom"
+  return dx < 0 ? "left" : "right"
+}
+
 /** Seat centers, on the seat ring (just outside the painted table). */
 export function seatArc(seatCount: number, viewerSeatIndex: number): ReadonlyArray<SeatPosition> {
   return ringPositions(seatCount, viewerSeatIndex, SEAT_RING_RADIUS_PCT)
