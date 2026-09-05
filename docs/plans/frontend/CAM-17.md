@@ -124,6 +124,8 @@ as-built code. All paths under `apps/web/src/` unless noted.
 | `packages/ui/src/styles.css`               | edit    | S1 comment sync, S2 `safe-area-shell` bottom inset, L3 `scene-courtyard` utility                                                                                                                   |
 | `.env.example`, `turbo.json`               | edit    | `VITE_REALTIME_URL`, `VITE_REALTIME_ANON_JWT` — env array of `@cambio/web#build` **and** dev `passThroughEnv` (ADR-0032)                                                                           |
 | `apps/web/package.json`                    | edit    | add `@supabase/realtime-js` (runtime dep; the only realtime package)                                                                                                                               |
+| `assets/table-top.webp`                    | new     | the painted table + benches (image11 regeneration, alpha shadows) — TableSurface's art layer (art-revision round)                                                                                  |
+| `packages/ui/src/assets/` (not apps/web)   | new     | `scene-courtyard.webp` (image9) + `scene-paving.webp` (image10) — the painted scene grounds (art-revision round)                                                                                   |
 
 Container/hook placement follows the co-location rule: `use-room.ts` sits
 beside its one consumer; `use-session.ts`/`use-connection.ts` are shared
@@ -323,7 +325,7 @@ skipped.
 | ---------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | loaded           | built        | courtyard scene, identity block, create + join-by-link                                                                                                                            |
 | first-load       | built        | skeleton matching the identity/action layout while `GET /me` resolves (Loading's 300ms no-flash)                                                                                  |
-| first-use empty  | built        | the unauthenticated state IS first use: `NameForm` with onboarding energy + the primary action                                                                                    |
+| first-use empty  | built        | the unauthenticated state IS first use: a `wash` panel (panel.md r2) holding the h1 + `NameForm` over the courtyard painting's hero table (art-revision round)                    |
 | no-results empty | N/A          | no list, no filter — join is share-link only (root Decision Log); nothing can produce "no matches"                                                                                |
 | page error       | built        | `GET /me` network/5xx failure → full-region alarm alert + retry; shell stays                                                                                                      |
 | partial failure  | N/A          | single data region (`/me`); mutation failures are the forms.md submit-failure alert, not a page partial                                                                           |
@@ -456,6 +458,19 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       evidence on both. Final full gate green 25/25 (web 71, ui 18);
       final state verified live (no settings control, sr-only h1,
       ellipsis, live count, per-route titles).
+- [x] 2026-09-05 17:00 — art revision round (user-directed; the full
+      story is in the root plan's Decision Log): `scene-courtyard.webp`
+      (image9) replaces the SVG; `scene-paving.webp` (image10) replaces
+      the CSS checker; `table-top.webp` (image11, alpha) replaces
+      TableSurface's drawn scenery — overlays stay programmatic, disc
+      geometry measured at 54% of asset width. Panel gains the `wash`
+      variant (panel.md r2); lobby headings moved inside wash panels
+      (both branches), so the first-use ledger realization is now
+      "wash panel containing h1 + NameForm over the courtyard hero
+      table". Gallery gains a wash card; canon docs revised
+      (table-surface r2, app-shell r2 amended, scenes.md). Suites green
+      (71 web + 18 ui) after each step; screens re-rendered and
+      checkpointed to the user at every stage.
 - [x] 2026-09-05 12:00 — step 2 done: `apps/web/src/services/api.ts`
       (`apiRequest` + typed `ApiError`; credentials on every call, contracts
       decode at the edge, `decodeErrorBodyEither` on non-2xx with a generic

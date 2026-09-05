@@ -298,6 +298,11 @@ timestamp each entry)_
       screen (both flagged/0-blocking), ai-tells 1/30, impeccable
       audited; fix batches applied and re-verified; final gate 25/25.
       Details in the frontend child plan Progress.
+- [x] 2026-09-05 17:00 — post-implementation art revision complete
+      (user-directed; Decision Log entry of the same date): painted
+      moodboard assets wired for courtyard/paving/table, panel wash
+      variant born, canon docs revised, both screens re-rendered and
+      user-checkpointed at each step. Suites green throughout.
 
 ## Decision log
 
@@ -357,7 +362,30 @@ timestamp each entry)_
   primitive hex values (an external background image cannot read page
   custom properties) with the token mapping documented in the asset
   header — the scene-paving theme-fixed precedent, noted for the
-  hardcheck's token scan.
+  hardcheck's token scan. _(Superseded the same day by the art revision
+  below — the SVG is gone.)_
+- 2026-09-05 — **Post-implementation art revision (user-directed).** The
+  user compared the shipped screens against `lums-illustrated/` (the art
+  direction itself) and rejected the scene art as not close — correctly:
+  the courtyard SVG was outlined clip art where the reference is
+  outline-free painterly flat, the paving was a harsh checker where
+  image7's ground is a calm plaid, and the benches were straight bars
+  where table-surface.md r1 always said CURVED. Resolution, approved
+  step by step: (1) paving → first a token-drawn plaid, then the
+  user-regenerated painted asset (image10 → `scene-paving.webp`);
+  (2) table + benches → first a vector redraw of image7, then the
+  user-regenerated painted asset with alpha shadows (image11 →
+  `table-top.webp`), the center/scrim/seat overlays staying
+  programmatic; (3) courtyard → first an outline-free SVG redraw, then
+  the user-regenerated painting (image9 → `scene-courtyard.webp`);
+  (4) the user's "ghost modal" idea became the `panel` **wash** variant
+  (90% paper, no blur — panel.md r2) so lobby content floats over the
+  painting with the hero table visible; headings moved inside the wash.
+  Canon revised: panel.md r2, table-surface.md r2, app-shell.md r2
+  amended, scenes.md rules updated; provenance in docs/design/README.md.
+  Root-cause note for future tasks: scene art must be drawn WITH the
+  moodboard images open — the original SVG was drawn from scenes.md's
+  one-line description alone.
 
 ## Surprises & discoveries
 

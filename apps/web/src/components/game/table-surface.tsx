@@ -1,20 +1,30 @@
 import { cn } from "@cambio/ui"
 import type * as React from "react"
 
+import tableArt from "../../assets/table-top.webp"
 import { seatArc } from "./seat-arc.js"
 
 /**
- * TableSurface — design-system/components/core/table-surface.md (r1).
+ * TableSurface — design-system/components/core/table-surface.md (r2).
  * Class: Game object.
  *
- * The top-down khoka table: round green tabletop with a green-deep rim
- * on the checkered paving (the shell's scene ground), four benches as
- * SCENERY — always four, never a constraint; 2–5 seats place radially by
- * seat order via seatArc, the viewer rotated to bottom-center (F4.1).
- * Below the `regular` breakpoint the radial arrangement compresses:
- * opponents arc along the top, the viewer's seat docks at the bottom
- * (F4.2). Ground, not HUD — it displays no derived game facts.
+ * The top-down khoka table: the moodboard's own painted asset (a
+ * regeneration of docs/design/moodboard/lums-illustrated/image7.jpg —
+ * weathered planked tabletop, umbrella hole, four CURVED benches
+ * hugging the table, cast shadows baked into the alpha; CAM-17 art
+ * revision). The art is static SCENERY — always four benches, never a
+ * constraint; the center content, the game-over scrim, and the 2–5
+ * seats stay programmatic on top, seats placed radially by seat order
+ * via seatArc with the viewer rotated to bottom-center (F4.1). Below
+ * the `regular` breakpoint the radial arrangement compresses: opponents
+ * arc along the top, the viewer's seat docks at the bottom (F4.2).
+ * Ground, not HUD — it displays no derived game facts.
+ *
+ * TABLE_DISC_PCT is the tabletop disc's measured share of the asset's
+ * width (spec-carried geometry, measured from the alpha channel): the
+ * center overlay and scrim size to the disc, not the asset.
  */
+const TABLE_DISC_PCT = "54%"
 export interface TableSurfaceProps {
   /** Seat nodes ordered by seat index (wire order). */
   seats: ReadonlyArray<React.ReactNode>
@@ -63,25 +73,25 @@ export function TableSurface({
         className,
       )}
     >
-      {/* Benches: scenery, always four, regular+ only. */}
-      <div aria-hidden className="hidden regular:block">
-        <span className="absolute top-1/6 left-1/2 h-2 w-1/3 -translate-x-1/2 rounded-full bg-(--green-deep)" />
-        <span className="absolute bottom-1/6 left-1/2 h-2 w-1/3 -translate-x-1/2 rounded-full bg-(--green-deep)" />
-        <span className="absolute top-1/2 left-1/6 h-1/3 w-2 -translate-y-1/2 rounded-full bg-(--green-deep)" />
-        <span className="absolute top-1/2 right-1/6 h-1/3 w-2 -translate-y-1/2 rounded-full bg-(--green-deep)" />
-      </div>
-
       <div className="flex flex-wrap justify-center gap-2 regular:contents">
         {opponentOrder.map(seatWrapper)}
       </div>
 
-      {/* The tabletop: rim via padded green-deep ring, float shadow. */}
-      <div className="relative w-2/3 rounded-full bg-(--green-deep) p-2 shadow-float regular:absolute regular:top-1/2 regular:left-1/2 regular:w-1/2 regular:-translate-x-1/2 regular:-translate-y-1/2">
-        <div className="flex aspect-square items-center justify-center rounded-full bg-surface-table">
+      {/* The painted table + benches (shadows baked into the asset);
+          center content and scrim overlay the tabletop disc only. */}
+      <div className="relative w-3/4 regular:absolute regular:top-1/2 regular:left-1/2 regular:-translate-x-1/2 regular:-translate-y-1/2">
+        <img src={tableArt} alt="" aria-hidden className="block h-auto w-full" />
+        <div
+          className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+          style={{ width: TABLE_DISC_PCT, aspectRatio: "1" }}
+        >
           {center}
         </div>
         {state === "game-over" ? (
-          <div className="absolute inset-0 rounded-full bg-(--green-deep)/55" />
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-(--green-deep)/55"
+            style={{ width: TABLE_DISC_PCT, aspectRatio: "1" }}
+          />
         ) : null}
       </div>
 

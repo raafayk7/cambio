@@ -4,19 +4,25 @@ import type * as React from "react"
 import { cn } from "../lib/utils.js"
 
 /**
- * Panel — design-system/components/core/panel.md (r1). Class: Static.
+ * Panel — design-system/components/core/panel.md (r2). Class: Static.
  *
  * The generic content card. Variants: default (framed), plain (ground
  * only, for grouping without a box), chrome (the suit-chrome ceremonial
- * dress — use sparingly, one per screen). Panels never nest more than two
- * deep; emphasis comes from border and type, never extra shadow.
+ * dress — use sparingly, one per screen), wash (r2: a translucent paper
+ * wash at 90% for panels sitting ON an illustrated scene ground — the
+ * scene stays faintly visible through the paper; border and shadow stay
+ * solid; NEVER backdrop-blur, which is not in this design's vocabulary.
+ * 90% is the legibility floor: helper-olive text keeps AA contrast over
+ * the scene's darkest values). Panels never nest more than two deep;
+ * emphasis comes from border and type, never extra shadow.
  */
-const panelVariants = cva("relative rounded-md bg-surface-raised p-4", {
+const panelVariants = cva("relative rounded-md p-4", {
   variants: {
     variant: {
-      default: "border-frame shadow-raised",
-      plain: "",
-      chrome: "border-frame shadow-raised",
+      default: "border-frame bg-surface-raised shadow-raised",
+      plain: "bg-surface-raised",
+      chrome: "border-frame bg-surface-raised shadow-raised",
+      wash: "border-frame bg-surface-raised/90 shadow-raised",
     },
   },
   defaultVariants: {

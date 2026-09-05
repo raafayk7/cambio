@@ -36,8 +36,11 @@ None.
 
 - r1: initial (CAM-13).
 - r2 (CAM-17): the courtyard scene ground is realized (creation-gate
-  round; the illustrated SVG lives in the ui package and follows
-  scenes.md law — flat ink, token palette, edges busy / center calm);
+  round, then a user-directed art revision: the ground is the
+  moodboard's own painted courtyard — a hi-res regeneration of
+  lums-illustrated image9, shipped as `scene-courtyard.webp` in the ui
+  package; content floats over it on `panel` wash variants so the hero
+  table stays visible);
   the shell root is the positioned ancestor for the game state's
   floating controls; safe-area padding covers the bottom inset so the
   own-hand dock clears home bars; the settings icon-button renders only

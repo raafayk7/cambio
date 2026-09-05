@@ -83,26 +83,29 @@ export function LobbyScreen() {
       </Alert>
     )
   } else if (session.data.state === "unauthenticated") {
-    // The unauthenticated state IS first use (L4 ledger).
+    // The unauthenticated state IS first use (L4 ledger). The heading
+    // lives inside the wash panel: the courtyard painting shows through
+    // the paper, and the display text never lands on the scene's dark
+    // values (panel.md r2).
     content = (
-      <div className="flex flex-col gap-5">
-        <h1 className="text-center font-display text-3xl">pull up a chair</h1>
-        <Panel>
+      <Panel variant="wash">
+        <div className="flex flex-col gap-4">
+          <h1 className="text-center font-display text-3xl">pull up a chair</h1>
           <NameForm
             onSubmit={(name) => createUser.mutate(name)}
             submitting={createUser.isPending}
             submitError={sessionErrorCopy(createUser.error)}
           />
-        </Panel>
-      </div>
+        </div>
+      </Panel>
     )
   } else {
     const name = session.data.user.name
     content = (
       <div className="flex flex-col gap-5">
-        <h1 className="font-display text-2xl">shuffle up, {name}</h1>
-        <Panel>
+        <Panel variant="wash">
           <div className="flex flex-col gap-4">
+            <h1 className="font-display text-2xl">shuffle up, {name}</h1>
             {createRoom.isError ? (
               <Alert variant="alarm">Couldn't create the room. Try again.</Alert>
             ) : null}
@@ -111,7 +114,7 @@ export function LobbyScreen() {
             </Button>
           </div>
         </Panel>
-        <Panel title="Join a room">
+        <Panel variant="wash" title="Join a room">
           <form onSubmit={submitLink} noValidate className="flex flex-col gap-4">
             <FieldScaffold
               label="Room link"

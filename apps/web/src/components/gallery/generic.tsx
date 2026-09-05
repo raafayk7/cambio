@@ -146,6 +146,13 @@ export function PanelSection() {
           The ceremonial dress.
         </Panel>
       </StateCard>
+      <StateCard label="wash (on illustrated scenes only, panel.md r2)" wide>
+        <div className="scene-courtyard flex justify-center rounded-md border-frame p-5">
+          <Panel variant="wash" className="w-2xs">
+            The painting shows through the paper.
+          </Panel>
+        </div>
+      </StateCard>
     </Section>
   )
 }

@@ -1,6 +1,6 @@
 name: table-surface
 status: draft
-version: 1
+version: 2
 extends: none
 
 The play surface — the top-down khoka table. Class: **Game object**.
@@ -42,3 +42,13 @@ None.
 ## Revisions
 
 - r1: initial, from the CAM-13 specimen board.
+- r2 (CAM-17, user-directed art revision): the table + benches render as
+  the moodboard's own painted asset (a hi-res regeneration of
+  lums-illustrated image7 with cast shadows baked into its alpha;
+  production copy `apps/web/src/assets/table-top.webp`), restoring the
+  CURVED benches this spec always specified — CAM-15's straight-bar
+  benches were drift. The paving ground likewise became the painted
+  top-down plaid (image10 regeneration). Center content, the game-over
+  scrim, and seats stay programmatic overlays; the tabletop disc
+  measures 54% of the asset width (spec-carried, measured from the
+  alpha channel).

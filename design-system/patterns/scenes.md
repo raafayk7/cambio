@@ -17,5 +17,12 @@ Rules:
   needs to notice renders in components, on tokens.
 - The dusk "khoka at night" scene is reserved for the future dark theme —
   do not use it as a light-theme variant.
-- Scene illustrations are moodboard-style flat ink with paper grain; no
-  photographs, no gradients, no depth-of-field.
+- Scene illustrations are moodboard-style painterly flat with paper
+  grain; no photographs, no depth-of-field. (CAM-17 revision: the
+  production scene grounds ARE the moodboard — hi-res painted
+  regenerations of lums-illustrated images 9/10, shipped as WebP; the
+  game-facing paving and table assets are strictly top-down so nothing
+  fights the orthographic play view.)
+- Content sitting on an illustrated scene floats on the `panel` wash
+  variant (panel.md r2) so the painting stays visible; display headings
+  move inside the wash rather than landing on the artwork.
