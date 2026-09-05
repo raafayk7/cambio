@@ -234,6 +234,19 @@ export function useGame(gameId: string) {
   const [slamBeatMessage, setSlamBeatMessage] = React.useState<string | null>(null)
   const slamBeatTimeoutRef = React.useRef<number | null>(null)
 
+  // E1: CambioCalled's ephemeral "who called" — the turn-indicator must
+  // announce the call BEFORE the refetched `Ended` view lands
+  // (turn-indicator.md ordering law: the call is announced before the
+  // score-sheet reveals). No timer clears this — the screen only consults
+  // it while `view.phase._tag !== "Ended"` (game-screen.tsx), so once the
+  // snapshot catches up, `phase.calledBy` takes over and this becomes
+  // moot rather than needing its own cleanup. `GameEnded` also sets it
+  // (belt-and-suspenders: both events carry the same id, and a client
+  // that missed `CambioCalled` — a drop/resubscribe window — still gets
+  // the announcement the instant `GameEnded` arrives, without waiting on
+  // the debounced refetch).
+  const [calledBy, setCalledBy] = React.useState<string | null>(null)
+
   React.useEffect(() => {
     return () => {
       if (peekTimeoutRef.current !== null) window.clearTimeout(peekTimeoutRef.current)
@@ -486,6 +499,16 @@ export function useGame(gameId: string) {
         setAwaitingGive(null)
         break
       }
+      // ---- E1: the call moment --------------------------------------------
+      case "CambioCalled":
+        setCalledBy(event.playerId)
+        break
+      case "GameEnded":
+        // E2's reveal is refetch-driven (ADR-0033) — this only guarantees
+        // the E1 announcement is showing even if `CambioCalled` itself was
+        // missed.
+        setCalledBy(event.calledBy)
+        break
       // ---- CH2: the reshuffle moment -------------------------------------
       case "DeckReshuffled":
         // One representative flight stands in for "the pile minus its
@@ -626,5 +649,6 @@ export function useGame(gameId: string) {
     slamReveal,
     awaitingGive,
     slamBeatMessage,
+    calledBy,
   }
 }

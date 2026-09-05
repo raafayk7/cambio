@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, waitFor } from "@testing-library/react"
 import { describe, expect, it } from "vitest"
 
 import { formatScore, ScoreSheet } from "../src/components/game/score-sheet.js"
@@ -64,5 +64,33 @@ describe("ScoreSheet", () => {
     expect(formatScore(13)).toBe("13")
     render(<ScoreSheet reveal={reveal} playerName={(id) => names[id] ?? "?"} />)
     expect(screen.getByText("−4")).toBeInTheDocument()
+  })
+
+  // r2 (CAM-18 E2): the `revealing` entrance — structural only, per
+  // ADR-0030 (jsdom asserts state/structure, never the animation itself).
+  describe("the revealing entrance (r2)", () => {
+    it("defaults to already-settled (`final`) when `revealing` is omitted — the pre-existing tests above never see a `revealing` beat", () => {
+      render(<ScoreSheet reveal={reveal} playerName={(id) => names[id] ?? "?"} />)
+      const sheet = screen.getByText("SCORES").closest("[data-state]")
+      expect(sheet).toHaveAttribute("data-state", "final")
+    })
+
+    it("mounts face-down and `revealing` when asked to dramatize the entrance, then settles to face-up and `final`", async () => {
+      render(<ScoreSheet reveal={reveal} playerName={(id) => names[id] ?? "?"} revealing />)
+      const sheet = screen.getByText("SCORES").closest("[data-state]")
+      if (sheet === null) throw new Error("score sheet root not found")
+
+      const totalCards = reveal.hands.reduce((sum, hand) => sum + hand.cards.length, 0)
+
+      expect(sheet).toHaveAttribute("data-state", "revealing")
+      // Every mini card starts face-down — nothing rank/suit is on screen
+      // yet, even though the reveal data is already known.
+      expect(sheet.querySelectorAll('[data-face="down"]')).toHaveLength(totalCards)
+      expect(sheet.querySelectorAll('[data-face="up"]')).toHaveLength(0)
+
+      await waitFor(() => expect(sheet).toHaveAttribute("data-state", "final"))
+      expect(sheet.querySelectorAll('[data-face="up"]')).toHaveLength(totalCards)
+      expect(sheet.querySelectorAll('[data-face="down"]')).toHaveLength(0)
+    })
   })
 })

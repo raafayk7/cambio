@@ -9,6 +9,7 @@ import { DrawDeck } from "../../components/game/draw-deck.js"
 import { FlightLayer } from "../../components/game/flight/flight-layer.js"
 import { Hand, type HandFace } from "../../components/game/hand.js"
 import { HeldCard } from "../../components/game/held-card.js"
+import { ScoreSheet } from "../../components/game/score-sheet.js"
 import { Seat } from "../../components/game/seat.js"
 import { SlamTimer } from "../../components/game/slam-timer.js"
 import { handArc, seatArc, type RadialPosition } from "../../components/game/table-geometry.js"
@@ -20,15 +21,17 @@ import { sessionErrorCopy } from "../../hooks/use-session.js"
 import { useGame } from "./use-game.js"
 
 /**
- * The game (table) screen (CAM-18 C1-C5 + T1-T4, SL/E scaffolded for the
- * later slam/endgame steps): paving scene, `AppShell` in its `game` chrome,
- * `TableSurface` in `in-game` state composed from the bootstrap snapshot.
- * Follows `room-screen.tsx` throughout: denial states render the no-access
- * recipe, identity resolves in place, the container owns its `AppShell`.
+ * The game (table) screen (CAM-18 C1-C5, H1/T1-T5, SL1-SL3, E1-E3): paving
+ * scene, `AppShell` in its `game` chrome, `TableSurface` composed from the
+ * bootstrap snapshot for every phase through to game-over. Follows
+ * `room-screen.tsx` throughout: denial states render the no-access recipe,
+ * identity resolves in place, the container owns its `AppShell`.
  *
  * Turn-flow/power affordances (`affordancesFor`, H1/T1-T3) drive every
- * interactive element here; `SlamWindow`/`Ended` phases render whatever
- * this milestone's minimal branches leave them (steps 13/14, out of scope).
+ * interactive element here. `Ended` (E1-E3): the turn indicator announces
+ * the call (ephemeral `CambioCalled`, then `phase.calledBy`) before the
+ * score sheet's `revealing` entrance renders as a screen-level sibling
+ * overlay above the dimmed `TableSurface` — never inside `center`.
  */
 
 // ---- no-access (C3): one honest panel, byte-identical for unknown and
@@ -105,8 +108,15 @@ function turnStatus(phase: ViewPhase, viewerId: string | undefined): TurnStatus 
 /** voice.md register: player language, sentence case for functional copy —
  * the indicator pairs with `SlamTimer` rather than replacing it
  * (turn-indicator.md), so this only names what's being matched; the "SLAM!"
- * shout itself lives on the timer in poster caps. */
-function turnStatusCopy(status: TurnStatus, activePlayerName: string): string {
+ * shout itself lives on the timer in poster caps.
+ *
+ * E1: `game-over` is the OTHER of voice.md's two poster-caps shout moments
+ * (a Cambio call, a slam) — the caller's name stays plain sentence case
+ * (turn-indicator.md's own "Nadia called Cambio" copy), but "Cambio"
+ * itself gets the same display-face treatment as the timer's "SLAM!"
+ * banner, `!` included (voice.md: "reserved for the two shout moments").
+ * Returns `ReactNode`, not `string`, only for this one case. */
+function turnStatusCopy(status: TurnStatus, activePlayerName: string): React.ReactNode {
   switch (status.state) {
     case "your-turn":
       return "Your turn"
@@ -117,7 +127,11 @@ function turnStatusCopy(status: TurnStatus, activePlayerName: string): string {
         ? "Slam window open"
         : `Slam window open — match the ${rankLabel(status.rank)}`
     case "game-over":
-      return `${activePlayerName} called Cambio`
+      return (
+        <>
+          {activePlayerName} called <span className="font-display text-shadow-poster">CAMBIO!</span>
+        </>
+      )
   }
 }
 
@@ -261,6 +275,7 @@ function GameTable({
   slamReveal,
   awaitingGive,
   slamBeatMessage,
+  calledBy,
 }: {
   view: PlayerGameView
   viewerId: string
@@ -273,6 +288,7 @@ function GameTable({
   slamReveal: ReturnType<typeof useGame>["slamReveal"]
   awaitingGive: ReturnType<typeof useGame>["awaitingGive"]
   slamBeatMessage: ReturnType<typeof useGame>["slamBeatMessage"]
+  calledBy: ReturnType<typeof useGame>["calledBy"]
 }) {
   const [tableRoot, setTableRoot] = React.useState<HTMLElement | null>(null)
   const [confirmCambioOpen, setConfirmCambioOpen] = React.useState(false)
@@ -288,7 +304,15 @@ function GameTable({
   const playerName = (id: string): string =>
     view.players.find((player) => player.id === id)?.name ?? ""
 
-  const status = turnStatus(view.phase, viewerId)
+  const ended = view.phase._tag === "Ended"
+  // E1: the ephemeral CambioCalled announcement wins ONLY until the
+  // snapshot itself catches up — the instant `view.phase` is really
+  // `Ended`, `turnStatus` reads `phase.calledBy` directly and this
+  // override stops mattering (no separate cleanup needed in the hook).
+  const status: TurnStatus =
+    calledBy !== null && !ended
+      ? { state: "game-over", activePlayerId: calledBy }
+      : turnStatus(view.phase, viewerId)
   const indicatorState = status.state === "slam-window" ? "slam-window" : status.state
   const affordances = affordancesFor(view, viewerId)
   // SL1: fully public, phase-gated (not turn-gated) — every viewer may slam
@@ -497,7 +521,10 @@ function GameTable({
           </Button>
         </div>
       ) : null}
-      {slamBeatMessage !== null ? (
+      {/* E3: slam/peek/turn ephemera are ignored once the game has ended —
+          a beat that happened to still be showing when the call landed
+          must not render on top of the score-sheet overlay below. */}
+      {!ended && slamBeatMessage !== null ? (
         <p className="font-ui text-sm text-ink-muted">{slamBeatMessage}</p>
       ) : null}
       {affordances.phase === "AwaitingDraw" && affordances.holder ? (
@@ -519,17 +546,17 @@ function GameTable({
           ) : null}
         </div>
       ) : null}
-      {commandError !== null ? (
+      {!ended && commandError !== null ? (
         <p role="alert" className="font-ui text-sm text-accent-alarm-deep">
           {commandError}
         </p>
       ) : null}
-      {fizzleMessage !== null ? (
+      {!ended && fizzleMessage !== null ? (
         <p className="font-ui text-sm text-ink-muted">{fizzleMessage}</p>
       ) : null}
       <div ref={setTableRoot} className="relative w-full">
         <TableSurface
-          state="in-game"
+          state={ended ? "game-over" : "in-game"}
           viewerSeatIndex={viewerSeatIndex}
           seats={seatNodes}
           center={
@@ -574,6 +601,30 @@ function GameTable({
           }
         />
         <FlightLayer root={tableRoot} active={flights.active} onSettle={flights.settle} />
+        {ended && view.reveal !== undefined ? (
+          // E3, hazard 4 (decided): the score sheet is a SCREEN-LEVEL
+          // SIBLING OVERLAY above `TableSurface`, never inside `center` —
+          // `center`'s content stays beneath the game-over scrim as the
+          // dimmed tabletop (table-surface.md: "table is ground, not
+          // HUD"). Placed after `FlightLayer` in DOM order (both are
+          // z-index:auto, sharing this `relative` div's stacking context)
+          // so it paints above the whole table without needing to fight
+          // TableSurface's own internal `regular:z-10` seat layer.
+          <div className="absolute inset-0 z-30 flex items-center justify-center overflow-y-auto p-4">
+            <div className="flex max-h-full flex-col items-center gap-4">
+              <ScoreSheet
+                reveal={view.reveal}
+                playerName={playerName}
+                revealing
+                className="max-h-full overflow-y-auto"
+              />
+              {/* Exactly one exit (E3, v0 decision): back to the lobby. */}
+              <Button asChild variant="secondary">
+                <RouterLink to="/">Back to the lobby</RouterLink>
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
       <Modal
         open={confirmCambioOpen}
@@ -624,6 +675,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
     slamReveal,
     awaitingGive,
     slamBeatMessage,
+    calledBy,
   } = useGame(gameId)
 
   let content: React.ReactNode
@@ -682,6 +734,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
         slamReveal={slamReveal}
         awaitingGive={awaitingGive}
         slamBeatMessage={slamBeatMessage}
+        calledBy={calledBy}
       />
     )
   } else {

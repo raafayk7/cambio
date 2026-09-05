@@ -1145,3 +1145,197 @@ describe("reshuffle choreography (CH2)", () => {
     expect(screen.getByText("K").closest('[data-face="up"]')).not.toBeNull()
   })
 })
+
+describe("the call moment (E1)", () => {
+  it("flips the turn indicator to the CAMBIO! call copy the instant CambioCalled arrives — before any reveal renders", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+
+    act(() => {
+      room.emit("CambioCalled", { _tag: "CambioCalled", playerId: ME.userId })
+    })
+
+    // Ephemeral (use-game.ts `calledBy`) — applied synchronously, before
+    // the debounced refetch (still pending) could possibly have landed a
+    // real `Ended` view with `reveal`.
+    // `getByRole("status")` alone is ambiguous — the AppShell connection
+    // dot (S1/S2) is also `role="status"` — so this scopes to the one
+    // TurnIndicator carries `data-state` on (turn-indicator.tsx).
+    const indicator = document.querySelector('[role="status"][data-state]')
+    expect(indicator).toHaveAttribute("data-state", "game-over")
+    expect(indicator).toHaveTextContent(`${ME.name} called CAMBIO!`)
+    expect(screen.queryByText("SCORES")).not.toBeInTheDocument()
+    // The table itself hasn't dimmed yet — only the indicator is in the
+    // game-over state; the still-`AwaitingDraw` snapshot renders normally.
+    expect(document.querySelectorAll('[data-state="game-over"]')).toHaveLength(1)
+  })
+
+  it("prefers the ephemeral announcement's own player over a stale turn-active seat ring until the snapshot catches up", async () => {
+    // FRIEND is the active player in the bootstrap snapshot (turn-gated
+    // affordances aside, this only asserts the copy/seat naming) — the
+    // CambioCalled announcement must still name the caller (ME), not
+    // whoever `view.phase` currently says is acting.
+    const fake = setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+          ],
+          phase: { _tag: "AwaitingDraw", playerId: FRIEND.id },
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+
+    act(() => {
+      room.emit("CambioCalled", { _tag: "CambioCalled", playerId: ME.userId })
+    })
+
+    expect(document.querySelector('[role="status"][data-state]')).toHaveTextContent(
+      `${ME.name} called CAMBIO!`,
+    )
+  })
+})
+
+describe("the reveal (E2)", () => {
+  const THIRD = "33333333-3333-4333-8333-333333333333"
+  const THIRD_NAME = "Sam"
+
+  // A. Rules-consistent totals (cambio-rules: black king −1): ME and
+  // FRIEND tie for lowest at −1; THIRD's zero-card hand scores 0 — higher
+  // than the tie, so it must NOT be styled as winning despite having the
+  // fewest cards. ME is also the caller — the reveal marks no distinct
+  // "caller" treatment beyond the shared winner styling.
+  const endedReveal = {
+    hands: [
+      { playerId: ME.userId, cards: [{ slotIndex: 0, card: "KS" }] },
+      { playerId: FRIEND.id, cards: [{ slotIndex: 0, card: "KC" }] },
+      { playerId: THIRD, cards: [] },
+    ],
+    scores: [
+      { playerId: ME.userId, total: -1 },
+      { playerId: FRIEND.id, total: -1 },
+      { playerId: THIRD, total: 0 },
+    ],
+    winners: [ME.userId, FRIEND.id],
+  }
+
+  const endedView = () =>
+    viewResponse({
+      players: [
+        { id: ME.userId, name: ME.name, hand: [] },
+        { id: FRIEND.id, name: FRIEND.name, hand: [] },
+        { id: THIRD, name: THIRD_NAME, hand: [] },
+      ],
+      phase: { _tag: "Ended", calledBy: ME.userId },
+      reveal: endedReveal,
+      version: 9,
+    })
+
+  it("renders the settled score sheet: sorted ascending, plural tie winners, true-minus totals, caller unmarked, zero-card hand not styled as winning", async () => {
+    setupFake()
+    stubApi({ "GET /me": json(200, ME), [GET_VIEW]: json(200, endedView()) })
+    renderGameApp(GAME_ID)
+
+    const heading = await screen.findByText("SCORES")
+    const sheet = heading.closest("[data-state]")
+    if (sheet === null) throw new Error("score sheet root not found")
+    await waitFor(() => expect(sheet).toHaveAttribute("data-state", "final"))
+
+    const rows = within(sheet as HTMLElement).getAllByRole("listitem")
+    expect(rows).toHaveLength(3)
+    // Ascending by total, never by card count: the two −1 ties come
+    // before the zero-card hand's 0, even though it holds fewer cards.
+    expect(rows[2]).toHaveTextContent(THIRD_NAME)
+    expect(rows[2]).toHaveAttribute("data-winner", "false")
+
+    const winnerRows = rows.filter((row) => row.getAttribute("data-winner") === "true")
+    expect(winnerRows).toHaveLength(2)
+    const winnerNames = winnerRows.map((row) => row.textContent ?? "")
+    expect(winnerNames.some((text) => text.includes(ME.name))).toBe(true)
+    expect(winnerNames.some((text) => text.includes(FRIEND.name))).toBe(true)
+
+    // True minus (voice.md), never a hyphen — both tied winners show it.
+    expect(within(sheet as HTMLElement).getAllByText("−1")).toHaveLength(2)
+
+    // The caller (ME) gets no marker beyond the winner styling FRIEND also
+    // gets — same row treatment, nothing caller-specific rendered anywhere
+    // in the sheet (ScoreSheet's props don't even carry `calledBy`).
+    const meRow = rows.find((row) => row.textContent?.includes(ME.name))
+    const friendRow = rows.find((row) => row.textContent?.includes(FRIEND.name))
+    expect(meRow?.className).toBe(friendRow?.className)
+  })
+
+  it("dims the table under the game-over state while the score sheet is showing", async () => {
+    setupFake()
+    stubApi({ "GET /me": json(200, ME), [GET_VIEW]: json(200, endedView()) })
+    renderGameApp(GAME_ID)
+
+    await screen.findByText("SCORES")
+    const tableRoot = document.querySelector("[data-seat-index]")?.closest("[data-state]")
+    expect(tableRoot).toHaveAttribute("data-state", "game-over")
+  })
+
+  it("a fresh bootstrap straight into an Ended view renders the score sheet, not an error — the revealing entrance is structurally present", async () => {
+    setupFake()
+    stubApi({ "GET /me": json(200, ME), [GET_VIEW]: json(200, endedView()) })
+    renderGameApp(GAME_ID)
+
+    // No error, no stuck skeleton — the score sheet itself is the first
+    // thing this fresh mount settles on.
+    const heading = await screen.findByText("SCORES")
+    expect(screen.queryByTestId("game-skeleton")).not.toBeInTheDocument()
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+
+    const sheet = heading.closest("[data-state]")
+    if (sheet === null) throw new Error("score sheet root not found")
+    // Mounts `revealing`: every mini card starts face-down.
+    expect(sheet).toHaveAttribute("data-state", "revealing")
+    expect(within(sheet as HTMLElement).queryAllByText("K")).toHaveLength(0)
+
+    // Flips every card up in the same beat and settles — never again.
+    await waitFor(() => expect(sheet).toHaveAttribute("data-state", "final"))
+    expect(within(sheet as HTMLElement).getAllByText("K")).toHaveLength(2)
+  })
+})
+
+describe("game-over composition and exit (E3)", () => {
+  const endedView = () =>
+    viewResponse({
+      players: [{ id: ME.userId, name: ME.name, hand: [] }],
+      phase: { _tag: "Ended", calledBy: ME.userId },
+      reveal: {
+        hands: [{ playerId: ME.userId, cards: [] }],
+        scores: [{ playerId: ME.userId, total: 0 }],
+        winners: [ME.userId],
+      },
+      version: 9,
+    })
+
+  it("offers exactly one exit — back to the lobby — which navigates to /", async () => {
+    setupFake()
+    const user = userEvent.setup()
+    stubApi({ "GET /me": json(200, ME), [GET_VIEW]: json(200, endedView()) })
+    const { router } = renderGameApp(GAME_ID)
+
+    await screen.findByText("SCORES")
+    const exitLinks = screen.getAllByRole("link", { name: "Back to the lobby" })
+    expect(exitLinks).toHaveLength(1)
+
+    await user.click(exitLinks[0]!)
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/")
+    })
+    expect(screen.getByTestId("index-route-stub")).toBeInTheDocument()
+  })
+})
