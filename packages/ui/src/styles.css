@@ -57,6 +57,9 @@
   --radius-card-ratio: 0.06; /* radius.card: 6% of card width */
   --duration-snap: 140ms;
   --duration-track: 340ms;
+  /* tokens.md §Motion r2 (CAM-18 G3): a reveal-hold, not an interaction
+   * duration — how long a peeked card holds face-up before flipping back. */
+  --duration-peek: 2800ms;
 }
 
 @theme {
@@ -251,12 +254,19 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The two gameplay durations (transition-duration form). */
+/* The gameplay durations (transition-duration form). duration-peek is a
+ * reveal-hold rather than an interaction duration (tokens.md §Motion r2) —
+ * consumers mostly read --duration-peek directly for a JS-driven timer
+ * (the peek reveal itself), but the utility exists for any CSS transition
+ * that shares the same hold, matching the snap/track precedent. */
 @utility duration-snap {
   transition-duration: var(--duration-snap);
 }
 @utility duration-track {
   transition-duration: var(--duration-track);
+}
+@utility duration-peek {
+  transition-duration: var(--duration-peek);
 }
 
 /* Interactive grounds with the one-step hover darken (button.md hover:

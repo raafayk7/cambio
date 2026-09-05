@@ -4,6 +4,7 @@ import * as React from "react"
 
 import { DiscardPile } from "../game/discard-pile.js"
 import { DrawDeck } from "../game/draw-deck.js"
+import { FlightLayer, useFlights } from "../game/flight/flight-layer.js"
 import { Hand } from "../game/hand.js"
 import { PlayingCard } from "../game/playing-card.js"
 import { ScoreSheet } from "../game/score-sheet.js"
@@ -327,6 +328,54 @@ export function SlamTimerSection() {
   )
 }
 
+export function FlightDemoSection() {
+  const [root, setRoot] = React.useState<HTMLElement | null>(null)
+  const flights = useFlights()
+  const nextFlightId = React.useRef(0)
+
+  const fireFlight = (entitled: boolean) => {
+    nextFlightId.current += 1
+    flights.enqueue({
+      id: `demo-${nextFlightId.current}`,
+      face: entitled ? { face: "up", card: "AS" } : { face: "down" },
+      originId: "deck",
+      destinationId: "discard",
+    })
+  }
+
+  return (
+    <Section
+      title="flight layer (deck → discard)"
+      note="The FLIP mechanism (flight/flip.ts + flight-layer.tsx, ADR-0034): two data-flight-anchor points, one queued flight, animated on duration.track/ease.snap. Under prefers-reduced-motion the card never moves — both anchors get the accent.focus cross-fade highlight instead, for the same duration."
+    >
+      <StateCard label="live demo" wide>
+        <div className="flex flex-col items-start gap-3">
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => fireFlight(false)}>
+              Fly a face-down card
+            </Button>
+            <Button variant="secondary" onClick={() => fireFlight(true)}>
+              Fly a face-up card (A♠)
+            </Button>
+          </div>
+          <div
+            ref={setRoot}
+            className="scene-paving relative flex w-full max-w-md items-center justify-between rounded-md p-6"
+          >
+            <div data-flight-anchor="deck">
+              <DrawDeck count={17} />
+            </div>
+            <div data-flight-anchor="discard">
+              <DiscardPile top="9D" underCount={1} />
+            </div>
+            <FlightLayer root={root} active={flights.active} onSettle={flights.settle} />
+          </div>
+        </div>
+      </StateCard>
+    </Section>
+  )
+}
+
 export function TurnIndicatorSection() {
   return (
     <Section title="turn-indicator" note="The single textual source of phase truth.">
@@ -373,6 +422,7 @@ export function GameSections() {
       <DeckAndDiscardSection />
       <SeatSection />
       <TableSurfaceSection />
+      <FlightDemoSection />
       <SlamTimerSection />
       <TurnIndicatorSection />
       <ScoreSheetSection />
