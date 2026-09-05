@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react"
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -17,14 +17,42 @@ import {
 } from "./support/harness.js"
 
 /**
- * Game container (CAM-18 C1-C5, this task's steps 5/8/9) — memory router,
- * mocked fetch, injected fake realtime client (jsdom never opens sockets,
- * ADR-0030). Follows room-screen.test.tsx's driving patterns throughout;
- * `renderGameApp` mounts the real `GameScreen`, distinct from `renderApp`'s
- * `/game/$gameId` stub the room/lobby suites still depend on.
+ * Game container (CAM-18 C1-C5 + H1/T1-T5, this task's steps 5/8/9 and
+ * 10-12) — memory router, mocked fetch, injected fake realtime client
+ * (jsdom never opens sockets, ADR-0030). Follows room-screen.test.tsx's
+ * driving patterns throughout; `renderGameApp` mounts the real
+ * `GameScreen`, distinct from `renderApp`'s `/game/$gameId` stub the
+ * room/lobby suites still depend on.
+ *
+ * Command-body assertions read `fetchMock.mock.calls` directly rather than
+ * awaiting the mutation's round trip: `mutate()` invokes `fetch` (and so
+ * the mock) synchronously, before any `await` suspends — so the sent
+ * command is already recorded the instant the click handler returns, with
+ * no `waitFor` (and no fake-timer/polling interaction) needed.
  */
 
 const GET_VIEW = `GET /games/${GAME_ID}/view`
+const POST_COMMANDS = `POST /games/${GAME_ID}/commands`
+
+/** The exact command body(ies) POSTed so far, decoded from the fetch mock's
+ * recorded call arguments. */
+function postedCommands(fetchMock: ReturnType<typeof stubApi>["fetchMock"]) {
+  return fetchMock.mock.calls
+    .filter(([input]) => new URL(String(input)).pathname === `/games/${GAME_ID}/commands`)
+    .map(([, init]) => JSON.parse(String(init?.body)))
+}
+
+/** A slot's clickable button, found by its stable flight anchor
+ * (`slot:<playerId>:<slotIndex>`) — the only reliable way to disambiguate
+ * two hands that can render the same "Slot N" label at once (e.g. the
+ * Queen's any-occupied-slot targeting spans every seat). */
+function slotButton(playerId: string, slotIndex: number): HTMLElement {
+  const button = document.querySelector<HTMLButtonElement>(
+    `[data-flight-anchor="slot:${playerId}:${slotIndex}"] button`,
+  )
+  if (button === null) throw new Error(`no clickable button at slot:${playerId}:${slotIndex}`)
+  return button
+}
 
 // The screen mounts FlightLayer (root plan step 8), which reads
 // prefers-reduced-motion via matchMedia — jsdom doesn't implement it
@@ -323,5 +351,385 @@ describe("hidden information (C5, structural sweep)", () => {
     await channelsReady(fake)
 
     expect(new Set(calls)).toEqual(new Set(["GET /me", GET_VIEW]))
+  })
+})
+
+describe("turn flow — AwaitingDraw (H1/T1)", () => {
+  it("Call Cambio opens the confirm modal and sends CallCambio only after the explicit confirm", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    const { handlers, fetchMock } = gameBootstrap()
+    handlers[POST_COMMANDS] = json(200, twoPlayerView)
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    await user.click(screen.getByRole("button", { name: "Call Cambio" }))
+    const dialog = screen.getByRole("dialog", { hidden: true })
+    expect(within(dialog).getByText("Call Cambio — ends the game")).toBeInTheDocument()
+    // Opening the confirm never sends the command by itself.
+    expect(postedCommands(fetchMock)).toEqual([])
+
+    await user.click(within(dialog).getByRole("button", { name: "Call Cambio" }))
+    expect(postedCommands(fetchMock)).toEqual([{ _tag: "CallCambio" }])
+  })
+
+  it("Take discard and Draw send their commands directly from the discard pile and the deck (T1)", async () => {
+    const fake = setupFake()
+    const { handlers, fetchMock } = gameBootstrap()
+    handlers[POST_COMMANDS] = json(200, twoPlayerView)
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(screen.getByRole("button", { name: "Take the top discard" }))
+    fireEvent.click(screen.getByRole("button", { name: "Draw a card" }))
+
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([{ _tag: "TakeDiscard" }, { _tag: "DrawFromDeck" }])
+    })
+  })
+
+  it("Take discard never renders when the top of the discard is a power card (H1)", async () => {
+    setupFake()
+    gameBootstrap()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+          ],
+          discard: ["7H"],
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(screen.queryByRole("button", { name: "Take the top discard" })).not.toBeInTheDocument()
+  })
+
+  it("non-holder gets no Call Cambio affordance and inert hands", async () => {
+    setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+          ],
+          phase: { _tag: "AwaitingDraw", playerId: FRIEND.id },
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(screen.queryByRole("button", { name: "Call Cambio" })).not.toBeInTheDocument()
+    expect(document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"] button`)).toBeNull()
+  })
+})
+
+describe("turn flow — command failures never break the table (T5)", () => {
+  it("a 422 surfaces inline failure copy and refetches — never a toast", async () => {
+    const fake = setupFake()
+    const { handlers, calls } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+    const getsBefore = calls.filter((call) => call === GET_VIEW).length
+
+    handlers[POST_COMMANDS] = json(422, errorBody("NotYourTurn", "illegal move"))
+    fireEvent.click(screen.getByRole("button", { name: "Draw a card" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "It's not your turn — the table has been refreshed.",
+    )
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBeGreaterThan(getsBefore)
+    })
+    // The table is intact — the failure is the one inline paragraph above,
+    // never a `role="status"` toast (the connection dot and the turn
+    // indicator are the app's only other `status` regions; no new one
+    // appears alongside the failure copy).
+    expect(screen.getByText(ME.name)).toBeInTheDocument()
+    expect(screen.getByText(FRIEND.name)).toBeInTheDocument()
+    expect(screen.getAllByRole("status")).toHaveLength(2)
+  })
+})
+
+describe("HoldingCard (T2)", () => {
+  const holdingView = (
+    holderId: string,
+    source: "deck" | "discard",
+    card: string,
+    myHand: ReadonlyArray<number> = [0, 1, 2, 3],
+  ) =>
+    viewResponse({
+      players: [
+        { id: ME.userId, name: ME.name, hand: myHand },
+        { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+      ],
+      deckCount: 37,
+      discard: ["KH"],
+      phase: { _tag: "HoldingCard", playerId: holderId, source, card },
+    })
+
+  it("holder sees the held card and swaps it into an own occupied slot", async () => {
+    const fake = setupFake()
+    const { handlers, fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, holdingView(ME.userId, "deck", "3S")),
+    })
+    handlers[POST_COMMANDS] = json(200, twoPlayerView)
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    expect(screen.getByText("You drew")).toBeInTheDocument()
+
+    fireEvent.click(slotButton(ME.userId, 0))
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([{ _tag: "SwapHeld", slotIndex: 0 }])
+    })
+  })
+
+  it("a holder's discard-source take never offers a discard-back affordance (rule §1(b)) but swap still works", async () => {
+    const fake = setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, holdingView(ME.userId, "discard", "3S")),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    expect(screen.getByText("You drew")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Discard" })).not.toBeInTheDocument()
+    expect(
+      document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"] button`),
+    ).not.toBeNull()
+  })
+
+  it("a discard-source hold is public — a non-holder sees the same value (T2 entitlement)", async () => {
+    const fake = setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, holdingView(FRIEND.id, "discard", "3S")),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    expect(screen.getByText("Nadia is holding")).toBeInTheDocument()
+    // The 3♠ came off the public discard — entitlement is structural, so
+    // its rank renders even though ME never held it.
+    expect(screen.getByText("3")).toBeInTheDocument()
+  })
+
+  it("keep is offered only when the holder's own hand is empty", async () => {
+    const fake = setupFake()
+    const { handlers, fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, holdingView(ME.userId, "deck", "3S", [])),
+    })
+    handlers[POST_COMMANDS] = json(200, twoPlayerView)
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    expect(document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"] button`)).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Keep" }))
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([{ _tag: "KeepHeld" }])
+    })
+  })
+})
+
+describe("powers + peeks (T3/T4)", () => {
+  const resolvingPowerView = (card: string) =>
+    viewResponse({
+      players: [
+        { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+        { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+      ],
+      phase: { _tag: "ResolvingPower", playerId: ME.userId, card },
+    })
+
+  it("9/10 target one opponent occupied slot with PowerPeek", async () => {
+    const fake = setupFake()
+    const { handlers, fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, resolvingPowerView("9H")),
+    })
+    handlers[POST_COMMANDS] = json(200, twoPlayerView)
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    // Own slots are not eligible for a 9/10 peek.
+    expect(document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"] button`)).toBeNull()
+
+    fireEvent.click(slotButton(FRIEND.id, 0))
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([
+        { _tag: "PowerPeek", target: { playerId: FRIEND.id, slotIndex: 0 } },
+      ])
+    })
+  })
+
+  it("J requires two distinct occupied slots before sending PowerSwap; a repeat click deselects", async () => {
+    const fake = setupFake()
+    const { handlers, fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, resolvingPowerView("JH")),
+    })
+    handlers[POST_COMMANDS] = json(200, twoPlayerView)
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(slotButton(ME.userId, 0))
+    expect(postedCommands(fetchMock)).toEqual([])
+
+    // A repeat click on the same slot deselects it rather than sending an
+    // invalid self-swap.
+    fireEvent.click(slotButton(ME.userId, 0))
+    expect(postedCommands(fetchMock)).toEqual([])
+
+    fireEvent.click(slotButton(ME.userId, 0))
+    fireEvent.click(slotButton(FRIEND.id, 0))
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([
+        {
+          _tag: "PowerSwap",
+          first: { playerId: ME.userId, slotIndex: 0 },
+          second: { playerId: FRIEND.id, slotIndex: 0 },
+        },
+      ])
+    })
+  })
+
+  it("the Queen's two-step sends PowerPeek, then (once the phase moves on) PowerSwap for two distinct slots", async () => {
+    const fake = setupFake()
+    const queenSwapView = viewResponse({
+      players: [
+        { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+        { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+      ],
+      phase: { _tag: "ResolvingQueenSwap", playerId: ME.userId },
+      version: 4,
+    })
+    const { handlers, fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, resolvingPowerView("QH")),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    handlers[POST_COMMANDS] = json(200, { view: queenSwapView.view, version: 4 })
+    // The Queen's first pick can be any occupied slot, own included.
+    fireEvent.click(slotButton(ME.userId, 0))
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([
+        { _tag: "PowerPeek", target: { playerId: ME.userId, slotIndex: 0 } },
+      ])
+    })
+
+    await waitFor(() => {
+      expect(
+        document.querySelector(`[data-flight-anchor="slot:${FRIEND.id}:1"] button`),
+      ).not.toBeNull()
+    })
+
+    fireEvent.click(slotButton(FRIEND.id, 0))
+    fireEvent.click(slotButton(FRIEND.id, 1))
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([
+        { _tag: "PowerPeek", target: { playerId: ME.userId, slotIndex: 0 } },
+        {
+          _tag: "PowerSwap",
+          first: { playerId: FRIEND.id, slotIndex: 0 },
+          second: { playerId: FRIEND.id, slotIndex: 1 },
+        },
+      ])
+    })
+  })
+
+  describe("the private peek reveal (T4, memory fidelity)", () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it("reveals the peeked card, then clears after the peek duration and never re-renders", async () => {
+      const fake = setupFake()
+      gameBootstrap()
+      renderGameApp(GAME_ID)
+      await screen.findByText(ME.name)
+      const { player } = await channelsReady(fake)
+
+      // Fake timers only start now — channelsReady above needs real ones to
+      // poll for the fake realtime client's subscription.
+      vi.useFakeTimers()
+
+      act(() => {
+        player.emit("PrivateCardPeeked", {
+          _tag: "PrivateCardPeeked",
+          target: { playerId: ME.userId, slotIndex: 0 },
+          card: "7H",
+        })
+      })
+      expect(screen.getByText("7")).toBeInTheDocument()
+
+      act(() => {
+        vi.advanceTimersByTime(2800)
+      })
+      expect(screen.queryByText("7")).not.toBeInTheDocument()
+      expect(document.querySelectorAll('[data-face="peeking"]')).toHaveLength(0)
+    })
+
+    it("the Queen's swap-picking stays disabled while the reveal is showing, then enables once it clears", async () => {
+      const fake = setupFake()
+      stubApi({
+        "GET /me": json(200, ME),
+        [GET_VIEW]: json(
+          200,
+          viewResponse({
+            players: [
+              { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+              { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+            ],
+            phase: { _tag: "ResolvingQueenSwap", playerId: ME.userId },
+          }),
+        ),
+      })
+      renderGameApp(GAME_ID)
+      await screen.findByText(ME.name)
+      const { player } = await channelsReady(fake)
+
+      vi.useFakeTimers()
+
+      act(() => {
+        player.emit("PrivateCardPeeked", {
+          _tag: "PrivateCardPeeked",
+          target: { playerId: FRIEND.id, slotIndex: 0 },
+          card: "9H",
+        })
+      })
+      expect(document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"] button`)).toBeNull()
+
+      act(() => {
+        vi.advanceTimersByTime(2800)
+      })
+      expect(
+        document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"] button`),
+      ).not.toBeNull()
+    })
   })
 })

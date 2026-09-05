@@ -6,6 +6,7 @@ import { DiscardPile } from "../game/discard-pile.js"
 import { DrawDeck } from "../game/draw-deck.js"
 import { FlightLayer, useFlights } from "../game/flight/flight-layer.js"
 import { Hand } from "../game/hand.js"
+import { HeldCard } from "../game/held-card.js"
 import { PlayingCard } from "../game/playing-card.js"
 import { ScoreSheet } from "../game/score-sheet.js"
 import { Seat } from "../game/seat.js"
@@ -133,33 +134,34 @@ export function HandSection() {
     <Section title="hand" note="Slot grids in rows of 2 — holes stay holes; indices never reflow.">
       <StateCard label="populated (own, 2×2)">
         <TableGround>
-          <Hand variant="own" slots={[0, 1, 2, 3]} />
+          <Hand variant="own" playerId={PLAYER_C} slots={[0, 1, 2, 3]} />
         </TableGround>
       </StateCard>
       <StateCard label="opponent (smaller, same anatomy)">
         <TableGround>
-          <Hand variant="opponent" slots={[0, 1, 2, 3]} />
+          <Hand variant="opponent" playerId={PLAYER_A} slots={[0, 1, 2, 3]} />
         </TableGround>
       </StateCard>
       <StateCard label="holes stay holes (slots 0, 2, 5)">
         <TableGround>
-          <Hand variant="opponent" slots={[0, 2, 5]} />
+          <Hand variant="opponent" playerId={PLAYER_A} slots={[0, 2, 5]} />
         </TableGround>
       </StateCard>
       <StateCard label="empty (still in the game)">
         <TableGround>
-          <Hand variant="opponent" slots={[]} />
+          <Hand variant="opponent" playerId={PLAYER_A} slots={[]} />
         </TableGround>
       </StateCard>
       <StateCard label="awaiting-give (slot 1)">
         <TableGround>
-          <Hand variant="opponent" slots={[0, 2, 3]} awaitingGiveSlot={1} />
+          <Hand variant="opponent" playerId={PLAYER_A} slots={[0, 2, 3]} awaitingGiveSlot={1} />
         </TableGround>
       </StateCard>
       <StateCard label="slam window (backs pulse; entitled face excluded)">
         <TableGround>
           <Hand
             variant="own"
+            playerId={PLAYER_C}
             slots={[0, 1, 2, 3]}
             slamWindow
             faces={[{ slotIndex: 2, card: "8H" }]}
@@ -168,17 +170,50 @@ export function HandSection() {
       </StateCard>
       <StateCard label="growing (penalty arrives in-flight, slot 4)">
         <TableGround>
-          <Hand variant="own" slots={[0, 1, 2, 3]} inFlightSlot={4} />
+          <Hand variant="own" playerId={PLAYER_C} slots={[0, 1, 2, 3]} inFlightSlot={4} />
         </TableGround>
       </StateCard>
       <StateCard label="shrinking (slammed card leaves face-up, slot 1)">
         <TableGround>
-          <Hand variant="own" slots={[0, 2, 3]} leaving={{ slotIndex: 1, card: "9H" }} />
+          <Hand
+            variant="own"
+            playerId={PLAYER_C}
+            slots={[0, 2, 3]}
+            leaving={{ slotIndex: 1, card: "9H" }}
+          />
         </TableGround>
       </StateCard>
       <StateCard label="inert (no hover affordance — not your turn)">
         <TableGround>
-          <Hand variant="own" slots={[0, 1, 2, 3]} inert onSlotClick={() => {}} />
+          <Hand
+            variant="own"
+            playerId={PLAYER_C}
+            slots={[0, 1, 2, 3]}
+            inert
+            onSlotClick={() => {}}
+          />
+        </TableGround>
+      </StateCard>
+      <StateCard label="targeting (CAM-18 T3 — slot 0 already picked for a J/Q swap)">
+        <TableGround>
+          <Hand
+            variant="own"
+            playerId={PLAYER_C}
+            slots={[0, 1, 2, 3]}
+            selectedSlots={[0]}
+            onSlotClick={() => {}}
+          />
+        </TableGround>
+      </StateCard>
+      <StateCard label="give-target (CAM-18 step 13 — empty slots become clickable too)">
+        <TableGround>
+          <Hand
+            variant="opponent"
+            playerId={PLAYER_A}
+            slots={[0, 2, 3]}
+            emptySlotsClickable
+            onSlotClick={() => {}}
+          />
         </TableGround>
       </StateCard>
     </Section>
@@ -203,6 +238,16 @@ export function DeckAndDiscardSection() {
           <DrawDeck count={0} />
         </TableGround>
       </StateCard>
+      <StateCard label="deck clickable (CAM-18 T1 — the draw affordance)">
+        <TableGround>
+          <DrawDeck count={32} onClick={() => {}} />
+        </TableGround>
+      </StateCard>
+      <StateCard label="deck draw (CAM-18 CH1 — the top is mid-flight)">
+        <TableGround>
+          <DrawDeck count={32} state="draw" />
+        </TableGround>
+      </StateCard>
       <StateCard label="discard populated (thrown angles)">
         <TableGround>
           <DiscardPile top="9D" underCount={2} />
@@ -216,6 +261,41 @@ export function DeckAndDiscardSection() {
       <StateCard label="discard slam-target">
         <TableGround>
           <DiscardPile top="9D" underCount={1} slamTarget />
+        </TableGround>
+      </StateCard>
+      <StateCard label="discard clickable (CAM-18 T1 — the take affordance)">
+        <TableGround>
+          <DiscardPile top="9D" underCount={1} onClick={() => {}} />
+        </TableGround>
+      </StateCard>
+      <StateCard label="discard receiving (CAM-18 CH1 — a card is settling in)">
+        <TableGround>
+          <DiscardPile top="9D" underCount={1} receiving />
+        </TableGround>
+      </StateCard>
+    </Section>
+  )
+}
+
+export function HeldCardSection() {
+  return (
+    <Section
+      title="held-card"
+      note="The one spot a drawn or taken card sits while its holder decides (CAM-18 T2)."
+    >
+      <StateCard label="entitled (you drew it)">
+        <TableGround>
+          <HeldCard card="7H" label="You drew" />
+        </TableGround>
+      </StateCard>
+      <StateCard label="unentitled (deck source — a back, structurally)">
+        <TableGround>
+          <HeldCard label="Nadia is holding" />
+        </TableGround>
+      </StateCard>
+      <StateCard label="public (discard source — everyone sees it)">
+        <TableGround>
+          <HeldCard card="9D" label="Nadia is holding" />
         </TableGround>
       </StateCard>
     </Section>
@@ -362,12 +442,9 @@ export function FlightDemoSection() {
             ref={setRoot}
             className="scene-paving relative flex w-full max-w-md items-center justify-between rounded-md p-6"
           >
-            <div data-flight-anchor="deck">
-              <DrawDeck count={17} />
-            </div>
-            <div data-flight-anchor="discard">
-              <DiscardPile top="9D" underCount={1} />
-            </div>
+            {/* DrawDeck/DiscardPile self-anchor (CAM-18 T1/T2 r2) — no wrapping div needed. */}
+            <DrawDeck count={17} />
+            <DiscardPile top="9D" underCount={1} />
             <FlightLayer root={root} active={flights.active} onSettle={flights.settle} />
           </div>
         </div>
@@ -420,6 +497,7 @@ export function GameSections() {
       <PlayingCardSection />
       <HandSection />
       <DeckAndDiscardSection />
+      <HeldCardSection />
       <SeatSection />
       <TableSurfaceSection />
       <FlightDemoSection />

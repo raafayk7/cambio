@@ -14,12 +14,14 @@
 export const FLIGHT_ANCHOR_ATTRIBUTE = "data-flight-anchor"
 
 /**
- * The anchor id vocabulary: the deck, the discard pile, and one id per
- * occupied hand slot. Slot ids are built from the wire's own identifiers
- * (player id + slot index) — never a generated key — so the same slot
- * resolves to the same anchor id across re-renders and across snapshots.
+ * The anchor id vocabulary: the deck, the discard pile, the held-card
+ * spot (CAM-18 T2 — the one place a drawn/taken card sits while it's being
+ * decided), and one id per occupied hand slot. Slot ids are built from the
+ * wire's own identifiers (player id + slot index) — never a generated key —
+ * so the same slot resolves to the same anchor id across re-renders and
+ * across snapshots.
  */
-export type AnchorId = "deck" | "discard" | `slot:${string}:${number}`
+export type AnchorId = "deck" | "discard" | "held" | `slot:${string}:${number}`
 
 /** The per-slot anchor id. */
 export function slotAnchorId(playerId: string, slotIndex: number): AnchorId {

@@ -4,13 +4,18 @@ import {
   decodeViewResponse,
   decodeGameReply,
   encodeWireCommand,
+  type CardSlug,
   type GameReply,
+  type PlayerGameEvent,
+  type RoomGameEvent,
+  type SlotRef,
   type ViewResponse,
   type WireCommand,
 } from "@cambio/contracts"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import * as React from "react"
 
+import { slotAnchorId } from "../../components/game/flight/anchors.js"
 import { useFlights } from "../../components/game/flight/flight-layer.js"
 import { useSession } from "../../hooks/use-session.js"
 import { ApiError, apiRequest } from "../../services/api.js"
@@ -35,6 +40,46 @@ export type GameDenial = "no-access"
 /** One GET per event batch, not per event (ADR-0033 C2) — a single command
  * can publish 5+ events; the trailing debounce coalesces them. */
 const REFETCH_DEBOUNCE_MS = 100
+
+/**
+ * Mirrors `--duration-peek` (`packages/ui/src/styles.css`, tokens.md
+ * `duration.peek` = 2800ms, playing-card.md r2): kept as a plain constant
+ * rather than read from CSS at runtime, because this drives a JS
+ * `setTimeout` for the T4 peek-reveal state machine, not a CSS transition —
+ * a runtime `getComputedStyle` read (the `Modal` `snapMs()` precedent)
+ * would need the exact same hardcoded jsdom fallback anyway, for no gain in
+ * testability. Keep in sync by hand if the token's value ever changes.
+ * Also doubles as the "briefly" duration for the public acting/fizzle beats
+ * (T3, CardPeeked/CardsBlindSwapped/PowerFizzled) — there is no separate
+ * token for those, and reusing this one avoids inventing an unspecified
+ * timing value.
+ */
+const PEEK_DURATION_MS = 2800
+
+/** T4: one player's own entitled peek, live for `PEEK_DURATION_MS` then
+ * deleted — never re-rendered (memory fidelity, cambio-rules). */
+interface PeekReveal {
+  readonly target: SlotRef
+  readonly card: CardSlug
+}
+
+/** T5: a 422's tag mapped to voice.md-register inline copy. Every tag not
+ * listed here (this milestone doesn't reach slam/endgame tags) falls back
+ * to a generic sentence — the table has already been refreshed either way. */
+const COMMAND_ERROR_COPY: Record<string, string> = {
+  NotYourTurn: "It's not your turn — the table has been refreshed.",
+  WrongPhase: "That move isn't available right now — the table has been refreshed.",
+  SlamTooLate: "The slam window had already closed — the table has been refreshed.",
+}
+
+function commandErrorCopy(error: unknown): string {
+  if (error instanceof ApiError) {
+    return (
+      COMMAND_ERROR_COPY[error.tag] ?? "That move didn't go through — the table has been refreshed."
+    )
+  }
+  return "That move didn't go through — the table has been refreshed."
+}
 
 const gameQueryKey = (gameId: string) => ["game", gameId] as const
 
@@ -110,11 +155,194 @@ export function useGame(gameId: string) {
     }
   }, [])
 
+  // ---- ephemeral display state (hazard 3, C5, T3-T5): React state that
+  // never touches the query cache — a peek/beat/error lives here for its
+  // own duration and is cleared by its own timer. Timers are mirrored
+  // nowhere special because each already clears itself on unmount below
+  // (the `useFlights` unmount trap only matters for state a *different*
+  // effect reads on cleanup; these read their own ref directly).
+
+  const playersRef = React.useRef<ReadonlyArray<{ id: string; name: string }>>([])
+  playersRef.current = view.data?.view.players ?? []
+
+  const nextFlightIdRef = React.useRef(0)
+  const nextFlightId = () => `flight-${(nextFlightIdRef.current += 1)}`
+
+  // T4: PrivateCardPeeked flips the target slot up for PEEK_DURATION_MS,
+  // then the entry is deleted — never to return (memory fidelity). The
+  // Queen's own peek uses the exact same entry; `ResolvingQueenSwap`
+  // targeting stays disabled by the screen while this is non-null, which is
+  // what makes "the player swaps from memory" (round-1 decision) hold.
+  const [peek, setPeek] = React.useState<PeekReveal | null>(null)
+  const peekTimeoutRef = React.useRef<number | null>(null)
+
+  // T3: the public "seat acting" beat (a peek's target, a fizzle) — one
+  // seat at a time is enough for this milestone; a second simultaneous beat
+  // is a rare visual nicety, never a correctness concern (nothing hidden
+  // rides on it).
+  const [actingPlayerId, setActingPlayerId] = React.useState<string | null>(null)
+  const actingTimeoutRef = React.useRef<number | null>(null)
+
+  // T3: PowerFizzled's public no-op beat (voice.md: "fizzle", never
+  // "cancel"/"skip").
+  const [fizzleMessage, setFizzleMessage] = React.useState<string | null>(null)
+  const fizzleTimeoutRef = React.useRef<number | null>(null)
+
+  // T5: the last command failure, surfaced inline near the action — never a
+  // toast (toast.md law). Cleared at the start of every new attempt.
+  const [commandError, setCommandError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    return () => {
+      if (peekTimeoutRef.current !== null) window.clearTimeout(peekTimeoutRef.current)
+      if (actingTimeoutRef.current !== null) window.clearTimeout(actingTimeoutRef.current)
+      if (fizzleTimeoutRef.current !== null) window.clearTimeout(fizzleTimeoutRef.current)
+    }
+  }, [])
+
+  function pulseSeat(playerId: string) {
+    if (actingTimeoutRef.current !== null) window.clearTimeout(actingTimeoutRef.current)
+    setActingPlayerId(playerId)
+    actingTimeoutRef.current = window.setTimeout(() => {
+      actingTimeoutRef.current = null
+      setActingPlayerId(null)
+    }, PEEK_DURATION_MS)
+  }
+
+  // CH1 (T2/T3): one handler per room event, enqueuing flights/beats THEN
+  // (back at the call site below) scheduling the refetch — ADR-0033: a
+  // flight spec references only the event's own payload, never live state.
+  // Slam/reshuffle/endgame tags (M5/M6) fall through to `default`: out of
+  // this milestone's scope, so the generic refetch is their entire handling
+  // for now (the screen renders whatever minimal branch M3 left for them).
+  function handleRoomEvent(event: RoomGameEvent) {
+    switch (event._tag) {
+      case "CardDrawn":
+        flights.enqueue({
+          id: nextFlightId(),
+          face: { face: "down" },
+          originId: "deck",
+          destinationId: "held",
+        })
+        break
+      case "DiscardTaken":
+        flights.enqueue({
+          id: nextFlightId(),
+          face: { face: "up", card: event.card },
+          originId: "discard",
+          destinationId: "held",
+        })
+        break
+      case "HeldSwapped": {
+        const slot = slotAnchorId(event.playerId, event.slotIndex)
+        flights.enqueue({
+          id: nextFlightId(),
+          face: { face: "down" },
+          originId: "held",
+          destinationId: slot,
+        })
+        flights.enqueue({
+          id: nextFlightId(),
+          face: { face: "up", card: event.discarded },
+          originId: slot,
+          destinationId: "discard",
+        })
+        break
+      }
+      case "HeldDiscarded":
+        flights.enqueue({
+          id: nextFlightId(),
+          face: { face: "up", card: event.card },
+          originId: "held",
+          destinationId: "discard",
+        })
+        break
+      case "PowerDiscarded":
+        flights.enqueue({
+          id: nextFlightId(),
+          face: { face: "up", card: event.card },
+          originId: "held",
+          destinationId: "discard",
+        })
+        break
+      case "HeldKept": {
+        const slot = slotAnchorId(event.playerId, event.slotIndex)
+        flights.enqueue({
+          id: nextFlightId(),
+          face: { face: "down" },
+          originId: "held",
+          destinationId: slot,
+        })
+        break
+      }
+      case "CardsBlindSwapped": {
+        const firstSlot = slotAnchorId(event.first.playerId, event.first.slotIndex)
+        const secondSlot = slotAnchorId(event.second.playerId, event.second.slotIndex)
+        flights.enqueue({
+          id: nextFlightId(),
+          face: { face: "down" },
+          originId: firstSlot,
+          destinationId: secondSlot,
+        })
+        flights.enqueue({
+          id: nextFlightId(),
+          face: { face: "down" },
+          originId: secondSlot,
+          destinationId: firstSlot,
+        })
+        break
+      }
+      case "CardPeeked":
+        pulseSeat(event.target.playerId)
+        break
+      case "PowerFizzled": {
+        pulseSeat(event.playerId)
+        const name = playersRef.current.find((player) => player.id === event.playerId)?.name
+        if (fizzleTimeoutRef.current !== null) window.clearTimeout(fizzleTimeoutRef.current)
+        setFizzleMessage(`${name ?? "A player"}'s power fizzled — no legal target.`)
+        fizzleTimeoutRef.current = window.setTimeout(() => {
+          fizzleTimeoutRef.current = null
+          setFizzleMessage(null)
+        }, PEEK_DURATION_MS)
+        break
+      }
+      default:
+        break
+    }
+  }
+
+  function handlePlayerEvent(event: PlayerGameEvent) {
+    switch (event._tag) {
+      case "PrivateCardPeeked":
+        if (peekTimeoutRef.current !== null) window.clearTimeout(peekTimeoutRef.current)
+        setPeek({ target: event.target, card: event.card })
+        peekTimeoutRef.current = window.setTimeout(() => {
+          peekTimeoutRef.current = null
+          setPeek(null)
+        }, PEEK_DURATION_MS)
+        break
+      case "PrivateCardDrawn":
+        // The holder's own phase already carries this value structurally
+        // (`ViewPhase.HoldingCard.card`) — nothing extra to display.
+        break
+    }
+  }
+
+  // Handlers are redefined every render (they close over this render's
+  // `flights`/setters) but the subscription effect below only re-runs when
+  // the topics themselves change — refs carry the latest handler across
+  // renders without adding them to that effect's dependency array (the
+  // `refetchRef` pattern above; no `exhaustive-deps` rule is registered in
+  // this repo, so this is a documented deliberate choice, not a lint dodge).
+  const handleRoomEventRef = React.useRef(handleRoomEvent)
+  handleRoomEventRef.current = handleRoomEvent
+  const handlePlayerEventRef = React.useRef(handlePlayerEvent)
+  handlePlayerEventRef.current = handlePlayerEvent
+
   // Live subscriptions (C1/C2): effect-scoped, both granted topics dropped
-  // on unmount. Handlers are scaffolded here — the peek/flight/reveal
-  // display state they'll drive lands in later steps — but every decoded
-  // broadcast already discharges its ADR-0033 duty in full: schedule the
-  // one debounced refetch, touch nothing else.
+  // on unmount. Every decoded broadcast enqueues its choreography (via the
+  // refs above) THEN discharges its ADR-0033 duty: schedule the one
+  // debounced refetch, touch nothing else in the snapshot.
   const roomTopic = view.data?.grants.roomTopic
   const playerTopic = view.data?.grants.playerTopic
   React.useEffect(() => {
@@ -123,6 +351,7 @@ export function useGame(gameId: string) {
       onEvent: (_event, payload) => {
         const decoded = decodeRoomGameEventEither(payload)
         if (decoded._tag !== "Right") return
+        handleRoomEventRef.current(decoded.right)
         scheduleRefetch()
       },
       onResubscribe: () => {
@@ -133,6 +362,7 @@ export function useGame(gameId: string) {
       onEvent: (_event, payload) => {
         const decoded = decodePlayerGameEventEither(payload)
         if (decoded._tag !== "Right") return
+        handlePlayerEventRef.current(decoded.right)
         scheduleRefetch()
       },
       onResubscribe: () => {
@@ -145,7 +375,6 @@ export function useGame(gameId: string) {
     }
   }, [roomTopic, playerTopic, scheduleRefetch])
 
-  // Wired but with no UI affordances yet (step 10 adds them per H1/T1-T5).
   const sendCommand = useMutation({
     mutationFn: (command: WireCommand) =>
       apiRequest(`/games/${gameId}/commands`, {
@@ -153,6 +382,9 @@ export function useGame(gameId: string) {
         body: encodeWireCommand(command),
         decode: decodeGameReply,
       }),
+    onMutate: () => {
+      setCommandError(null)
+    },
     onSuccess: (reply: GameReply) => {
       if (!isNewerVersion(lastVersionRef.current, reply.version)) return
       lastVersionRef.current = reply.version
@@ -161,6 +393,12 @@ export function useGame(gameId: string) {
           ? previous
           : { ...previous, view: reply.view, version: reply.version },
       )
+    },
+    onError: (error: unknown) => {
+      // T5: a 422 (or any command failure) never breaks the table — resync
+      // first, then surface the failure inline (never a toast).
+      scheduleRefetch()
+      setCommandError(commandErrorCopy(error))
     },
   })
 
@@ -177,5 +415,19 @@ export function useGame(gameId: string) {
     void view.refetch()
   }
 
-  return { session, createUser, view, denial, failed, retry, viewerId, sendCommand, flights }
+  return {
+    session,
+    createUser,
+    view,
+    denial,
+    failed,
+    retry,
+    viewerId,
+    sendCommand,
+    flights,
+    peek,
+    actingPlayerId,
+    fizzleMessage,
+    commandError,
+  }
 }

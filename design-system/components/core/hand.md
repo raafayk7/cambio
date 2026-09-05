@@ -1,6 +1,6 @@
 name: hand
 status: draft
-version: 1
+version: 2
 extends: none
 
 A player's slot grid. Class: **Game object**.
@@ -35,6 +35,13 @@ A player's slot grid. Class: **Game object**.
 - `own` (near, large, interactive) / `opponent` (seated, small, slam-only
   interactions).
 
+## States (r2 addition)
+
+- `targeting` — a power (7/8/9/10/J/Q) or the swap-held action is choosing a
+  slot: the slot(s) already picked render `selected` (same visual language
+  as keyboard focus, `playing-card.md` state 4); clicking a slot again
+  toggles the pick off rather than completing an invalid target.
+
 ## Rules
 
 - The hand receives only entitled card views: opponents' hands are always
@@ -45,7 +52,14 @@ A player's slot grid. Class: **Game object**.
 - Card count is public and may be displayed; values never.
 - No "cards you know" affordance on any slot, own or opponent (memory
   fidelity).
+- Every slot exposes a flight anchor (`slot:<playerId>:<slotIndex>`),
+  occupied or not — a vacancy is a valid flight destination (a give) and a
+  valid give-target click, never just a dead outline.
 
 ## Revisions
 
 - r1: initial, from the CAM-13 specimen board.
+- r2 (CAM-18, T2/T3): `selectedSlots` (targeting picks — 7/8/9/10 peeks,
+  J/Q swaps, the swap-held action) and `emptySlotsClickable` (the slam
+  give-target case, step 13) land as props; every slot, occupied or not,
+  now carries its flight anchor.

@@ -1,6 +1,6 @@
 name: discard-pile
 status: draft
-version: 1
+version: 2
 extends: none
 
 The face-up pile slams match against. Class: **Game object**.
@@ -39,7 +39,14 @@ None.
   remembering what went by is part of the game).
 - The top card is the only card in the game that is always public — it
   anchors the slam-rank match visually.
+- The click affordance (r2) is presentation only — legality (a non-power
+  top) is the server's and the client mirrors it via H1; omitting `onClick`
+  entirely renders the pile as static rather than a disabled button.
+- The pile exposes `data-flight-anchor="discard"` for the flight layer.
 
 ## Revisions
 
 - r1: initial, from the CAM-13 specimen board.
+- r2 (CAM-18, T1/T2/CH1): `onClick` (accessible-button wrap, same
+  precedent as `hand.md`/`draw-deck.md`) and the `receiving` state — the
+  CAM-15 carve-out this task repays.
