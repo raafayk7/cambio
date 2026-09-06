@@ -64,6 +64,21 @@
    * §1.5 slam reveal, the DrawSkipped beat, the which-slot-was-peeked
    * beat. A glance, not a memorization window (that's duration-peek). */
   --duration-reveal: 1200ms;
+
+  /* tokens.md §Shape (CAM-21): the compact game screen's table-art
+   * max-width cap — a square asset, so this is also the height cap. Fits
+   * the 360×640 fold budget alongside the compact card scale below;
+   * gate-approved, interview 2026-09-06. Compact only (game-screen.tsx
+   * cancels it at regular via max-w-none). Tuned down from the plan's
+   * starting 160px at the M5 rendered pass (measured fold-budget
+   * shortfall, see root plan Surprises) — 128px is the first escalation
+   * step the child plan names. Off the spacing scale deliberately: it is
+   * a measured fold-budget constant (viewport minus chrome, dock, and
+   * opponent rows at the tuned card scale), not a rhythm step — and it
+   * stays a bare primitive (no @theme role) because exactly one consumer
+   * exists, table-surface.tsx's docked-composition art cap (review F5.8;
+   * promote to a role if a second consumer ever appears). */
+  --size-table-art-compact: 128px;
 }
 
 @theme {
@@ -226,23 +241,43 @@
   aspect-ratio: 5 / 7;
   border-radius: calc(var(--card-width) * var(--radius-card-ratio));
 }
+/* Compact card scale (CAM-21, gate-approved, interview 2026-09-06): the
+ * 360×640 fold budget forces smaller footprints than regular's — card-lg
+ * shrinks one spacing step, card-md two, so five opponent hands and the
+ * viewer's own still fit one screen height. Regular values (96px/64px)
+ * are unchanged (root plan clause 10); card-sm is already the same
+ * physical size compact and regular need, so it stays flat. */
 @utility card-lg {
-  --card-width: calc(var(--spacing-7) * 2);
+  /* Tuned down from --spacing-8 (64px) at the M5 rendered pass: the
+   * measured fold budget was short even after the art cap and gap
+   * reductions (root plan Surprises) — the child plan's next escalation
+   * step. */
+  --card-width: var(--spacing-7);
+  @media (width >= theme(--breakpoint-regular)) {
+    --card-width: calc(var(--spacing-7) * 2);
+  }
 }
 @utility card-md {
-  --card-width: var(--spacing-8);
+  --card-width: var(--spacing-6);
+  @media (width >= theme(--breakpoint-regular)) {
+    --card-width: var(--spacing-8);
+  }
 }
 @utility card-sm {
   --card-width: var(--spacing-6);
 }
 
-/* Rank and pip scale with the card, not the page (playing-card.md). */
+/* Rank and pip scale with the card, not the page (playing-card.md),
+ * floored at the type scale's smallest step (--text-xs, CAM-21 design-gate
+ * fix) — below the compact card-sm/card-md width the derived ratio fell
+ * under 12px (9.6px rank / 8.32px pip on a 32px card), the smallest
+ * legible size the type scale allows anywhere else. */
 @utility card-rank {
-  font-size: calc(var(--card-width, 100px) * 0.3);
+  font-size: max(calc(var(--card-width, 100px) * 0.3), var(--text-xs));
   line-height: 1.1;
 }
 @utility card-pip {
-  font-size: calc(var(--card-width, 100px) * 0.26);
+  font-size: max(calc(var(--card-width, 100px) * 0.26), var(--text-xs));
 }
 
 /* Poster text on alarm grounds (slam-timer.md): display face in

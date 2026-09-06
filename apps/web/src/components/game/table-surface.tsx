@@ -5,7 +5,7 @@ import tableArt from "../../assets/table-top.webp"
 import { inwardSide, seatArc, TABLE_DISC_FRACTION } from "./table-geometry.js"
 
 /**
- * TableSurface — design-system/components/core/table-surface.md (r2).
+ * TableSurface — design-system/components/core/table-surface.md (r4).
  * Class: Game object.
  *
  * The top-down khoka table: the moodboard's own painted asset (a
@@ -44,6 +44,20 @@ export interface TableSurfaceProps {
    * the turn indicator and the Call Cambio control).
    */
   seatAnchor?: "center" | "edge"
+  /**
+   * Whether the viewer's own seat renders inside this component (CAM-21).
+   * `"internal"` (default) is the room screen's pre-game view — every seat,
+   * own included, renders here. `"external"` selects the game screen's
+   * DOCKED COMPOSITION: the viewer's own hand lives in the screen's bottom
+   * dock, so this component skips it (while still deriving every position
+   * from the full `seats.length`) and the screen renders it itself, reusing
+   * the same geometry. The compact fold-fit values ride this same switch
+   * (review F1): the art max-width cap and the tightened root gap exist to
+   * close the docked composition's fold budget and apply ONLY under
+   * `"external"` — the default path (the room screen) keeps the uncapped
+   * `w-3/4` art and `gap-4`, byte-for-byte its pre-CAM-21 rendering.
+   */
+  viewerSeat?: "internal" | "external"
   className?: string
 }
 
@@ -67,6 +81,7 @@ export function TableSurface({
   center,
   state = "in-game",
   seatAnchor = "center",
+  viewerSeat = "internal",
   className,
 }: TableSurfaceProps) {
   const positions = seatArc(seats.length, viewerSeatIndex)
@@ -107,8 +122,20 @@ export function TableSurface({
     <div
       data-state={state}
       className={cn(
-        "flex w-full flex-col items-center gap-4",
-        "regular:relative regular:mx-auto regular:block regular:aspect-square regular:max-w-2xl",
+        // Unconditionally relative (CAM-21, was `regular:relative`): the
+        // compact docked composition needs this as a positioned ancestor
+        // too, so the game-over full-region rest below scopes to the
+        // surface at every breakpoint instead of escaping to whatever
+        // positioned ancestor is next up the tree.
+        "relative flex w-full flex-col items-center",
+        // The tightened gap belongs to the DOCKED composition only (review
+        // F1): it was minted at the M5 rendered pass to close the game
+        // screen's fold budget (root plan Surprises: short at 160/64/gap-4)
+        // and must not reach the room screen, whose default path keeps the
+        // pre-CAM-21 gap-4. Compact-only in effect either way — regular
+        // absolutely-positions every child, so flow gap never applies there.
+        viewerSeat === "external" ? "gap-2" : "gap-4",
+        "regular:mx-auto regular:block regular:aspect-square regular:max-w-2xl",
         className,
       )}
     >
@@ -118,7 +145,17 @@ export function TableSurface({
 
       {/* The painted table + benches (shadows baked into the asset);
           center content and scrim overlay the tabletop disc only. */}
-      <div className="relative w-3/4 regular:absolute regular:top-1/2 regular:left-1/2 regular:-translate-x-1/2 regular:-translate-y-1/2">
+      <div
+        // CAM-21: the DOCKED composition caps the art at a token max-width
+        // at compact (the asset is square, so this is also the height cap —
+        // root plan fold budget); regular cancels the cap and keeps today's
+        // w-3/4-of-aspect-square sizing untouched (clause 10). The default
+        // (room screen) path takes no cap at all (review F1 — clause 9).
+        className={cn(
+          "relative w-3/4 regular:absolute regular:top-1/2 regular:left-1/2 regular:-translate-x-1/2 regular:-translate-y-1/2",
+          viewerSeat === "external" && "max-w-(--size-table-art-compact) regular:max-w-none",
+        )}
+      >
         <img src={tableArt} alt="" aria-hidden className="block h-auto w-full" />
         <div
           className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
@@ -140,7 +177,7 @@ export function TableSurface({
         ) : null}
       </div>
 
-      {seats.length > 0 ? seatWrapper(viewerSeatIndex) : null}
+      {seats.length > 0 && viewerSeat === "internal" ? seatWrapper(viewerSeatIndex) : null}
 
       {state === "game-over" ? (
         // The full-region rest (table-surface.md r3): the disc scrim above

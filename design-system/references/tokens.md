@@ -92,7 +92,10 @@ Roles:
 Type scale _(approved CAM-13; provisional until CAM-15 renders real
 components — adjustments land as revisions)_: 12 / 14 / 15 (body) / 17 / 22 /
 28 / 44 / 64px, 1.5 line-height for body, 1.1 for display sizes. Card rank
-size scales with the card, not the page.
+size scales with the card — floored at 12px, the scale's smallest step, so
+tiny footprints stay legible (CAM-21 design-gate fix: rank/pip read
+`max(card-proportional, 12px)`; the floor bites only below a 40px card,
+i.e. `card-sm`, at both breakpoints — the score-sheet minis included).
 
 ## Spacing
 
@@ -110,6 +113,20 @@ as digital, not print.
   CAM-15 renders real cards)_.
 - Borders: `1.5px` solid `ink` on interactive objects, `2px` on frames.
   Borders, not shadows, carry emphasis — per the framed-label references.
+- Card footprints (`--card-width`, read by `radius.card` and every
+  playing-card size utility): `card-lg` / `card-md` are responsive —
+  regular keeps `96px` / `64px`; compact reads `48px` / `32px`, forced by
+  the 360×640 fold budget (CAM-21, gate-approved, interview 2026-09-06;
+  tuned down from an initial `64px`/`32px` at the M5 rendered pass once
+  the measured budget came up short — root plan Surprises). `card-sm`
+  (`32px`) is unchanged at both breakpoints. `--size-table-art-compact`
+  (`128px`, tuned down from an initial `160px` the same pass): the
+  compact-only max-width cap on the table art — square asset, so it's
+  also the height cap. The cap (like the surface's tightened root gap)
+  belongs to the game screen's DOCKED composition only
+  (`viewerSeat="external"`, table-surface.md r4 as amended at review) —
+  the room screen's default path keeps the uncapped `w-3/4` art and
+  `gap-4`.
 
 ## Elevation
 

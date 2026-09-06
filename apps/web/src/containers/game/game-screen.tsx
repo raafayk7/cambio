@@ -1,5 +1,5 @@
 import type { PlayerGameView, Rank, SlotIndex, SlotRef, ViewPhase } from "@cambio/contracts"
-import { Alert, AppShell, Button, Link as UiLink, Modal, Panel, Skeleton } from "@cambio/ui"
+import { Alert, AppShell, Button, cn, Link as UiLink, Modal, Panel, Skeleton } from "@cambio/ui"
 import { Link as RouterLink } from "@tanstack/react-router"
 import * as React from "react"
 
@@ -250,27 +250,49 @@ function handSlotWiring(params: {
  * `seatAnchor="edge"` so the whole seat+hand group grows from the ring
  * point toward the table center (CAM-18 gate fix: a centered group escaped
  * the container and occluded the chrome above it). Exact pixel placement
- * is tuned against the rendered table (step 15, ADR-0030). */
+ * is tuned against the rendered table (step 15, ADR-0030).
+ *
+ * CAM-21: at compact this radial direction is `regular:`-scoped, not
+ * unprefixed — compact doesn't render the arc at all (opponents are a
+ * flat wrapping row, table-surface.tsx), so letting a "left"/"right" side
+ * leak into a horizontal (`flex-row`) group there was never a deliberate
+ * choice, just unexamined reuse. A horizontal group is ~175px wide vs a
+ * vertical one's ~95px (width = pill + gap + hand vs max(pill, hand)) —
+ * with 360px to share, that's the difference between 2 opponents fitting
+ * on one wrapped line and needing two (measured at the M5 rendered pass:
+ * forcing every opponent to the vertical form closes the fold budget for
+ * 2–4 players outright, root plan Surprises). The viewer's own seat is
+ * unaffected — it already rendered vertically (its `side` always resolves
+ * "top", the only side whose compact and regular forms coincide) and
+ * keeps that via the `own` flag rather than `side`. */
 type RadialSide = InwardSide
 
-const SIDE_FLEX_CLASS: Record<RadialSide, string> = {
-  top: "flex-col-reverse",
-  bottom: "flex-col",
-  left: "flex-row-reverse",
-  right: "flex-row",
+const REGULAR_SIDE_FLEX_CLASS: Record<RadialSide, string> = {
+  top: "regular:flex-col-reverse",
+  bottom: "regular:flex-col",
+  left: "regular:flex-row-reverse",
+  right: "regular:flex-row",
 }
 
 function SeatWithHand({
   side,
+  own,
   seat,
   hand,
 }: {
   side: RadialSide
+  own: boolean
   seat: React.ReactNode
   hand: React.ReactNode
 }) {
   return (
-    <div className={`flex items-center gap-2 ${SIDE_FLEX_CLASS[side]}`}>
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        own ? "flex-col-reverse" : "flex-col",
+        REGULAR_SIDE_FLEX_CLASS[side],
+      )}
+    >
       {seat}
       {hand}
     </div>
@@ -528,6 +550,7 @@ function GameTable({
       <SeatWithHand
         key={player.id}
         side={side}
+        own={own}
         seat={
           <Seat
             name={player.name}
@@ -571,142 +594,190 @@ function GameTable({
   })
 
   return (
-    // `regular:relative`: the positioned ancestor for the docked Call
-    // Cambio affordance below (bottom-right of the whole stage column).
-    <div className="flex w-full flex-col items-center gap-4 regular:relative">
-      <TurnIndicator state={indicatorState}>
-        {turnStatusCopy(status, playerName(status.activePlayerId))}
-      </TurnIndicator>
-      {slamPhase !== undefined ? (
-        // SL1/SL2: pairs with the indicator above, never replaces it
-        // (turn-indicator.md) — `resolving` pauses the drain visually while
-        // a slam's public reveal plays; the drain math itself never resets
-        // (ADR-0011 fixed `closesAt`, unaffected by `resolving`).
-        <SlamTimer
-          window={{ closesAt: slamPhase.closesAt, durationMs: view.config.slamWindowMs }}
-          resolving={slamReveal !== null}
-        />
-      ) : null}
-      {/* CAM-23: lets the slammer pre-arm which own card they'll give ahead
-          of spotting an opponent to slam, so the opponent tap itself fires
-          in one action. Hidden while the two-tap fallback (below) already
-          holds a pending target — the two sub-states are mutually
-          exclusive (root plan clause 9), and showing both prompts at once
-          would be confusing. */}
-      {slamPhase !== undefined && slamPendingGive === null && viewerHand.length > 0 ? (
-        <div className="flex items-center gap-2">
-          {slamArmedGive !== null ? (
-            <Button variant="ghost" onClick={() => setSlamArmedGive(null)}>
-              Cancel give
-            </Button>
-          ) : slamReadyMode ? (
-            <Button variant="ghost" onClick={() => setSlamReadyMode(false)}>
-              Cancel
-            </Button>
-          ) : (
-            <Button variant="ghost" onClick={() => setSlamReadyMode(true)}>
-              Ready a give
-            </Button>
-          )}
-        </div>
-      ) : null}
-      {slamPendingGive !== null ? (
-        <div className="flex items-center gap-2">
-          <p className="font-ui text-sm text-ink-primary">
-            If you&apos;re right, which card do you give them?
+    // Unconditionally relative (CAM-21, was `regular:relative`): the
+    // positioned ancestor for both the compact bounded stage below and the
+    // regular docked Call Cambio affordance (bottom-right of the whole
+    // stage column).
+    <div className="relative flex w-full flex-1 min-h-0 flex-col items-center gap-4 regular:flex-initial regular:min-h-auto">
+      {/* Top band (root plan clause 2, CAM-21): turn indicator, slam timer,
+          and every inline message pin here — none of them can leave the
+          viewport while the game screen is mounted. `regular:contents`
+          dissolves the wrapper at regular so its children resume being
+          plain stage flex items (a `contents` element is never a
+          positioned ancestor, so nothing else shifts); `regular:order-*`
+          on each restores today's exact stage sequence. */}
+      <div
+        data-region="chrome"
+        className="flex shrink-0 flex-col items-center gap-4 regular:contents"
+      >
+        <TurnIndicator state={indicatorState}>
+          {turnStatusCopy(status, playerName(status.activePlayerId))}
+        </TurnIndicator>
+        {slamPhase !== undefined ? (
+          // SL1/SL2: pairs with the indicator above, never replaces it
+          // (turn-indicator.md) — `resolving` pauses the drain visually while
+          // a slam's public reveal plays; the drain math itself never resets
+          // (ADR-0011 fixed `closesAt`, unaffected by `resolving`).
+          <SlamTimer
+            window={{ closesAt: slamPhase.closesAt, durationMs: view.config.slamWindowMs }}
+            resolving={slamReveal !== null}
+            className="regular:order-1"
+          />
+        ) : null}
+        {/* E3: slam/peek/turn ephemera are ignored once the game has ended —
+            a beat that happened to still be showing when the call landed
+            must not render on top of the score-sheet overlay below. */}
+        {!ended && slamBeatMessage !== null ? (
+          <p className="font-ui text-sm text-ink-muted regular:order-4">{slamBeatMessage}</p>
+        ) : null}
+        {!ended && commandError !== null ? (
+          <p role="alert" className="font-ui text-sm text-accent-alarm-deep regular:order-7">
+            {commandError}
           </p>
-          <Button variant="ghost" onClick={() => setSlamPendingGive(null)}>
-            Cancel
-          </Button>
-        </div>
-      ) : null}
-      {/* E3: slam/peek/turn ephemera are ignored once the game has ended —
-          a beat that happened to still be showing when the call landed
-          must not render on top of the score-sheet overlay below. */}
-      {!ended && slamBeatMessage !== null ? (
-        <p className="font-ui text-sm text-ink-muted">{slamBeatMessage}</p>
-      ) : null}
-      {affordances.phase === "AwaitingDraw" && affordances.holder ? (
-        // The call affordance docks at the stage's bottom corner at
-        // regular — it is the VIEWER's action, so it lives by their hand,
-        // and taking it out of the top band keeps the chrome to one
-        // indicator (gate fix: the tall top stack pushed the viewer's own
-        // seat below the fold). Compact keeps it in flow, thumb-reachable.
-        <div className="regular:absolute regular:right-5 regular:bottom-5 regular:z-20 regular:self-end">
-          <Button variant="danger" onClick={() => setConfirmCambioOpen(true)}>
-            Call Cambio
-          </Button>
-        </div>
-      ) : null}
-      {affordances.phase === "HoldingCard" && affordances.holder ? (
-        <div className="flex items-center justify-center gap-2">
-          {affordances.discardHeld ? (
-            <Button variant="secondary" onClick={() => sendCommand.mutate({ _tag: "DiscardHeld" })}>
-              Discard
-            </Button>
-          ) : null}
-          {affordances.keep ? (
-            <Button variant="secondary" onClick={() => sendCommand.mutate({ _tag: "KeepHeld" })}>
-              Keep
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-      {!ended && commandError !== null ? (
-        <p role="alert" className="font-ui text-sm text-accent-alarm-deep">
-          {commandError}
-        </p>
-      ) : null}
-      {!ended && fizzleMessage !== null ? (
-        <p className="font-ui text-sm text-ink-muted">{fizzleMessage}</p>
-      ) : null}
-      <div ref={setTableRoot} className="relative w-full">
-        <TableSurface
-          state={ended ? "game-over" : "in-game"}
-          viewerSeatIndex={viewerSeatIndex}
-          seats={seatNodes}
-          seatAnchor="edge"
-          center={
-            <div className="flex items-center gap-4">
-              <DrawDeck
-                count={view.deckCount}
-                {...(reshuffling
-                  ? { state: "reshuffling" as const }
-                  : drawing
-                    ? { state: "draw" as const }
+        ) : null}
+        {!ended && fizzleMessage !== null ? (
+          <p className="font-ui text-sm text-ink-muted regular:order-8">{fizzleMessage}</p>
+        ) : null}
+      </div>
+      {/* Middle region (root plan clause 4, CAM-21): stays the flight root
+          and the ScoreSheet overlay's positioning box (ADR-0034/0035 —
+          zero flight-layer churn, no transform anywhere in this chain).
+          Compact: a bounded column of (a) the ONLY element that ever
+          scrolls — the opponents/table/art, and (b) the extracted own
+          seat, docked directly beneath it (the dock's hand half).
+          `regular:block` restores plain document flow; align-items and
+          gap die with the flex display, but flex-ITEM properties
+          (`flex-1`, `min-h-0`) would stay live against the stage — so
+          both are explicitly restored at regular below (review F3:
+          an earlier comment here claimed they'd be inert; they aren't).
+          Design-gate note (2026-09-06, wording per review F5): the
+          scroll region below is `flex-1`, so at 2–4 players (where its
+          content is shorter than its allocation) it grows past its
+          content and leaves ~37px of empty paving between the table and
+          the own-hand dock. That slack is ACCEPTED FLEX RESIDUE, kept
+          knowingly: it reads acceptably as separation between the
+          shared table and the viewer's zone, it's identical across
+          every player count that fits the fold, and 16px of it was
+          reclaimed as real padding on the pinned bands (the screen
+          wrapper's `py-2`). Fully eliminating it would mean moving
+          flex-grow off this element entirely, relocating the same slack
+          elsewhere in the column for no clear gain — not worth the risk
+          against the fold budget. */}
+      <div
+        ref={setTableRoot}
+        data-region="table-root"
+        // `gap-2` (not the stage's `gap-4`): compact-only in effect — the
+        // fold budget was short at the M5 rendered pass (root plan
+        // Surprises), and this gap is inert at regular anyway once
+        // `regular:block` cancels flex.
+        className="relative flex w-full flex-1 min-h-0 flex-col items-center gap-2 regular:order-9 regular:block regular:flex-initial regular:min-h-auto"
+      >
+        <div
+          data-region="table-scroll"
+          className="w-full flex-1 min-h-0 overflow-y-auto regular:contents"
+        >
+          <TableSurface
+            state={ended ? "game-over" : "in-game"}
+            viewerSeatIndex={viewerSeatIndex}
+            seats={seatNodes}
+            seatAnchor="edge"
+            viewerSeat="external"
+            center={
+              // CAM-21 design-gate fix: compact-only gap-1 (was the shared
+              // gap-4) — at the 128px compact art cap the painted disc is
+              // only 69px (TABLE_DISC_FRACTION 0.54), and the deck+discard
+              // pair at gap-4 (80px total) hung ~5.5px off each edge onto
+              // the bench art. gap-1 brings the pair to 68px, inside the
+              // disc; regular keeps gap-4 (its disc has plenty of room).
+              <div className="flex items-center gap-1 regular:gap-4">
+                <DrawDeck
+                  count={view.deckCount}
+                  {...(reshuffling
+                    ? { state: "reshuffling" as const }
+                    : drawing
+                      ? { state: "draw" as const }
+                      : {})}
+                  {...(affordances.phase === "AwaitingDraw" &&
+                  affordances.holder &&
+                  affordances.drawFromDeck
+                    ? { onClick: () => sendCommand.mutate({ _tag: "DrawFromDeck" }) }
                     : {})}
-                {...(affordances.phase === "AwaitingDraw" &&
-                affordances.holder &&
-                affordances.drawFromDeck
-                  ? { onClick: () => sendCommand.mutate({ _tag: "DrawFromDeck" }) }
-                  : {})}
-              />
-              <DiscardPile
-                {...(discardTop !== undefined ? { top: discardTop } : {})}
-                underCount={discardUnderCount}
-                receiving={receiving}
-                {...(slamPhase !== undefined ? { slamTarget: true } : {})}
-                {...(affordances.phase === "AwaitingDraw" &&
-                affordances.holder &&
-                affordances.takeDiscard
-                  ? { onClick: () => sendCommand.mutate({ _tag: "TakeDiscard" }) }
-                  : {})}
-              />
-              {heldPhase !== undefined ? (
-                // Entitlement is already decided by the wire (GameView.ts:
-                // "present exactly when the viewer is entitled — holder
-                // always, everyone when source === 'discard'") — `card`
-                // being present at all IS the entitlement signal; no extra
-                // holder check here would only re-hide data the server
-                // already decided to send.
-                <HeldCard
-                  {...(heldPhase.card !== undefined ? { card: heldPhase.card } : {})}
-                  label={heldCardLabel(heldIsHolder, playerName(heldPhase.playerId))}
                 />
-              ) : null}
-            </div>
-          }
-        />
+                <DiscardPile
+                  {...(discardTop !== undefined ? { top: discardTop } : {})}
+                  underCount={discardUnderCount}
+                  receiving={receiving}
+                  {...(slamPhase !== undefined ? { slamTarget: true } : {})}
+                  {...(affordances.phase === "AwaitingDraw" &&
+                  affordances.holder &&
+                  affordances.takeDiscard
+                    ? { onClick: () => sendCommand.mutate({ _tag: "TakeDiscard" }) }
+                    : {})}
+                />
+                {heldPhase !== undefined ? (
+                  // Entitlement is already decided by the wire (GameView.ts:
+                  // "present exactly when the viewer is entitled — holder
+                  // always, everyone when source === 'discard'") — `card`
+                  // being present at all IS the entitlement signal; no extra
+                  // holder check here would only re-hide data the server
+                  // already decided to send.
+                  <HeldCard
+                    {...(heldPhase.card !== undefined ? { card: heldPhase.card } : {})}
+                    label={heldCardLabel(heldIsHolder, playerName(heldPhase.playerId))}
+                  />
+                ) : null}
+              </div>
+            }
+          />
+        </div>
+        {/* The viewer's own seat, extracted from TableSurface (root plan
+            clause 3): reuses the exact geometry TableSurface would have
+            applied (`seatArc`'s ring point, the "top"-inward centered
+            translate the viewer's bottom-center position always resolves
+            to — table-surface.tsx's own EDGE_ANCHOR_CLASS comment records
+            why). Landing INSIDE this middle div, after the scroll wrapper,
+            keeps every flight anchor a descendant of `tableRoot` with zero
+            flight-layer churn — clause 5 by containment, not by moving the
+            ref. Compact: `shrink-0` so the scroll region above absorbs any
+            squeeze, never the dock. This OUTER div must stay `position:
+            static` at compact — its inline `left`/`top` are ring-point
+            PERCENTAGES meant only for `regular:absolute`; making it
+            `relative` here too (an earlier version of this fix did)
+            resurrects them as a relative offset and shoves the whole hand
+            off-screen (confirmed at the M5 rendered pass). The INNER div
+            is the positioning context for the game-over rest instead.
+            The rest is COMPACT-ONLY (`regular:hidden`, review F2): at
+            regular this wrapper is `regular:z-10`, a stacking context
+            that TableSurface's own full-region z-20 rest paints OVER
+            wherever the seat overlaps the square — so an always-on copy
+            here DOUBLE-dims that overlap (~0.58 combined vs the
+            pre-CAM-21 0.35) and dims the below-square overhang the
+            pre-change rendering left undimmed. Hiding it at regular
+            reproduces the pre-change regular game-over exactly (surface
+            rest alone: 35% inside the square, 0 below — that boundary is
+            pre-existing, not this task's seam to fix). At compact the
+            wrapper sits entirely outside the square, gets no share of
+            the surface's rest, and needs this copy — same
+            z-20/`green-deep`/35% treatment, scoped to this wrapper. */}
+        <div
+          data-seat-index={viewerSeatIndex}
+          className="shrink-0 regular:absolute regular:z-10 regular:-translate-x-1/2 regular:-translate-y-1/2"
+          style={{
+            left: `${seatPositions[viewerSeatIndex]?.xPct ?? 50}%`,
+            top: `${seatPositions[viewerSeatIndex]?.yPct ?? 50}%`,
+          }}
+        >
+          <div className="relative">
+            {seatNodes[viewerSeatIndex]}
+            {ended ? (
+              <div
+                aria-hidden
+                data-region="own-seat-rest"
+                className="pointer-events-none absolute inset-0 z-20 bg-(--green-deep)/35 regular:hidden"
+              />
+            ) : null}
+          </div>
+        </div>
         <FlightLayer root={tableRoot} active={flights.active} onSettle={flights.settle} />
         {ended && view.reveal !== undefined ? (
           // E3, hazard 4 (decided): the score sheet is a SCREEN-LEVEL
@@ -731,6 +802,82 @@ function GameTable({
                 </Button>
               }
             />
+          </div>
+        ) : null}
+      </div>
+      {/* Bottom dock (root plan clause 3, CAM-21): every action affordance,
+          pinned beneath the own-hand row above so the whole dock reads as
+          one thumb-reachable unit — explicitly reversing CAM-18's "compact
+          keeps Call Cambio in flow" call (root plan Decision Log; the
+          playtest finding that the actionable chrome went invisible mid-
+          scroll is what justifies it). `regular:contents` + `regular:order-*`
+          restore today's exact stage sequence at regular, same mechanism
+          as the top band above. */}
+      <div
+        data-region="dock-actions"
+        className="flex shrink-0 flex-col items-center gap-4 regular:contents"
+      >
+        {/* CAM-23: lets the slammer pre-arm which own card they'll give ahead
+            of spotting an opponent to slam, so the opponent tap itself fires
+            in one action. Hidden while the two-tap fallback (below) already
+            holds a pending target — the two sub-states are mutually
+            exclusive (root plan clause 9), and showing both prompts at once
+            would be confusing. */}
+        {slamPhase !== undefined && slamPendingGive === null && viewerHand.length > 0 ? (
+          <div className="flex items-center gap-2 regular:order-2">
+            {slamArmedGive !== null ? (
+              <Button variant="ghost" onClick={() => setSlamArmedGive(null)}>
+                Cancel give
+              </Button>
+            ) : slamReadyMode ? (
+              <Button variant="ghost" onClick={() => setSlamReadyMode(false)}>
+                Cancel
+              </Button>
+            ) : (
+              <Button variant="ghost" onClick={() => setSlamReadyMode(true)}>
+                Ready a give
+              </Button>
+            )}
+          </div>
+        ) : null}
+        {slamPendingGive !== null ? (
+          <div className="flex items-center gap-2 regular:order-3">
+            <p className="font-ui text-sm text-ink-primary">
+              If you&apos;re right, which card do you give them?
+            </p>
+            <Button variant="ghost" onClick={() => setSlamPendingGive(null)}>
+              Cancel
+            </Button>
+          </div>
+        ) : null}
+        {affordances.phase === "AwaitingDraw" && affordances.holder ? (
+          // The call affordance docks at the stage's bottom corner at
+          // regular — it is the VIEWER's action, so it lives by their hand
+          // (gate fix: the tall top stack pushed the viewer's own seat
+          // below the fold). Compact: part of the bottom dock, alongside
+          // the hand it belongs to (root plan Decision Log — this reverses
+          // CAM-18's "compact keeps it in flow" call).
+          <div className="regular:absolute regular:right-5 regular:bottom-5 regular:z-20 regular:order-5 regular:self-end">
+            <Button variant="danger" onClick={() => setConfirmCambioOpen(true)}>
+              Call Cambio
+            </Button>
+          </div>
+        ) : null}
+        {affordances.phase === "HoldingCard" && affordances.holder ? (
+          <div className="flex items-center justify-center gap-2 regular:order-6">
+            {affordances.discardHeld ? (
+              <Button
+                variant="secondary"
+                onClick={() => sendCommand.mutate({ _tag: "DiscardHeld" })}
+              >
+                Discard
+              </Button>
+            ) : null}
+            {affordances.keep ? (
+              <Button variant="secondary" onClick={() => sendCommand.mutate({ _tag: "KeepHeld" })}>
+                Keep
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -853,7 +1000,29 @@ export function GameScreen({ gameId }: { gameId: string }) {
 
   return (
     <AppShell scene="paving" state="game" connection={connection}>
-      <div className="flex w-full flex-1 flex-col justify-center gap-4 p-4">
+      {/* CAM-21: the compact viewport bound lives HERE, not on AppShell —
+          lobby/room screens don't use this wrapper and inherit nothing
+          (root plan decision 1). `max-h-dvh` + the `min-h-0` flex chain
+          give GameTable's stage a real height to bound itself against;
+          the compact vertical padding is restored at regular, where the
+          bound itself is cancelled — this screen keeps scrolling normally
+          there (clause 10). Known residual: `max-h-dvh` ignores the
+          shell's safe-area inset padding, so on notched devices the bound
+          is generous by that amount; exact at the 360×640 floor.
+          `py-2` (design-gate fix, was `py-0`): the scroll region
+          (table-root's `table-scroll`) is flex-grown past its own
+          content at 2–4 players by ~53px — unclaimed slack, not a
+          decision — which left the pinned top/bottom bands flush with
+          the viewport edges and clipped the dock's button shadow. This
+          claims 16px of that same slack as real padding instead
+          (verified: still exactly fits at 2–4 players; 5 players was
+          already relying on its scroll fallback and is unaffected in
+          practice). */}
+      {/* `justify-center` is inert for the game state (GameTable's stage is
+          `flex-1`) but still centers every non-stage state — skeleton,
+          no-access, error — so it stays (review F5.6 called it dead; it is
+          only conditionally so). */}
+      <div className="flex max-h-dvh w-full flex-1 min-h-0 flex-col justify-center gap-4 overflow-hidden px-4 py-2 regular:max-h-none regular:min-h-auto regular:overflow-visible regular:py-4">
         {ownHeading ? null : <h1 className="sr-only">Game</h1>}
         {content}
       </div>

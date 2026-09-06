@@ -1,6 +1,6 @@
 name: turn-indicator
 status: draft
-version: 1
+version: 2
 extends: none
 
 Whose turn, what phase. Class: **Game object**.
@@ -9,8 +9,10 @@ Whose turn, what phase. Class: **Game object**.
 
 - Banner: `surface.raised`, `2px` `ink.primary` border, `elevation.raised`,
   leading `accent.focus` dot, phase copy in `ui` 600 sentence case.
-- Docks to a fixed screen position (top on regular, above own hand on
-  compact) — it never floats over cards.
+- Docks to a fixed screen position — **top, at every breakpoint** (r2
+  supersedes r1's "above own hand on compact": compact docks it to the
+  screen's pinned top band alongside the slam timer, not near the hand) —
+  it never floats over cards.
 
 ## States
 
@@ -39,3 +41,9 @@ None.
 ## Revisions
 
 - r1: initial, from the CAM-13 specimen board.
+- r2 (CAM-21, 2026-09-06, user call): docks TOP at compact too, in the
+  screen's pinned chrome band alongside the slam timer and inline
+  messages — supersedes r1's "above own hand on compact." The playtest
+  finding this task fixes was exactly the opposite of r1's placement:
+  scrolled down to act on your own hand, the indicator (and the slam
+  timer with it) went off-screen.

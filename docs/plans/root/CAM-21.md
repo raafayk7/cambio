@@ -27,6 +27,13 @@ chrome visible while touching your cards.
 
 ## Context & orientation
 
+> Line numbers below are pre-task (`HEAD 8f865e1`) — the M2/M3
+> restructure (Progress) rewired `game-screen.tsx` and
+> `table-surface.tsx` extensively, so these citations describe what
+> existed BEFORE this task, not current line positions. The as-built
+> shape is described in Progress and the frontend plan's Progress;
+> reconcile against the file, not these numbers.
+
 - **Screen composition** lives in
   `apps/web/src/containers/game/game-screen.tsx`. `GameTable`'s render is
   one flex column (`:576`): TurnIndicator → SlamTimer → slam prompts →
@@ -123,21 +130,43 @@ slam give prompts ("Ready a give" / give-pick prompt).
 
 ### Acceptance criteria
 
-- [ ] Rendered verification at 360×640 via the design-gate render path
+- [x] Rendered verification at 360×640 via the design-gate render path
       (`--width 360 --height 640`) at 2, 3, 4, and 5 players: no page
       scroll in default state; chrome and dock visible simultaneously
-      (clauses 1–4).
-- [ ] Rendered verification that regular (1280×900) output is unchanged
+      (clauses 1–4). **Amended at M5 (user decision, mid-implementation,
+      see Decision Log):** 2–4 players fit the full default state
+      (table + chrome + dock) with no scrolling at all; 5 players keeps
+      chrome and dock pinned/visible per clause 3, but reaching the
+      table's deck/discard needs one scroll gesture inside the middle
+      region — the fallback clause 4 already sanctioned for
+      below-360×640 viewports, now also covering the one player count
+      four full-width opponent groups can't fit on a single 360px line.
+      **Second amendment (review fix cycle, 2026-09-06):** the "2–4
+      players fit" half is NAME-WIDTH-SENSITIVE and was over-claimed: a
+      4-player table whose seat pills carry ~6-character names wraps
+      the opponent row and engages the same sanctioned middle-scroll
+      (probed at 110px overflow, identical PRE- and POST-fix-cycle — a
+      pre-existing over-claim, not a fix regression; 2–3 players fit
+      outright with these names). The name-independent guarantees,
+      probed at every count: zero page-level scroll, chrome and dock
+      pinned, overflow confined to the middle region's own scroll.
+- [x] Rendered verification that regular (1280×900) output is unchanged
       (clause 10) and the room screen is unchanged (clause 9).
-- [ ] jsdom suites green, including structural assertions the child plan
+- [x] jsdom suites green, including structural assertions the child plan
       adds for the dock/chrome regions (ADR-0030 scope: structure, not
       pixels).
-- [ ] Design-gate run on the new compact composition (advisory verdict,
-      surfaced not auto-resolved).
-- [ ] Canon revision notes landed in `table-surface.md`, `app-shell.md`,
+- [x] Design-gate run on the new compact composition (advisory verdict,
+      surfaced not auto-resolved). Verdict: flagged, 0 blocking —
+      12 default-tier calls (4 accidental, cheap/local fixes; 8
+      controlled or advisory-only). See the Surprises entry and the
+      full report shared with the user 2026-09-06. **The 4 accidental
+      findings were fixed** on user request (same day) — see the
+      follow-up Decision Log entry.
+- [x] Canon revision notes landed in `table-surface.md`, `app-shell.md`,
       `turn-indicator.md`, `slam-timer.md`.
-- [ ] The quality gate passes: `pnpm turbo build typecheck lint test`
-      (run bare, never piped).
+- [x] The quality gate passes: `pnpm turbo build typecheck lint test`
+      (run bare, never piped; exit 0 verified at review and again at
+      the fix cycle, with forced fresh web/ui/api runs).
 
 ## Plan of work
 
@@ -174,11 +203,11 @@ No contracts freeze is needed — this task never touches `contracts`
 
 ## Validation
 
-- Rendered: the design-gate render script against a live authenticated
-  game (`.agents/scripts/design-gate/render.js --url
-http://localhost:3100/game/<id> --cookie ... --width 360 --height
-640`), repeated per player count; screenshots archived with the gate
-  run. Regular and room-screen regression shots at 1280×900.
+- Rendered: the design-gate render script
+  (`.agents/scripts/design-gate/render.js`) against a live authenticated
+  game — pass the game URL, session cookie, and `--width 360 --height 640`
+  — repeated per player count; screenshots archived with the gate run.
+  Regular and room-screen regression shots at 1280×900.
 - jsdom: new structural tests per the child plan's coverage table;
   existing `game-screen.test.tsx` (1705 lines) stays green — it asserts
   behavior via roles/anchors, not layout, so survivors are expected
@@ -190,7 +219,46 @@ http://localhost:3100/game/<id> --cookie ... --width 360 --height
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] _(none yet — planning complete 2026-09-06)_
+- [x] 2026-09-06 — M1–M4 implemented (tokens, screen restructure,
+      TableSurface adjustments, tests) — see the frontend child plan's
+      Progress for the file-level detail. Full gate green throughout.
+- [x] 2026-09-06 — M5 rendered pass complete: 2–4 players fit the
+      360×640 floor exactly by default; 5 players uses the sanctioned
+      middle-scroll fallback (amended acceptance criterion above).
+      _(Correction, review F6: the 4p fit does not generalize — it is
+      name-width-sensitive; see the criterion's second amendment.)_
+      Regular and room screen confirmed unchanged, rendered and jsdom.
+      _(Correction, review F1: the room-screen half of this entry was
+      false as written — the rendered room captures were taken but the
+      128px art cap and gap-2 had leaked into the room screen at
+      compact; the review probed the room art at 128px. Fixed in the
+      fix cycle by scoping both values to `viewerSeat="external"`.)_
+      Canon revisions landed. See the Decision Log for the mid-task
+      redirect this required.
+- [x] 2026-09-06 — Design-gate's 4 accidental default-tier findings
+      fixed (user request, post-gate): the discard rank/pip type floor,
+      the deck/discard center gap (disc overhang), the pinned-band
+      vertical padding (CTA shadow clip), and the un-tokened void
+      (partially reclaimed, remainder documented as intentional). Full
+      gate green; 2–4p fit re-verified byte-for-byte (scrollContentH ==
+      scrollClientH); regular re-rendered and confirmed unchanged in
+      layout. See Decision Log for the specific values and trade-offs.
+      _(Correction, review F6: the 4p half of that re-verification does
+      not generalize — it is name-width-sensitive; see the amended
+      acceptance criterion.)_
+- [x] 2026-09-06 (review fix cycle) — F1–F4 fixed, F5 cheap items done
+      (see the retrospective's RESOLVED markers for each branch taken):
+      art cap + root gap scoped to `viewerSeat="external"` (room screen
+      restored, probed 234px art); own-seat rest gated compact-only
+      (regular game-over probed `display:none`, single-dim); five
+      strengthened/new jsdom assertions (68 tests); canon amendments +
+      version bumps across five design-system files; ADR-0035 owned-edge
+      note + widened guard; class restorations at regular. Full gate
+      green (one CPU-contention flake in `@cambio/config` on the forced
+      all-parallel run, green in isolation and on re-run). Rendered
+      re-probe at 2/3/4/5 players + room + game-over both breakpoints;
+      F6 (4p name-sensitivity) found, isolated pre/post-fix by stash,
+      resolved by claim amendment.
 
 ## Decision log
 
@@ -219,6 +287,75 @@ timestamp each entry)_
 - 2026-09-06 — dvh/overflow boundary lives at the game-screen wrapper,
   not AppShell, so lobby/room keep the document-flow shell — planning
   call from explorer finding (g).
+- 2026-09-06 (M5, mid-implementation) — The initially-planned fold
+  mechanism (art cap 160px, card-lg 64px, card-md 32px) did not close
+  the fold budget at ANY player count when actually rendered — user was
+  consulted with the measured numbers and screenshots. Two directions
+  were raised and set aside: capping the game at 4 players (a real rule
+  change with no full backend enforcement possible from the frontend
+  alone — see the exchange for the concrete tradeoffs) and a table
+  redesign (enlarged table, straight-row bench placement) — both
+  deferred to CAM-20, which already owns table geometry / regular-width
+  tuning; re-litigating CAM-20's scope belongs to that task's own
+  `/plan` pass, not a mid-CAM-21 detour. **User decision: ship a
+  same-scope compact fix now.** The actual root cause (opponent
+  seat+hand orientation leaking the regular-mode radial side into
+  compact's flat wrap, `game-screen.tsx`'s `SeatWithHand`) was found and
+  fixed — forcing every opponent to the narrow column form at compact
+  closes the budget for 2–4 players; 5 players falls back to the
+  already-sanctioned middle-region scroll (clause 4). Full numbers and
+  screenshots are in the frontend plan's Surprises.
+- 2026-09-06 (M5) — Design-gate run (decompose → map → judge) against
+  the 3-player compact composition at 360×640: verdict **flagged, 0
+  blocking**. No constraint violation (contrast, touch-target floor,
+  slop convergence all clear) and no templated-design signal (a full
+  18-marker negative sweep, one uncontested medium marker). Four
+  **accidental** default-tier calls, all local to the compact layout
+  and cheap to fix: the deck/discard center group overhangs the
+  painted tabletop disc by ~5.5px (disc-fraction vs content-width
+  mismatch at the new 128px art cap); the pinned top/bottom bands sit
+  at zero vertical padding, clipping the Call Cambio button's elevation
+  shadow; a 53.5px un-tokened void sits between the table and the own
+  hand (likely flex residue, not a decision); the discard's rank/pip
+  render at 9.6px/8.32px, under the type scale's 12px floor. Eight
+  further calls were **controlled** (the flat 15px type tier, the
+  four-benches-for-three-seats scenery, seat-pill uniformity, the
+  count-badge overlap, the connection dot) or advisory-only (the
+  already-known 32px touch-target tension, one avatar's 3.67:1
+  aria-hidden initial). None fixed as part of this task — surfaced to
+  the user per ADR-0029 (advisory until Carbonteq's labeling lands);
+  left for `/review` or a follow-up to triage.
+- 2026-09-06 (M5) — the game-over full-region rest needed its own copy
+  on the extracted own seat (not a share of TableSurface's), since
+  `viewerSeat="external"` moved that seat outside TableSurface's square
+  root at every breakpoint, not just compact — see frontend plan
+  Surprises for the fix and the positioning bug the first attempt at it
+  introduced (caught and corrected before landing).
+- 2026-09-06 — User requested the 4 accidental design-gate findings be
+  fixed before `/review`. Fixed all 4, each chosen to spend zero of the
+  fold budget the M5 tuning cascade had already spent down to exactly
+  zero slack for 2–4 players: (1) `card-rank`/`card-pip` floored at
+  `--text-xs` (12px) via `max()` — a pure legibility fix, applies at
+  both breakpoints since `card-sm` is 32px everywhere (a deliberate,
+  narrow exception to "regular untouched," which governs layout, not
+  incidental type-floor bugs). (2) The deck/discard center gap dropped
+  compact-only from `gap-4` (16px) to `gap-1` (4px), closing the ~5.5px
+  overhang onto the bench art at the 128px art cap — a horizontal-only
+  change, zero cost to the vertical fold budget. (3) The screen
+  wrapper's compact padding raised `py-0`→`py-2` (16px), fixing the
+  Call-Cambio shadow clip — paid for by reclaiming 16px of the ~53.5px
+  slack the scroll region's `flex-1` was leaving unclaimed at 2–4
+  players (verified: `scrollContentH` still equals `scrollClientH`
+  exactly post-fix, i.e. still zero overflow). (4) The remaining ~37.5px
+  of that slack was left as-is and documented in a code comment as
+  intentional grouping space (shared table vs. the viewer's own zone) —
+  a full flex restructure to eliminate it was judged not worth the risk
+  this late against the fold budget. Did NOT touch the 8 controlled/
+  advisory-only findings (flat type tier, four-benches scenery, seat-
+  pill ring ambiguity, badge overlap, connection dot, the pre-existing
+  32px touch-target tension, one avatar's aria-hidden contrast) — those
+  read as legitimate design choices or were already-known, separately-
+  tracked tensions, not bugs to fix reflexively.
 
 ## Surprises & discoveries
 
@@ -233,4 +370,182 @@ timestamp each entry)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+_(review pass, 2026-09-06 — verdict: **fix-then-ship**)_
+
+### What passed (independently verified, not from the plan's claims)
+
+- Full gate green (exit 0); forced fresh runs: `@cambio/web` 212/212
+  (67 in `game-screen.test.tsx` incl. the 8 new structural tests),
+  `@cambio/ui`, `@cambio/api` 118/118 against live Postgres.
+- Live rendered probes against a fresh 3p and 5p game (playwright,
+  live api): 3p compact 360×640 — page overflow **0**, chrome pinned
+  (8–51px), dock pinned (588–632px), all 14 anchors inside the flight
+  root, no transformed ancestor. 5p compact — page overflow 0,
+  middle-region-only scroll (110px), chrome/dock rects byte-identical
+  before/after driving `scrollTop`. Clauses 1–6 hold live.
+- Baseline comparison via a `release-v0` worktree served on the same
+  origin: pre-change compact overflow was 490px (3p) / 727px (5p) —
+  the premise was real; post-change 0. Regular 5p at 1280×900:
+  `scrollHeight` 918px on BOTH branches — the 18px page overflow there
+  is pre-existing, not a clause-10 regression.
+- Hidden information (clause 8): diff scope clean — zero edits under
+  `packages/contracts`, `apps/api`, realtime, or projections; no new
+  state, no storage, no `useEffect` added.
+- Token discipline (clause 11): all new values are scale steps or named
+  tokens; no arbitrary-value utilities; the one new inline `style` is
+  the sanctioned dynamic `seatArc` percentages.
+
+### Findings (fix cycle works from this list)
+
+**F1 — BLOCKING, clause 9 violated: the room screen visibly changed at
+compact.** Two unprefixed changes on TableSurface's shared root reach
+the room screen: `max-w-(--size-table-art-compact)` (128px art cap,
+`table-surface.tsx`) and root `gap-4`→`gap-2`. Live probe: the room's
+seating-state table art renders **128px** wide at 360×640 (pre-change
+`w-3/4` ≈ 246px — roughly halved). The "room screen unchanged" claim is
+false in every instance; the sweep found: root plan :52–54, :122–123
+(clause 9 itself), :145, :187, :218; frontend plan :154, :183, :375,
+coverage row 9 (:397), :435; and `table-surface.md` r4 now documents
+the cap component-wide — canon and contract clause 9 are in direct
+conflict. **Fix requires a user call:** either scope both changes to
+the game screen (variant/className), or deliberately amend clause 9 +
+every claim instance + canon. **RESOLVED (fix cycle, 2026-09-06;
+scoped-to-game-screen branch, user call):** the art cap and root gap
+now key off `viewerSeat === "external"` (the docked composition's own
+discriminator — one prop, no two-props-must-agree surface) in
+`table-surface.tsx`; the default path is byte-for-byte pre-CAM-21.
+Probed live post-fix: room art 234px at 360×640 (= `w-3/4` of the
+312px padded surface; was 128px). Canon re-aligned (table-surface.md
+Anatomy + r4 amendment, tokens.md Shape note); the two false Progress
+claims carry inline corrections; the game screen's own fold metrics
+re-probed unchanged.
+
+**F2 — clause 10 + 7 violated at regular game-over: the viewer's own
+hand is double-dimmed (analysis-confirmed; render to prove).** At
+regular the extracted seat (`regular:z-10`, a stacking context trapping
+its inner z-20 rest) is painted over by TableSurface's full-region
+z-20 rest wherever the seat overlaps the square: combined dim ≈ 0.578
+vs pre-change 0.35; the below-square overhang is now dimmed 0.35 vs
+pre-change 0. The frontend plan's claim that `v2_gameover_regular.png`
+verified this state is contradicted by stacking analysis — the M5 "hard
+seam" fix changed the seam's opacities, not removed it. Fix: gate the
+extracted-seat rest to compact (or reproduce the exact pre-change
+composition: single 35% inside the square, 0 outside), then a rendered
+regular game-over check. **RESOLVED (fix cycle, 2026-09-06; gated to
+compact):** the extracted-seat rest gained `regular:hidden` (+ a
+`data-region="own-seat-rest"` hook) and the misleading comment was
+rewritten to state the stacking analysis. Verified against a live
+Ended game: at 1280×900 the rest computes `display:none` (surface rest
+alone — the pre-change composition, screenshot checked: single square
+dim, undimmed overhang, which is the PRE-EXISTING boundary, not this
+task's); at 360×640 it renders, page overflow 0. New jsdom pin:
+"renders the own-seat game-over rest inside the extracted seat
+wrapper, compact-only (review F2)".
+
+**F3 — coverage-table rows overclaim what the tests assert
+(doc-claims-X-falsely; close by sweep, not spot-fix).** Verified
+against test bodies: row 2 claims the beat message is asserted in the
+band — no test asserts it; row 3 claims Call Cambio / Keep/**Discard**
+/ the slam prompts — the Discard button is never asserted, the
+Keep/Discard test omits the "never the chrome band" half, and the
+"Ready a give" prompt is asserted nowhere; row 4 claims the scroll
+wrapper "never contains … the dock" — unasserted (only the own-hand
+row is); row 7's "dimmed table at both breakpoints" — the cited test
+asserts a `data-state` attribute only, and the NEW dim element
+(`game-screen.tsx` extracted-seat rest) has no test; row 10's "every
+regular-breakpoint class is unprefixed-identical or explicitly
+regular:-restored" is false — `flex-1` and `min-h-0` are live
+unprefixed flex-item properties on `table-root` at regular (inert in
+practice by auto-height analysis, but the stated standard is class
+restoration), and the code comment "flex-\* … become inert once display
+leaves flex" (`game-screen.tsx` table-root region) is wrong for
+exactly those two. Prefer strengthening tests over weakening rows;
+amend row 10's claim + the comment. **RESOLVED (fix cycle,
+2026-09-06; tests strengthened, one claim amended):** DrawSkipped-beat,
+Discard + negative-half, "Ready a give", and dock-outside-scroll
+assertions all added (game-screen.test.tsx, 68 tests now); the new
+own-seat-rest pin covers row 7's gap. Row 10 took the
+strengthen-the-code branch where possible — `regular:flex-initial` /
+`regular:min-h-auto` restorations landed on the wrapper, stage, and
+table-root — plus a claim amendment for the one legitimate residue
+(`regular:contents`-dissolved wrappers have no box for item properties
+to act on); the wrong flex-inertness comment is rewritten. Coverage
+rows 2/3/4/7/10 updated to match what is actually asserted.
+
+**F4 — canon divergence (ADR-0027: "divergence is a defect").**
+(a) `tokens.md:95` and `playing-card.md:16` still say rank/pip "scales
+with the card, not the page" — false since the `max(…, --text-xs)`
+floor (which also bites `card-sm` at REGULAR: score-sheet minis' pip
+8.32→12px, understated in the Decision Log). (b) `version:` frontmatter
+not bumped: `app-shell.md` v3≠r4 and `turn-indicator.md` v1≠r2 (both
+regressed by this diff), `table-surface.md` v2≠r4, `slam-timer.md`
+v1≠r3 (pre-existing staleness). (c) `table-surface.md` r4 omits the
+root `gap-4`→`gap-2` change entirely. (d) `table-surface.tsx` header
+comment still cites r2. **RESOLVED (fix cycle, 2026-09-06; canon
+amended):** (a) tokens.md's type-scale line now records the 12px floor
+and its regular `card-sm` bite; playing-card.md gained r3 (and its
+Anatomy line the floor) — claim amended rather than behavior reverted,
+per the logged user decision behind the floor. (b) version fields
+bumped: playing-card 3, table-surface 4, app-shell 4, turn-indicator
+2, slam-timer 3. (c) the gap change is documented in the r4 amendment,
+scoped per F1. (d) the header comment now cites r4.
+
+**F5 — advisory (not blocking; triage in fix cycle or follow-ups).**
+(1) ADR-0035 guard test regex `/(^|\s)scale-/` misses variant-prefixed
+(`regular:scale-*`), negative (`-scale-x-*`), and inline-style
+transforms — widen. (2) The 5p fallback puts anchors inside an
+`overflow-y-auto` region: a scroll during an in-flight card desyncs
+FLIP coordinates; not covered by ADR-0035 — add a sentence there or
+file a follow-up. (3) `overflow-hidden` on the dvh wrapper clips (not
+scrolls) if chrome+dock ever exceed the viewport (message pile-up or
+penalty-swollen hand) — unproven risk, worth a rendered look. (4) The
+container hand-copies `EDGE_ANCHOR_CLASS.top` and the rest treatment
+(unexported from table-surface), and the extracted seat's regular
+placement rests on an unnamed containing-block coincidence
+(`table-root` w-full vs surface max-w-2xl, centered, x=50%) — export
+the anchor map or extract a ViewerSeatDock component when next
+touched. (5) ai-tells: the ~37.5px void's code comment narrates flex
+residue as a deliberate "common-region split" — user-accepted at fix
+time, but the comment should say "accepted residue" rather than
+retrofit intent. (6) Dead classes: `regular:order-none` (no-op),
+wrapper `justify-center` (inert). (7) Prettier-stable but broken
+inline-code-span line flow at frontend plan :407–408 (and pre-existing
+root :197–199). (8) `--size-table-art-compact: 128px` is an off-scale
+bare primitive consumed from TSX — fine, but deserves its one-line
+rationale in styles.css. (9) Standing tensions carried, still open:
+32px tap targets vs the 44px floor; toast stack overlaying the compact
+dock (never exercised).
+**F5 disposition (fix cycle, 2026-09-06):** DONE — (1) guard widened
+(`/(^|\s|:)-?scale-/` + `transform-[` + inline `style.transform`
+checks); (2) owned-edge sentence added to ADR-0035's Consequences;
+(5) comment rewritten as "accepted flex residue"; (6)
+`regular:order-none` removed; `justify-center` KEPT — the "dead class"
+call was wrong, it still centers the non-game states (skeleton,
+no-access), noted inline; (7) both spans rephrased onto one line; (8)
+rationale comment added. DEFERRED as follow-ups — (3)
+chrome+dock-overflow clip risk, (4) geometry duplication /
+containing-block coincidence, (9) both standing tensions.
+
+**F6 (new, found during fix-cycle verification) — the "2–4 players
+fit" claim was name-width-sensitive and over-claimed at 4p.** The
+review's 4-player probe game (6-character seat names) wraps the
+opponent row: 110px middle-region scroll, IDENTICAL pre- and
+post-fix-cycle (isolated by stashing the fix and re-probing), so a
+pre-existing over-claim, not a regression — the implement session's
+4p measurement presumably used narrower content. RESOLVED by claim
+amendment (the geometry promise cannot be test-hardened against
+content width): acceptance criterion second amendment, coverage row 1,
+frontend Surprises note, table-surface.md r4 amendment. The
+name-independent guarantees — zero page scroll, pinned chrome/dock,
+middle-only overflow — were probed at 2/3/4/5 players and all hold.
+
+### What was run
+
+`pnpm turbo build typecheck lint test` (exit 0); forced
+`--filter @cambio/web --filter @cambio/ui --force` and
+`--filter @cambio/api --force` (all fresh-green, live Postgres);
+playwright probes (fold/pinning/anchors/transform-chain at 3p+5p
+compact, 5p regular, room screen) against live dev servers
+(freshness-checked per AGENTS.md) plus a `release-v0` worktree
+baseline on the same CORS origin. Screenshots and probe JSON in the
+review session's scratchpad.

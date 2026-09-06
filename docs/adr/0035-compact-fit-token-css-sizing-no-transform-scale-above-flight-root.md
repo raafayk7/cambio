@@ -61,6 +61,15 @@ Alternatives considered:
   for `transform: scale`.
 - Committed to: the flight root remaining transform-free up its ancestor
   chain; compact sizing expressed through the design-system token layer.
+- Owned edge (recorded at CAM-21 review): the docked composition puts
+  flight anchors inside a compact `overflow-y-auto` region (the 5-player
+  fallback's scroll). A scroll during an in-flight card desyncs the
+  frozen FLIP coordinates from the moved anchors — the same
+  capture-then-cancel stance ADR-0034 takes for scroll/resize applies:
+  flights measure at start and never retarget; a mid-flight scroll may
+  land a card visually off its slot for that one beat, and the next
+  refetch-driven render corrects it. Not a violation of this ADR; noted
+  so nobody "fixes" it with a transform.
 - Revisit if: the flight layer ever moves to a coordinate model measured
   in a transform-aware space (e.g. `visualViewport`/manual matrix math),
   which would dissolve the constraint.
