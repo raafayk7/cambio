@@ -1,6 +1,6 @@
 name: table-surface
 status: draft
-version: 2
+version: 4
 extends: none
 
 The play surface — the top-down khoka table. Class: **Game object**.
@@ -20,10 +20,13 @@ The play surface — the top-down khoka table. Class: **Game object**.
   arranged radially around the asset.
 - The viewer's own seat is always at the bottom; the table rotates per
   viewer.
-- Compact art cap (CAM-21): the painted table asset's width is capped at a
+- Compact art cap (CAM-21, docked composition only): under
+  `viewerSeat="external"` the painted table asset's width is capped at a
   token max-width (`--size-table-art-compact`, tokens.md) so the whole
   composition fits the 360×640 fold — square asset, so the cap is also the
-  height cap. Regular is unaffected (the cap is cancelled there).
+  height cap. Regular is unaffected (the cap is cancelled there), and the
+  default `"internal"` path (the room screen) takes no cap at all (review
+  F1).
 
 ## States
 
@@ -102,4 +105,17 @@ None.
   floor by default (4 wide-enough groups need two wrapped rows
   regardless of orientation) — the middle region's own scroll (the
   screen's `data-region="table-scroll"`) is the sanctioned fallback,
-  chrome and dock stay pinned.
+  chrome and dock stay pinned. _(Amended at review, 2026-09-06, F1/F4:
+  two fold-fit values this revision originally left implicit or
+  component-wide are DOCKED-COMPOSITION-ONLY, keyed to
+  `viewerSeat="external"` — the compact art max-width cap
+  (`--size-table-art-compact`, 128px) and the root flow gap tightened
+  `gap-4`→`gap-2` (a change r4 first omitted entirely). The default
+  `"internal"` path — the room screen — keeps the uncapped `w-3/4` art
+  and `gap-4`, byte-for-byte its pre-CAM-21 rendering; as shipped
+  before this amendment both values leaked into the room screen at
+  compact, halving its table art. The revision's "closed the fold
+  budget for 2–4 players" is also name-width-sensitive: seat pills wide
+  enough — e.g. 6-character names at 4 players — wrap the opponent row
+  into the screen's sanctioned middle scroll; the invariants that hold
+  at every count are page-level fit and pinned chrome/dock.)_

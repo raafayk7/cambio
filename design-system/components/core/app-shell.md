@@ -1,6 +1,6 @@
 name: app-shell
 status: draft
-version: 3
+version: 4
 extends: none
 
 The screen frame. Class: **Layout**.

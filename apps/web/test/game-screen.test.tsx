@@ -1737,7 +1737,7 @@ describe("compact docked composition (CAM-21)", () => {
     expect(within(band).getByRole("progressbar", { name: "Slam window" })).toBeInTheDocument()
   })
 
-  it("keeps a command-error and a public-fizzle message inside the chrome band once they render", async () => {
+  it("keeps command-error, fizzle, and beat messages inside the chrome band once they render", async () => {
     const fake = setupFake()
     const { handlers } = gameBootstrap()
     renderGameApp(GAME_ID)
@@ -1757,6 +1757,15 @@ describe("compact docked composition (CAM-21)", () => {
     expect(
       within(band).getByText(`${FRIEND.name}'s power fizzled — no legal target.`),
     ).toBeInTheDocument()
+
+    // Review F3: the DrawSkipped beat message is band content too — the
+    // coverage table claimed it, no assertion pinned it until now.
+    act(() => {
+      room.emit("DrawSkipped", { _tag: "DrawSkipped", playerId: FRIEND.id, kind: "penalty" })
+    })
+    expect(
+      within(band).getByText(`No cards left to draw — ${FRIEND.name}'s penalty card was skipped.`),
+    ).toBeInTheDocument()
   })
 
   it("keeps the give-pick prompt inside the bottom dock, never the chrome band", async () => {
@@ -1769,6 +1778,12 @@ describe("compact docked composition (CAM-21)", () => {
     renderGameApp(GAME_ID)
     await screen.findByText(ME.name)
     await channelsReady(fake)
+
+    // Review F3: the pre-arm "Ready a give" affordance is dock content too
+    // (root plan clause 3) — claimed by the coverage table, unpinned before.
+    const readyGive = screen.getByRole("button", { name: "Ready a give" })
+    expect(dockActions().contains(readyGive)).toBe(true)
+    expect(chromeBand().contains(readyGive)).toBe(false)
 
     fireEvent.click(slotButton(FRIEND.id, 0))
     const prompt = await screen.findByText("If you're right, which card do you give them?")
@@ -1808,8 +1823,14 @@ describe("compact docked composition (CAM-21)", () => {
     await screen.findByText(ME.name)
     await channelsReady(fake)
 
+    // Review F3: both buttons, and the negative half — the coverage table
+    // claimed Keep/Discard "never the chrome band"; only Keep was pinned.
     const keep = screen.getByRole("button", { name: "Keep" })
-    expect(dockActions().contains(keep)).toBe(true)
+    const discard = screen.getByRole("button", { name: "Discard" })
+    for (const button of [keep, discard]) {
+      expect(dockActions().contains(button)).toBe(true)
+      expect(chromeBand().contains(button)).toBe(false)
+    }
   })
 
   it("keeps the viewer's own hand anchors outside the scroll region but inside the flight root", async () => {
@@ -1839,6 +1860,9 @@ describe("compact docked composition (CAM-21)", () => {
     expect(scrollRegion.contains(opponentAnchor)).toBe(true)
     expect(scrollRegion.contains(deckAnchor)).toBe(true)
     expect(scrollRegion.contains(discardAnchor)).toBe(true)
+    // Review F3: the coverage table's row 4 claims the scroll wrapper never
+    // contains the dock either — pin that half too.
+    expect(scrollRegion.contains(dockActions())).toBe(false)
   })
 
   it("no longer renders the viewer's own seat wrapper inside TableSurface — it's extracted to the screen's dock", async () => {
@@ -1876,7 +1900,55 @@ describe("compact docked composition (CAM-21)", () => {
     const tableRoot = document.querySelector('[data-region="table-root"]')
     if (tableRoot === null) throw new Error("table-root region not found")
     for (let node: Element | null = tableRoot; node !== null; node = node.parentElement) {
-      expect(node.className).not.toMatch(/(^|\s)scale-/)
+      // Review F5.1 widened the net: variant-prefixed (`regular:scale-*`)
+      // and negative (`-scale-x-*`) utilities, arbitrary transform
+      // utilities, and inline transform styles are all ADR-0035 breaches
+      // the original `/(^|\s)scale-/` couldn't see.
+      expect(node.className).not.toMatch(/(^|\s|:)-?scale-/)
+      expect(node.className).not.toMatch(/transform-\[/)
+      expect((node as HTMLElement).style.transform ?? "").toBe("")
     }
+  })
+
+  it("renders the own-seat game-over rest inside the extracted seat wrapper, compact-only (review F2)", async () => {
+    setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0] },
+          ],
+          phase: { _tag: "Ended", calledBy: ME.userId },
+          reveal: {
+            hands: [
+              { playerId: ME.userId, cards: [] },
+              { playerId: FRIEND.id, cards: [{ slotIndex: 0, card: "KS" }] },
+            ],
+            scores: [
+              { playerId: ME.userId, total: 0 },
+              { playerId: FRIEND.id, total: 13 },
+            ],
+            winners: [ME.userId],
+          },
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText("SCORES")
+
+    // The extracted own seat needs its OWN rest at compact (it sits outside
+    // TableSurface's square, so the surface's full-region rest never reaches
+    // it) — and that rest must be compact-only: at regular the surface's
+    // z-20 rest already paints over the `regular:z-10` seat wherever they
+    // overlap, and an always-on copy double-dims it (review F2). The class
+    // pin mirrors the ADR-0035 guard's structural-classname precedent.
+    const rest = document.querySelector('[data-region="own-seat-rest"]')
+    expect(rest).not.toBeNull()
+    expect(rest?.closest("[data-seat-index]")).not.toBeNull()
+    expect(rest?.closest('[data-state="game-over"]')).toBeNull()
+    expect(rest?.className).toContain("regular:hidden")
   })
 })

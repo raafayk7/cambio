@@ -598,7 +598,7 @@ function GameTable({
     // positioned ancestor for both the compact bounded stage below and the
     // regular docked Call Cambio affordance (bottom-right of the whole
     // stage column).
-    <div className="relative flex w-full flex-1 min-h-0 flex-col items-center gap-4 regular:flex-initial">
+    <div className="relative flex w-full flex-1 min-h-0 flex-col items-center gap-4 regular:flex-initial regular:min-h-auto">
       {/* Top band (root plan clause 2, CAM-21): turn indicator, slam timer,
           and every inline message pin here — none of them can leave the
           viewport while the game screen is mounted. `regular:contents`
@@ -610,7 +610,7 @@ function GameTable({
         data-region="chrome"
         className="flex shrink-0 flex-col items-center gap-4 regular:contents"
       >
-        <TurnIndicator state={indicatorState} className="regular:order-none">
+        <TurnIndicator state={indicatorState}>
           {turnStatusCopy(status, playerName(status.activePlayerId))}
         </TurnIndicator>
         {slamPhase !== undefined ? (
@@ -645,22 +645,24 @@ function GameTable({
           Compact: a bounded column of (a) the ONLY element that ever
           scrolls — the opponents/table/art, and (b) the extracted own
           seat, docked directly beneath it (the dock's hand half).
-          `regular:block` restores plain document flow, matching today's
-          `relative w-full` exactly (align-items/gap/flex-* all become
-          inert once display leaves flex).
-          Design-gate note (2026-09-06): the scroll region below is
-          `flex-1`, so at 2–4 players (where its content is shorter than
-          its allocation) it grows past its content and leaves empty
-          paving between the table and the own-hand dock — read as a
-          deliberate common-region split (shared table vs. the viewer's
-          own zone) rather than residue: it's identical across every
-          player count that fits the fold (the opponent-orientation fix
-          makes all of them render one row), and a chunk of it is now
-          claimed as real padding on the pinned bands (see the screen
-          wrapper's `py-2`). Fully eliminating the rest would mean
-          moving flex-grow off this element entirely, which relocates
-          the same slack elsewhere in the column for no clear gain — not
-          worth the risk this late against the fold budget. */}
+          `regular:block` restores plain document flow; align-items and
+          gap die with the flex display, but flex-ITEM properties
+          (`flex-1`, `min-h-0`) would stay live against the stage — so
+          both are explicitly restored at regular below (review F3:
+          an earlier comment here claimed they'd be inert; they aren't).
+          Design-gate note (2026-09-06, wording per review F5): the
+          scroll region below is `flex-1`, so at 2–4 players (where its
+          content is shorter than its allocation) it grows past its
+          content and leaves ~37px of empty paving between the table and
+          the own-hand dock. That slack is ACCEPTED FLEX RESIDUE, kept
+          knowingly: it reads acceptably as separation between the
+          shared table and the viewer's zone, it's identical across
+          every player count that fits the fold, and 16px of it was
+          reclaimed as real padding on the pinned bands (the screen
+          wrapper's `py-2`). Fully eliminating it would mean moving
+          flex-grow off this element entirely, relocating the same slack
+          elsewhere in the column for no clear gain — not worth the risk
+          against the fold budget. */}
       <div
         ref={setTableRoot}
         data-region="table-root"
@@ -668,7 +670,7 @@ function GameTable({
         // fold budget was short at the M5 rendered pass (root plan
         // Surprises), and this gap is inert at regular anyway once
         // `regular:block` cancels flex.
-        className="relative flex w-full flex-1 min-h-0 flex-col items-center gap-2 regular:order-9 regular:block"
+        className="relative flex w-full flex-1 min-h-0 flex-col items-center gap-2 regular:order-9 regular:block regular:flex-initial regular:min-h-auto"
       >
         <div
           data-region="table-scroll"
@@ -743,15 +745,20 @@ function GameTable({
             `relative` here too (an earlier version of this fix did)
             resurrects them as a relative offset and shoves the whole hand
             off-screen (confirmed at the M5 rendered pass). The INNER div
-            is the positioning context for the game-over rest instead —
-            TableSurface's own rest (table-surface.tsx r3) is `inset-0` of
-            ITS square root, which this wrapper sits outside of at every
-            breakpoint (`viewerSeat="external"` is unconditional, not
-            compact-only), so relying on it here would only dim whatever
-            fraction of this box happens to overlap that square — the
-            other bug the M5 pass caught, a hard seam through the own
-            hand's cards at regular. Same z-20/`green-deep`/35% treatment
-            as table-surface.tsx's rest, scoped to this wrapper instead. */}
+            is the positioning context for the game-over rest instead.
+            The rest is COMPACT-ONLY (`regular:hidden`, review F2): at
+            regular this wrapper is `regular:z-10`, a stacking context
+            that TableSurface's own full-region z-20 rest paints OVER
+            wherever the seat overlaps the square — so an always-on copy
+            here DOUBLE-dims that overlap (~0.58 combined vs the
+            pre-CAM-21 0.35) and dims the below-square overhang the
+            pre-change rendering left undimmed. Hiding it at regular
+            reproduces the pre-change regular game-over exactly (surface
+            rest alone: 35% inside the square, 0 below — that boundary is
+            pre-existing, not this task's seam to fix). At compact the
+            wrapper sits entirely outside the square, gets no share of
+            the surface's rest, and needs this copy — same
+            z-20/`green-deep`/35% treatment, scoped to this wrapper. */}
         <div
           data-seat-index={viewerSeatIndex}
           className="shrink-0 regular:absolute regular:z-10 regular:-translate-x-1/2 regular:-translate-y-1/2"
@@ -765,7 +772,8 @@ function GameTable({
             {ended ? (
               <div
                 aria-hidden
-                className="pointer-events-none absolute inset-0 z-20 bg-(--green-deep)/35"
+                data-region="own-seat-rest"
+                className="pointer-events-none absolute inset-0 z-20 bg-(--green-deep)/35 regular:hidden"
               />
             ) : null}
           </div>
@@ -1010,7 +1018,11 @@ export function GameScreen({ gameId }: { gameId: string }) {
           (verified: still exactly fits at 2–4 players; 5 players was
           already relying on its scroll fallback and is unaffected in
           practice). */}
-      <div className="flex max-h-dvh w-full flex-1 min-h-0 flex-col justify-center gap-4 overflow-hidden px-4 py-2 regular:max-h-none regular:overflow-visible regular:py-4">
+      {/* `justify-center` is inert for the game state (GameTable's stage is
+          `flex-1`) but still centers every non-stage state — skeleton,
+          no-access, error — so it stays (review F5.6 called it dead; it is
+          only conditionally so). */}
+      <div className="flex max-h-dvh w-full flex-1 min-h-0 flex-col justify-center gap-4 overflow-hidden px-4 py-2 regular:max-h-none regular:min-h-auto regular:overflow-visible regular:py-4">
         {ownHeading ? null : <h1 className="sr-only">Game</h1>}
         {content}
       </div>

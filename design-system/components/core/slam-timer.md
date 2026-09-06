@@ -1,6 +1,6 @@
 name: slam-timer
 status: draft
-version: 1
+version: 3
 extends: none
 
 The slam window made visible. Class: **Game object**.

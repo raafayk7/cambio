@@ -1,6 +1,6 @@
 name: turn-indicator
 status: draft
-version: 1
+version: 2
 extends: none
 
 Whose turn, what phase. Class: **Game object**.

@@ -72,7 +72,12 @@
    * cancels it at regular via max-w-none). Tuned down from the plan's
    * starting 160px at the M5 rendered pass (measured fold-budget
    * shortfall, see root plan Surprises) — 128px is the first escalation
-   * step the child plan names.  */
+   * step the child plan names. Off the spacing scale deliberately: it is
+   * a measured fold-budget constant (viewport minus chrome, dock, and
+   * opponent rows at the tuned card scale), not a rhythm step — and it
+   * stays a bare primitive (no @theme role) because exactly one consumer
+   * exists, table-surface.tsx's docked-composition art cap (review F5.8;
+   * promote to a role if a second consumer ever appears). */
   --size-table-art-compact: 128px;
 }
 

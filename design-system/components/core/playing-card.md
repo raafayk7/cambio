@@ -1,6 +1,6 @@
 name: playing-card
 status: draft
-version: 2
+version: 3
 extends: none
 
 The atom of the game. Class: **Game object**.
@@ -14,7 +14,8 @@ The atom of the game. Class: **Game object**.
 - Back: `brick-bright` stripes on card cream with a `mustard` inner frame —
   the back is the most-seen surface in the game; it carries the identity.
 - Size scales by context (hand, pile, score reveal); rank scales with the
-  card, not the page.
+  card, floored at the type scale's 12px step (r3) so the smallest
+  footprints stay legible.
 
 ## States
 
@@ -62,3 +63,11 @@ none may be an animation accident):
 - r2 (CAM-18, G3): the `peeking` hold duration is `duration.peek`
   (tokens.md), no longer "game-configured" — round-1 user decision: a
   fixed client duration, the same for every peek.
+- r3 (CAM-21 design-gate fix, recorded at review): rank and pip sizes
+  gain a 12px floor — `max(card-proportional, 12px)`, tokens.md type
+  scale. Below a 40px card the proportional size dropped under the
+  scale's smallest legible step (measured 9.6px/8.32px at the compact
+  32px `card-md`); the floor applies at both breakpoints, so `card-sm`
+  consumers (the score-sheet minis) pick it up at regular too — a
+  deliberate, narrow legibility exception to CAM-21's "regular
+  untouched" scope, logged in that task's Decision Log.
