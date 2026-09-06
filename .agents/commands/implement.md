@@ -54,6 +54,13 @@ Follow the root plan's milestone order. Rules of engagement:
   plan files — check off Progress with timestamps, append Decision Log
   entries for every non-obvious choice, record Surprises with evidence.
   Subagents update their child plan; you consolidate anything root-worthy.
+  Fill Contract-coverage rows with
+  `node .agents/scripts/fill-coverage-row.mjs <plan.md> <CLAUSE> --test …
+--asserted …` — prettier re-pads the table's columns on every write, so
+  direct string-match edits against it rot immediately (CAM-18 lesson).
+  When lanes run in parallel, only ONE writer touches a given plan file;
+  parallel subagents report their doc updates for the orchestrator to
+  apply.
 - **Deviations:** small tactical deviations from a child plan are fine if
   logged. If the _functional contract_ or an ADR turns out wrong, stop and
   ask the user — do not silently reshape the task. HANDOFF §9 open rules:

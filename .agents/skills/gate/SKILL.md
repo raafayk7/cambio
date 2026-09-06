@@ -22,6 +22,14 @@ prior output, and assemble the final verdict for the user.
 > start; without the setup, fall back to the visual review path. And the
 > design system outranks this gate: a flag against a deliberate Cambio
 > identity choice is surfaced as a conflict, not a defect.
+>
+> Two lessons from CAM-18's gate run: (1) **verify dev-server transform
+> freshness before rendering against it** (AGENTS.md §Development has the
+> curl-and-grep check) — a stale Vite transform produced a phantom
+> touch-target finding that survived into the Map stage; (2) for screens
+> behind a session, `render.js` takes `--cookie "name=value"` (applied to
+> the page origin and `--api-origin`, default `http://localhost:3001`) —
+> no ad-hoc wrapper needed.
 
 ## What counts as a gateable artifact (v1)
 
