@@ -337,4 +337,124 @@ timestamp each entry)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+_(review pass, 2026-09-06 — verdict: **fix-then-ship**)_
+
+### What passed (independently verified, not from the plan's claims)
+
+- Full gate green (exit 0); forced fresh runs: `@cambio/web` 212/212
+  (67 in `game-screen.test.tsx` incl. the 8 new structural tests),
+  `@cambio/ui`, `@cambio/api` 118/118 against live Postgres.
+- Live rendered probes against a fresh 3p and 5p game (playwright,
+  live api): 3p compact 360×640 — page overflow **0**, chrome pinned
+  (8–51px), dock pinned (588–632px), all 14 anchors inside the flight
+  root, no transformed ancestor. 5p compact — page overflow 0,
+  middle-region-only scroll (110px), chrome/dock rects byte-identical
+  before/after driving `scrollTop`. Clauses 1–6 hold live.
+- Baseline comparison via a `release-v0` worktree served on the same
+  origin: pre-change compact overflow was 490px (3p) / 727px (5p) —
+  the premise was real; post-change 0. Regular 5p at 1280×900:
+  `scrollHeight` 918px on BOTH branches — the 18px page overflow there
+  is pre-existing, not a clause-10 regression.
+- Hidden information (clause 8): diff scope clean — zero edits under
+  `packages/contracts`, `apps/api`, realtime, or projections; no new
+  state, no storage, no `useEffect` added.
+- Token discipline (clause 11): all new values are scale steps or named
+  tokens; no arbitrary-value utilities; the one new inline `style` is
+  the sanctioned dynamic `seatArc` percentages.
+
+### Findings (fix cycle works from this list)
+
+**F1 — BLOCKING, clause 9 violated: the room screen visibly changed at
+compact.** Two unprefixed changes on TableSurface's shared root reach
+the room screen: `max-w-(--size-table-art-compact)` (128px art cap,
+`table-surface.tsx`) and root `gap-4`→`gap-2`. Live probe: the room's
+seating-state table art renders **128px** wide at 360×640 (pre-change
+`w-3/4` ≈ 246px — roughly halved). The "room screen unchanged" claim is
+false in every instance; the sweep found: root plan :52–54, :122–123
+(clause 9 itself), :145, :187, :218; frontend plan :154, :183, :375,
+coverage row 9 (:397), :435; and `table-surface.md` r4 now documents
+the cap component-wide — canon and contract clause 9 are in direct
+conflict. **Fix requires a user call:** either scope both changes to
+the game screen (variant/className), or deliberately amend clause 9 +
+every claim instance + canon. RESOLVED: (fill in fix cycle).
+
+**F2 — clause 10 + 7 violated at regular game-over: the viewer's own
+hand is double-dimmed (analysis-confirmed; render to prove).** At
+regular the extracted seat (`regular:z-10`, a stacking context trapping
+its inner z-20 rest) is painted over by TableSurface's full-region
+z-20 rest wherever the seat overlaps the square: combined dim ≈ 0.578
+vs pre-change 0.35; the below-square overhang is now dimmed 0.35 vs
+pre-change 0. The frontend plan's claim that `v2_gameover_regular.png`
+verified this state is contradicted by stacking analysis — the M5 "hard
+seam" fix changed the seam's opacities, not removed it. Fix: gate the
+extracted-seat rest to compact (or reproduce the exact pre-change
+composition: single 35% inside the square, 0 outside), then a rendered
+regular game-over check. RESOLVED: (fill in fix cycle).
+
+**F3 — coverage-table rows overclaim what the tests assert
+(doc-claims-X-falsely; close by sweep, not spot-fix).** Verified
+against test bodies: row 2 claims the beat message is asserted in the
+band — no test asserts it; row 3 claims Call Cambio / Keep/**Discard**
+/ the slam prompts — the Discard button is never asserted, the
+Keep/Discard test omits the "never the chrome band" half, and the
+"Ready a give" prompt is asserted nowhere; row 4 claims the scroll
+wrapper "never contains … the dock" — unasserted (only the own-hand
+row is); row 7's "dimmed table at both breakpoints" — the cited test
+asserts a `data-state` attribute only, and the NEW dim element
+(`game-screen.tsx` extracted-seat rest) has no test; row 10's "every
+regular-breakpoint class is unprefixed-identical or explicitly
+regular:-restored" is false — `flex-1` and `min-h-0` are live
+unprefixed flex-item properties on `table-root` at regular (inert in
+practice by auto-height analysis, but the stated standard is class
+restoration), and the code comment "flex-\* … become inert once display
+leaves flex" (`game-screen.tsx` table-root region) is wrong for
+exactly those two. Prefer strengthening tests over weakening rows;
+amend row 10's claim + the comment. RESOLVED: (fill in fix cycle).
+
+**F4 — canon divergence (ADR-0027: "divergence is a defect").**
+(a) `tokens.md:95` and `playing-card.md:16` still say rank/pip "scales
+with the card, not the page" — false since the `max(…, --text-xs)`
+floor (which also bites `card-sm` at REGULAR: score-sheet minis' pip
+8.32→12px, understated in the Decision Log). (b) `version:` frontmatter
+not bumped: `app-shell.md` v3≠r4 and `turn-indicator.md` v1≠r2 (both
+regressed by this diff), `table-surface.md` v2≠r4, `slam-timer.md`
+v1≠r3 (pre-existing staleness). (c) `table-surface.md` r4 omits the
+root `gap-4`→`gap-2` change entirely. (d) `table-surface.tsx` header
+comment still cites r2. RESOLVED: (fill in fix cycle).
+
+**F5 — advisory (not blocking; triage in fix cycle or follow-ups).**
+(1) ADR-0035 guard test regex `/(^|\s)scale-/` misses variant-prefixed
+(`regular:scale-*`), negative (`-scale-x-*`), and inline-style
+transforms — widen. (2) The 5p fallback puts anchors inside an
+`overflow-y-auto` region: a scroll during an in-flight card desyncs
+FLIP coordinates; not covered by ADR-0035 — add a sentence there or
+file a follow-up. (3) `overflow-hidden` on the dvh wrapper clips (not
+scrolls) if chrome+dock ever exceed the viewport (message pile-up or
+penalty-swollen hand) — unproven risk, worth a rendered look. (4) The
+container hand-copies `EDGE_ANCHOR_CLASS.top` and the rest treatment
+(unexported from table-surface), and the extracted seat's regular
+placement rests on an unnamed containing-block coincidence
+(`table-root` w-full vs surface max-w-2xl, centered, x=50%) — export
+the anchor map or extract a ViewerSeatDock component when next
+touched. (5) ai-tells: the ~37.5px void's code comment narrates flex
+residue as a deliberate "common-region split" — user-accepted at fix
+time, but the comment should say "accepted residue" rather than
+retrofit intent. (6) Dead classes: `regular:order-none` (no-op),
+wrapper `justify-center` (inert). (7) Prettier-stable but broken
+inline-code-span line flow at frontend plan :407–408 (and pre-existing
+root :197–199). (8) `--size-table-art-compact: 128px` is an off-scale
+bare primitive consumed from TSX — fine, but deserves its one-line
+rationale in styles.css. (9) Standing tensions carried, still open:
+32px tap targets vs the 44px floor; toast stack overlaying the compact
+dock (never exercised).
+
+### What was run
+
+`pnpm turbo build typecheck lint test` (exit 0); forced
+`--filter @cambio/web --filter @cambio/ui --force` and
+`--filter @cambio/api --force` (all fresh-green, live Postgres);
+playwright probes (fold/pinning/anchors/transform-chain at 3p+5p
+compact, 5p regular, room screen) against live dev servers
+(freshness-checked per AGENTS.md) plus a `release-v0` worktree
+baseline on the same CORS origin. Screenshots and probe JSON in the
+review session's scratchpad.
