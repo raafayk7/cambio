@@ -132,8 +132,13 @@ test rows.)_
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
-- [ ] YYYY-MM-DD HH:MM — step
+- [x] 2026-09-06 13:42 — Both files edited exactly as sketched in "Plan of
+      work" above (verbatim, no drift from the quoted current state). Steps
+      1-4 of "Concrete steps & validation" run: diffs identical (4-line
+      addition each), `git status --porcelain` on test globs empty, full
+      gate green (25/25 tasks; `@cambio/web:test` 204/204,
+      `@cambio/ui:test` 25/25).
 
 ## Surprises & notes for the root plan
 
-_(anything the root plan's Decision Log or the reviewer must know)_
+None — implementation matched the plan exactly, no deviations.
