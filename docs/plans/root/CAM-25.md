@@ -189,5 +189,69 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+**Verdict: ship** (2026-09-06 review, first pass — no fix cycle needed).
+
+Two parallel reviewers (contract, architecture) plus an independent
+verification pass found **no** findings of any kind — contract, architecture,
+or otherwise. Full detail below.
+
+### Contract review
+
+All 6 functional-contract clauses and all 5 acceptance criteria: **satisfied**,
+each with file:line evidence (`apps/web/test/setup.ts:2,11-16`,
+`packages/ui/test/setup.ts:2,11-16` for the `configure()` addition; both
+files' `afterEach(() => cleanup())` blocks and `@testing-library/jest-dom/vitest`
+imports untouched; `git diff release-v0...HEAD --stat` confirms the diff
+touches only the two `setup.ts` files plus the two plan docs — no test file,
+no `vitest.config.ts` anywhere in the repo). The child plan's Contract
+coverage table's "none" rows were confirmed accurate (genuinely no test
+exists that could be cited for a config-only change) and every clause is
+mapped — no unmapped clause. `asyncUtilTimeout` was independently confirmed
+as a live, non-deprecated `@testing-library/dom` config key with a runtime
+default of `1000` (`dist/config.js:15` in the resolved package), making
+`10_000` a real, meaningful, correctly-typed change. No behavior beyond the
+contract was found.
+
+### Architecture review
+
+**No violations** against `architecture`, `frontend-architecture`,
+`hidden-information`, `design-system`, or `ai-tells` — the diff touches only
+npm-external imports (`@testing-library/react`, `vitest`) in two test-harness
+files, crosses no package boundary, and touches no component, contracts
+schema, or realtime code. The reviewer additionally checked (unprompted by
+the contract, but relevant to a global-config change) whether `apps/web`'s
+and `packages/ui`'s `configure()` calls could clobber each other via a
+shared vitest process — confirmed they run as fully separate OS processes
+(each package's own `vitest run` script, no shared `vitest.workspace.ts`),
+so no cross-package interference is possible. Also confirmed the
+`asyncUtilTimeout: 10_000` / `testTimeout: 30_000` pairing is internally
+consistent (the async-query timeout fires well before the outer test
+timeout, so a genuine failure still reports a clear testing-library error).
+
+### Independent verification
+
+Ran `pnpm turbo build typecheck lint test` bare — 25/25 tasks green, but
+`@cambio/web:test`/`@cambio/ui:test` were cache hits. Forced a fresh run
+myself: `pnpm turbo test --filter=@cambio/web --filter=@cambio/ui --force` —
+**3/3 tasks successful, 0 cached**, `@cambio/ui:test` 6 files / 25 tests
+passed, `@cambio/web:test` 20 files / 204 tests passed. Matches both
+reviewers' independently-run fresh gates and the implementer's recorded
+counts exactly — no discrepancy, no flake this cycle. No timer/queue/race
+behavior was touched by this diff, so no probe beyond the process-isolation
+check above was warranted.
+
+### What shipped
+
+Exactly what was planned: `configure({ asyncUtilTimeout: 10_000 })` added to
+both `apps/web/test/setup.ts` and `packages/ui/test/setup.ts`, each with a
+comment naming CPU contention and distinguishing this from vitest's
+`testTimeout`. No deviations, no cuts, no ADR (correctly skipped — a
+config-value tweak with direct CAM-24 precedent).
+
+### What should carry into the next task
+
+Nothing outstanding from this task specifically. The originating issue's
+"worth investigating" note about auditing `findBy*`/`waitFor` call sites for
+real-timer sensitivity was deliberately deferred (Decision Log above) and
+remains deferred — no evidence surfaced during this review that changes
+that call.
