@@ -111,13 +111,13 @@ five call-site files for real-timer sensitivity, matching CAM-24's
 
 ### Acceptance criteria
 
-- [ ] `apps/web/test/setup.ts` calls `configure({ asyncUtilTimeout: 10_000 })`
+- [x] `apps/web/test/setup.ts` calls `configure({ asyncUtilTimeout: 10_000 })`
       with an explanatory comment above it.
-- [ ] `packages/ui/test/setup.ts` calls the identical
+- [x] `packages/ui/test/setup.ts` calls the identical
       `configure({ asyncUtilTimeout: 10_000 })` with an equivalent comment.
-- [ ] No `.test.ts`/`.test.tsx` file anywhere in the repo is modified.
-- [ ] Neither `vitest.config.ts` file is modified.
-- [ ] `pnpm turbo build typecheck lint test` passes.
+- [x] No `.test.ts`/`.test.tsx` file anywhere in the repo is modified.
+- [x] Neither `vitest.config.ts` file is modified.
+- [x] `pnpm turbo build typecheck lint test` passes.
 
 ## Plan of work
 
@@ -144,7 +144,18 @@ gap in this task's closeout, same as CAM-24's Validation section notes.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] YYYY-MM-DD HH:MM — step description
+- [x] 2026-09-06 14:55 — Added `configure({ asyncUtilTimeout: 10_000 })`
+      with the CPU-contention comment to both `apps/web/test/setup.ts` and
+      `packages/ui/test/setup.ts`, exactly as sketched in the frontend child
+      plan; diffs confirmed identical (7-line addition each) and both files
+      confirmed still byte-identical to each other after the edit. No test
+      file or `vitest.config.ts` touched
+      (`git status --porcelain -- '**/*.test.ts' '**/*.test.tsx' '**/vitest.config.ts'`
+      empty).
+- [x] 2026-09-06 14:56 — Full gate green:
+      `pnpm turbo build typecheck lint test` — 25/25 tasks successful.
+      `@cambio/web:test` 20 files / 204 tests passed; `@cambio/ui:test` 6
+      files / 25 tests passed. All acceptance criteria checked off above.
 
 ## Decision log
 
