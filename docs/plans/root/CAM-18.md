@@ -525,4 +525,126 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+**Review 2026-09-06 — verdict: fix-then-ship.** Two reviewers (contract +
+architecture) plus independent verification; one finding probe-confirmed
+in a real browser.
+
+### What passed
+
+- **No contract clause is violated.** Every clause G1–CH3 satisfied or
+  satisfied-with-a-named-gap (T3/T4 below); coverage-table tests
+  body-verified row by row; all gate-fix-cycle deviations match their
+  Decision Log entries; no unrequested network surface (pinned by the
+  recorded-calls test).
+- **Hidden information and memory fidelity fully clean**: no card value
+  constructed, inferred, cached, or persisted beyond its window; peeks
+  are timer-cleared React state only — the only `setQueryData` calls are
+  HTTP-response paths; penalty/give flights face-down structurally;
+  channel discipline exact (granted topics only, contracts decoders,
+  malformed dropped); no payload logging anywhere in the diff.
+- **ADR-0033 conformance verified branch-by-branch**: every
+  `handleRoomEvent`/`handlePlayerEvent` arm enqueues choreography +
+  schedules one debounced refetch and never touches the snapshot; one
+  version guard used by both HTTP paths; the client never closes the
+  slam window itself.
+- Import boundaries clean (full sweep of added imports); hardcoded-value
+  audit clean (both forms); ADR-0030 test discipline held; canon batch
+  conformant except the two doc overclaims below.
+- Independent verification: fresh forced full gate **25/25, 0 cached**,
+  635 tests, api suite against live Postgres + Realtime this cycle.
+
+### Findings (fix cycle works from THIS list)
+
+- **F1 — Reduced-motion flights never settle (probe-confirmed bug).**
+  `flight-layer.tsx` HighlightBox carries `motion-reduce:transition-none`
+  while the reduced-motion branch settles on `onTransitionEnd` — under
+  `prefers-reduced-motion` (the only condition that branch renders) no
+  transition ever runs, `settleOnce("completed")` never fires, the
+  flight stays in `useFlights().active` forever, and the derived
+  `drawing`/`reshuffling`/`receiving` states latch until unmount.
+  Probe: real Chromium, gallery flight demo — 2 highlight nodes still
+  live 1.5s post-flight under reduce; 0 under normal motion. Adjacent
+  hazard, same mechanism: an identity plan (origin rect == destination)
+  also never fires `transitionend` and there is no timeout fallback.
+  Fix: settle reduced-motion flights on a `duration.track`-scale timeout
+  (not transitionend), and add a generic settle-timeout fallback; pin
+  both with tests (fake timers; the injectable `measure` makes a
+  non-degenerate plan drivable in jsdom).
+- **F2 — T3's non-holder clause overclaims the wire.** "Non-holders see
+  the seat acting **+ which power**" is unimplementable during
+  resolution: `phase.card` is absent for non-holders (as the clause
+  itself parenthesizes) and no room event names the power until
+  `PowerDiscarded` lands (after resolution). The code shows the acting
+  seat only — correct given the wire. Fix branch: amend the CLAIM (with
+  an inline amendment note at T3) — sweep every phrasing: root T3, the
+  child plan's ViewPhase table row and step-12 prose, the T3 coverage
+  row.
+- **F3 — The public peek beat drops the slot.** `CardPeeked` carries
+  `target: SlotRef` (public info — which card was looked at is part of
+  the memory game) but `use-game.ts` discards `target.slotIndex` and
+  pulses the target's seat only; root T4 says everyone sees "which
+  slot". Fix branch: STRENGTHEN THE CODE — render a brief slot-level
+  beat (the accent treatment on the target slot for the public beat
+  duration), and pin it; the wire already provides everything needed.
+- **F4 — Canon/doc-vs-code batch (all doc amendments).**
+  (a) table-surface.md r3 states `edge` anchors every seat's outboard
+  edge; the shipped code deliberately centers the viewer's dock (the
+  gate fix's viewer-dock exception, documented only in a code comment) —
+  amend r3 to record the exception. (b) hand.md r2 claims
+  `emptySlotsClickable` serves the shipped give-target flow (the give
+  resolves on the slammer's OWN occupied slots; the prop is
+  gallery-only today) and lists `selectedSlots` consumers that never
+  populate a selection (peeks, swap-held are single-click) — align the
+  wording with what ships. (c) The root Decision Log's "the shadow
+  stays for … SCORES" parenthetical is imprecise (SCORES never carried
+  `text-shadow-poster`; only SLAM! does) — correct it. (d)
+  `affordances.ts`'s "two public-rule helpers" header and draw-deck.md
+  r2's "via H1" phrasing attribute the drawable rule to H1 where it
+  does not live — one-line precision fixes.
+- **F5 — Coverage-claim corrections + two missing beats' tests.**
+  (a) The T3 coverage row claims "fizzle beats pinned in
+  affordances.test.ts" — no fizzle test exists anywhere; add a
+  `PowerFizzled` beat test and correct the row. (b) SL2's `DrawSkipped`
+  beat is implemented but untested — add the test. (c) The CH1 row
+  overstates: no interaction test asserts a flight enqueue (jsdom
+  auto-cancels degenerate plans); reword the row to what is actually
+  pinned, or add an enqueue-level pin via the injectable measure.
+  (d) The S1 row still cites the deleted placeholder test — reword.
+  (e) C1's "300ms no-flash" test doesn't assert pre-300ms absence —
+  reword the row or strengthen the test.
+- **F6 — `SLAM_REVEAL_MS = 1200` is a second, off-token reveal-hold.**
+  This task promoted the peek hold to `duration.peek` precisely because
+  JS-timed holds are design vocabulary, then shipped another one
+  inline-justified. Needs a canon call (creation gate — user decides):
+  promote to a token (e.g. `duration.reveal`) with a tokens.md
+  amendment, or record a deliberate exemption in slam-timer.md.
+- **F7 — Side effects inside `setState` updaters.** `useFlights`'
+  `settle`/`cancelAll` invoke `onDone` callbacks inside their state
+  updaters — impure updaters double-fire under StrictMode. Not a live
+  bug (no StrictMode today); fix by moving the callback invocation
+  outside the updater.
+
+### Advisory (defer allowed; log only)
+
+DrawDeck's `reshuffling` pulse treatment is unreachable at the one
+moment it fires for real (deckCount still 0 pre-refetch renders the
+empty branch); `findAnchor` should `CSS.escape` its interpolation;
+tokens.md's reduced-motion canon says "cross-fades PLUS highlight" while
+the flight layer renders highlights only (defensible, note the reading);
+the 300ms no-flash constant now exists in three screens with no shared
+home; `isOccupiedSlot` and `handArc` are production-dead (test-only)
+exports; `PEEK_DURATION_MS`/`SCORE_REVEAL_MS` sync with their CSS tokens
+by hand-maintained convention. Process note: ADR-0033/0034 stay
+**proposed** — correct per the adr skill (accepted at the
+release→development merge), despite being fully implemented.
+
+### Verification record
+
+Fresh forced gate `pnpm turbo build typecheck lint test --force` →
+25/25 tasks, 0 cached (contracts 11, config 16, ui 25, domain 194,
+application 86, web 185, api 118 = 635), api suite against live
+containers. F1 probe: throwaway Playwright script (deleted) against the
+gallery flight demo — reduced-motion flight nodes persist at 1.5s
+(2 vs 0 normal). Both reviewers read-only; every reported finding was
+re-verified against source before inclusion; reviewer claims that did
+not hold were dropped.
