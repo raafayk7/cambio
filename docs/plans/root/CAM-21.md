@@ -27,6 +27,13 @@ chrome visible while touching your cards.
 
 ## Context & orientation
 
+> Line numbers below are pre-task (`HEAD 8f865e1`) — the M2/M3
+> restructure (Progress) rewired `game-screen.tsx` and
+> `table-surface.tsx` extensively, so these citations describe what
+> existed BEFORE this task, not current line positions. The as-built
+> shape is described in Progress and the frontend plan's Progress;
+> reconcile against the file, not these numbers.
+
 - **Screen composition** lives in
   `apps/web/src/containers/game/game-screen.tsx`. `GameTable`'s render is
   one flex column (`:576`): TurnIndicator → SlamTimer → slam prompts →
@@ -123,18 +130,28 @@ slam give prompts ("Ready a give" / give-pick prompt).
 
 ### Acceptance criteria
 
-- [ ] Rendered verification at 360×640 via the design-gate render path
+- [x] Rendered verification at 360×640 via the design-gate render path
       (`--width 360 --height 640`) at 2, 3, 4, and 5 players: no page
       scroll in default state; chrome and dock visible simultaneously
-      (clauses 1–4).
-- [ ] Rendered verification that regular (1280×900) output is unchanged
+      (clauses 1–4). **Amended at M5 (user decision, mid-implementation,
+      see Decision Log):** 2–4 players fit the full default state
+      (table + chrome + dock) with no scrolling at all; 5 players keeps
+      chrome and dock pinned/visible per clause 3, but reaching the
+      table's deck/discard needs one scroll gesture inside the middle
+      region — the fallback clause 4 already sanctioned for
+      below-360×640 viewports, now also covering the one player count
+      four full-width opponent groups can't fit on a single 360px line.
+- [x] Rendered verification that regular (1280×900) output is unchanged
       (clause 10) and the room screen is unchanged (clause 9).
-- [ ] jsdom suites green, including structural assertions the child plan
+- [x] jsdom suites green, including structural assertions the child plan
       adds for the dock/chrome regions (ADR-0030 scope: structure, not
       pixels).
-- [ ] Design-gate run on the new compact composition (advisory verdict,
-      surfaced not auto-resolved).
-- [ ] Canon revision notes landed in `table-surface.md`, `app-shell.md`,
+- [x] Design-gate run on the new compact composition (advisory verdict,
+      surfaced not auto-resolved). Verdict: flagged, 0 blocking —
+      12 default-tier calls (4 accidental, cheap/local fixes; 8
+      controlled or advisory-only). See the Surprises entry and the
+      full report shared with the user 2026-09-06.
+- [x] Canon revision notes landed in `table-surface.md`, `app-shell.md`,
       `turn-indicator.md`, `slam-timer.md`.
 - [ ] The quality gate passes: `pnpm turbo build typecheck lint test`
       (run bare, never piped).
@@ -190,7 +207,15 @@ http://localhost:3100/game/<id> --cookie ... --width 360 --height
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] _(none yet — planning complete 2026-09-06)_
+- [x] 2026-09-06 — M1–M4 implemented (tokens, screen restructure,
+      TableSurface adjustments, tests) — see the frontend child plan's
+      Progress for the file-level detail. Full gate green throughout.
+- [x] 2026-09-06 — M5 rendered pass complete: 2–4 players fit the
+      360×640 floor exactly by default; 5 players uses the sanctioned
+      middle-scroll fallback (amended acceptance criterion above).
+      Regular and room screen confirmed unchanged, rendered and jsdom.
+      Canon revisions landed. See the Decision Log for the mid-task
+      redirect this required.
 
 ## Decision log
 
@@ -219,6 +244,50 @@ timestamp each entry)_
 - 2026-09-06 — dvh/overflow boundary lives at the game-screen wrapper,
   not AppShell, so lobby/room keep the document-flow shell — planning
   call from explorer finding (g).
+- 2026-09-06 (M5, mid-implementation) — The initially-planned fold
+  mechanism (art cap 160px, card-lg 64px, card-md 32px) did not close
+  the fold budget at ANY player count when actually rendered — user was
+  consulted with the measured numbers and screenshots. Two directions
+  were raised and set aside: capping the game at 4 players (a real rule
+  change with no full backend enforcement possible from the frontend
+  alone — see the exchange for the concrete tradeoffs) and a table
+  redesign (enlarged table, straight-row bench placement) — both
+  deferred to CAM-20, which already owns table geometry / regular-width
+  tuning; re-litigating CAM-20's scope belongs to that task's own
+  `/plan` pass, not a mid-CAM-21 detour. **User decision: ship a
+  same-scope compact fix now.** The actual root cause (opponent
+  seat+hand orientation leaking the regular-mode radial side into
+  compact's flat wrap, `game-screen.tsx`'s `SeatWithHand`) was found and
+  fixed — forcing every opponent to the narrow column form at compact
+  closes the budget for 2–4 players; 5 players falls back to the
+  already-sanctioned middle-region scroll (clause 4). Full numbers and
+  screenshots are in the frontend plan's Surprises.
+- 2026-09-06 (M5) — Design-gate run (decompose → map → judge) against
+  the 3-player compact composition at 360×640: verdict **flagged, 0
+  blocking**. No constraint violation (contrast, touch-target floor,
+  slop convergence all clear) and no templated-design signal (a full
+  18-marker negative sweep, one uncontested medium marker). Four
+  **accidental** default-tier calls, all local to the compact layout
+  and cheap to fix: the deck/discard center group overhangs the
+  painted tabletop disc by ~5.5px (disc-fraction vs content-width
+  mismatch at the new 128px art cap); the pinned top/bottom bands sit
+  at zero vertical padding, clipping the Call Cambio button's elevation
+  shadow; a 53.5px un-tokened void sits between the table and the own
+  hand (likely flex residue, not a decision); the discard's rank/pip
+  render at 9.6px/8.32px, under the type scale's 12px floor. Eight
+  further calls were **controlled** (the flat 15px type tier, the
+  four-benches-for-three-seats scenery, seat-pill uniformity, the
+  count-badge overlap, the connection dot) or advisory-only (the
+  already-known 32px touch-target tension, one avatar's 3.67:1
+  aria-hidden initial). None fixed as part of this task — surfaced to
+  the user per ADR-0029 (advisory until Carbonteq's labeling lands);
+  left for `/review` or a follow-up to triage.
+- 2026-09-06 (M5) — the game-over full-region rest needed its own copy
+  on the extracted own seat (not a share of TableSurface's), since
+  `viewerSeat="external"` moved that seat outside TableSurface's square
+  root at every breakpoint, not just compact — see frontend plan
+  Surprises for the fix and the positioning bug the first attempt at it
+  introduced (caught and corrected before landing).
 
 ## Surprises & discoveries
 

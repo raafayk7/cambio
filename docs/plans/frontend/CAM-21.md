@@ -10,7 +10,12 @@
 
 ## Context & orientation
 
-All line refs are current at HEAD `8f865e1` on `release-v0`.
+All line refs were current at HEAD `8f865e1` on `release-v0` (plan time).
+**Stale as of close-out** — the M2/M3 restructure (Progress) rewired
+`game-screen.tsx` and `table-surface.tsx` extensively; these numbers
+describe the pre-task shape this section is explaining, not where things
+live now. The as-built shape is in Progress and the Plan of work's
+per-milestone notes below.
 
 - **Screen composition** — `apps/web/src/containers/game/game-screen.tsx`.
   `GameTable` returns one flex column (`:576`,
@@ -379,25 +384,58 @@ _(plan-time: Clause + planned approach only. Test file, test name, and
 assertion phrase are filled in by `/implement` as each test actually
 lands — an invented test title here would be an overclaim.)_
 
-| Clause                          | Planned approach (plan-time)                                                                                                                                                                                                                              | Test (file + name) | What is asserted |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------- |
-| 1. Fold fit                     | Rendered-path only (ADR-0030 routes geometry): render.js at 360×640 for 2/3/4/5 players, no page-level scroll; screenshots archived with the gate run. No jsdom test can pin this.                                                                        |                    |                  |
-| 2. Top chrome pinned            | jsdom structural: chrome-band region contains the indicator, the slam timer (window open), and beat/error/fizzle messages. "Cannot leave the viewport" itself is verified on the rendered pass (default, slam-window, and below-floor shots).             |                    |                  |
-| 3. Bottom dock pinned           | jsdom structural: own-hand anchors outside the scroll region; dock-actions region contains Call Cambio / Keep/Discard / slam prompts in their phases. Pinning + home-bar clearance verified rendered (safe-area padding is pre-existing shell behavior).  |                    |                  |
-| 4. Middle fits or scrolls alone | jsdom structural: the scroll wrapper contains TableSurface and contains neither the own-hand row nor the actions region. Fit at the floor and scroll-alone below it are rendered checks (360×640 and 360×560 runs).                                       |                    |                  |
-| 5. Flights keep working         | jsdom: every flight anchor (own slots, opponent slots, deck, discard) is a descendant of the element passed as FlightLayer's root; existing flight/arrival suites in game-screen.test.tsx stay green unmodified.                                          |                    |                  |
-| 6. No transform scaling         | By construction (no scale utilities introduced) + review grep of the flight root's ancestor chain; optionally a cheap structural pin that no ancestor of the root carries a scale-transform class. ADR-0035 is the authority.                             |                    |                  |
-| 7. Game-over intact             | Existing game-over seat→data-state walk in game-screen.test.tsx stays green (adapt only knowingly, logged); the latent rest-scoping fix verified by the compact game-over rendered shot (ScoreSheet above dimmed table, clauses 1–3 respected).           |                    |                  |
-| 8. Hidden information untouched | No test: verified by diff scope at review — zero edits under packages/contracts, apps/api, or any payload/projection code; the task moves and sizes already-entitled renderings only.                                                                     |                    |                  |
-| 9. Room screen unaffected       | Existing room-screen suites green; jsdom pin that TableSurface's default path still renders all seats internally; rendered room-screen shots at 360×640 and 1280×900 compared against pre-change captures.                                                |                    |                  |
-| 10. Regular untouched           | Rendered 1280×900 game-screen regression compared against a pre-change capture of the same state; full existing jsdom suite green. DOM/class restructure is shared across breakpoints — the standard is unchanged rendered output, which this run proves. |                    |                  |
-| 11. Token discipline            | All new values land in the styles.css token layer mirrored in tokens.md (M1); design-gate hard checks + review grep for arbitrary-value utilities and constant inline styles (both forms, per the CAM-17 lesson).                                         |                    |                  |
+| Clause                          | Planned approach (plan-time)                                                                                                                                                                                                                              | Test (file + name)                                                                                                                                                                                                                                                                                                                                                   | What is asserted                                                                                                                                                                                             |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Fold fit                     | Rendered-path only (ADR-0030 routes geometry): render.js at 360×640 for 2/3/4/5 players, no page-level scroll; screenshots archived with the gate run. No jsdom test can pin this.                                                                        | Rendered: design-gate render.js at 360×640 for 2/3/4/5 players (final_2p/3p/4p/5p captures)                                                                                                                                                                                                                                                                          | document height == viewport (720×1280 physical px at deviceScaleFactor 2) for 2–4 players; 5 players uses the sanctioned middle-scroll fallback (clause 4) with chrome/dock still pinned                     |
+| 2. Top chrome pinned            | jsdom structural: chrome-band region contains the indicator, the slam timer (window open), and beat/error/fizzle messages. "Cannot leave the viewport" itself is verified on the rendered pass (default, slam-window, and below-floor shots).             | game-screen.test.tsx > compact docked composition (CAM-21) > "keeps the turn indicator and an open slam timer inside the pinned chrome band" and "keeps a command-error and a public-fizzle message inside the chrome band once they render"                                                                                                                         | data-region=chrome contains the indicator always, the slam timer while a window is open, and beat/error/fizzle messages when present                                                                         |
+| 3. Bottom dock pinned           | jsdom structural: own-hand anchors outside the scroll region; dock-actions region contains Call Cambio / Keep/Discard / slam prompts in their phases. Pinning + home-bar clearance verified rendered (safe-area padding is pre-existing shell behavior).  | game-screen.test.tsx > compact docked composition (CAM-21) > "keeps the give-pick prompt inside the bottom dock, never the chrome band", "renders Call Cambio inside the bottom dock, not the chrome band", "renders Keep/Discard inside the bottom dock in the holding phase"                                                                                       | data-region=dock-actions contains the slam give-pick prompt, Call Cambio, and Keep/Discard in their respective phases, never the chrome band; own-hand anchors sit outside the scroll region (clause 5 test) |
+| 4. Middle fits or scrolls alone | jsdom structural: the scroll wrapper contains TableSurface and contains neither the own-hand row nor the actions region. Fit at the floor and scroll-alone below it are rendered checks (360×640 and 360×560 runs).                                       | game-screen.test.tsx > compact docked composition (CAM-21) > "keeps the viewer's own hand anchors outside the scroll region but inside the flight root"; rendered fit at 360×640 (clause 1 evidence) and scroll-fallback verified at 5 players (scrollTop drive, final_5p_scrolled capture: chrome top=0, dock bottom=640 unmoved)                                   | the scroll wrapper (data-region=table-scroll) contains TableSurface only, never the own-hand row or the dock; at 5 players scrolling it reveals the deck/discard while chrome and dock stay pinned           |
+| 5. Flights keep working         | jsdom: every flight anchor (own slots, opponent slots, deck, discard) is a descendant of the element passed as FlightLayer's root; existing flight/arrival suites in game-screen.test.tsx stay green unmodified.                                          | game-screen.test.tsx > compact docked composition (CAM-21) > "keeps the viewer's own hand anchors outside the scroll region but inside the flight root"; existing flight-layer.test.tsx and game-screen.test.tsx flight/arrival suites unmodified and green                                                                                                          | every flight anchor (own slots, opponent slots, deck, discard) is a descendant of data-region=table-root, the element passed as FlightLayer's root                                                           |
+| 6. No transform scaling         | By construction (no scale utilities introduced) + review grep of the flight root's ancestor chain; optionally a cheap structural pin that no ancestor of the root carries a scale-transform class. ADR-0035 is the authority.                             | game-screen.test.tsx > compact docked composition (CAM-21) > "carries no scale-transform class on any ancestor of the flight root (ADR-0035)"                                                                                                                                                                                                                        | no ancestor of data-region=table-root carries a class matching /scale-/                                                                                                                                      |
+| 7. Game-over intact             | Existing game-over seat→data-state walk in game-screen.test.tsx stays green (adapt only knowingly, logged); the latent rest-scoping fix verified by the compact game-over rendered shot (ScoreSheet above dimmed table, clauses 1–3 respected).           | game-screen.test.tsx > the reveal (E2) > "dims the table under the game-over state while the score sheet is showing" (existing, green unmodified); rendered compact (final_gameover_compact) and regular (final_gameover_regular) game-over captures                                                                                                                 | the score sheet overlays a dimmed table at both breakpoints; compact still produces no page-level scroll (720×1280 exact) with the fix to TableSurface's now-unconditional relative root                     |
+| 8. Hidden information untouched | No test: verified by diff scope at review — zero edits under packages/contracts, apps/api, or any payload/projection code; the task moves and sizes already-entitled renderings only.                                                                     | No test — verified by diff scope                                                                                                                                                                                                                                                                                                                                     | zero edits under packages/contracts, apps/api, or any payload/projection code; the diff touches only apps/web and packages/ui (styles.css tokens)                                                            |
+| 9. Room screen unaffected       | Existing room-screen suites green; jsdom pin that TableSurface's default path still renders all seats internally; rendered room-screen shots at 360×640 and 1280×900 compared against pre-change captures.                                                | room-screen.test.tsx > member bootstrap (R1, R3) > "renders every member by name in join order from the GET alone — no join call" (existing, green unmodified — asserts BOTH members have a data-seat-index ancestor, pinning TableSurface's default viewerSeat="internal" path); rendered room-screen captures at 360×640 and 1280×900 (final_room_compact/regular) | TableSurface's default path still renders every seat (including the viewer's) internally; the room screen's compact/regular composition is visually unchanged                                                |
+| 10. Regular untouched           | Rendered 1280×900 game-screen regression compared against a pre-change capture of the same state; full existing jsdom suite green. DOM/class restructure is shared across breakpoints — the standard is unchanged rendered output, which this run proves. | Rendered 1280×900 game-screen (5 players) before and after the SeatWithHand compact-orientation fix — pixel-identical (final_regular_5p vs final_gameover_regular's non-overlay portion); full existing jsdom suite green (67/67 in game-screen.test.tsx, 212/212 in apps/web overall)                                                                               | every regular-breakpoint class is unprefixed-identical or explicitly regular:-restored; no jsdom regression across the whole web suite                                                                       |
+| 11. Token discipline            | All new values land in the styles.css token layer mirrored in tokens.md (M1); design-gate hard checks + review grep for arbitrary-value utilities and constant inline styles (both forms, per the CAM-17 lesson).                                         | Review grep: only token-referencing utilities introduced (gap-2/gap-4 from the enumerated spacing scale, max-w-(--size-table-art-compact), the card-lg/card-md @utility blocks); packages/ui/src/styles.css mirrors design-system/references/tokens.md (Shape section)                                                                                               | no arbitrary-value utility or hardcoded inline style was added; every new visual value is a token or an enumerated scale step                                                                                |
 
 ## Progress
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
-- [ ] _(none yet — planning complete 2026-09-06)_
+- [x] 2026-09-06 — M1 (tokens): compact card-lg/card-md scale and
+      `--size-table-art-compact` landed in `packages/ui/src/styles.css`,
+      tuned during M5 (see Surprises). `pnpm turbo test --filter
+@cambio/ui` green.
+- [x] 2026-09-06 — M2 (screen restructure): `game-screen.tsx` — dvh-bound
+      wrapper, unconditionally-relative bounded stage, pinned chrome
+      band (`data-region="chrome"`) and dock-actions
+      (`data-region="dock-actions"`) with `regular:contents` +
+      `regular:order-*` restoration, `data-region="table-root"` /
+      `"table-scroll"` middle region, extracted own seat.
+- [x] 2026-09-06 — M3 (TableSurface): `viewerSeat` prop
+      (`"internal"`/`"external"`), unconditionally-relative root, compact
+      art max-width cap.
+- [x] 2026-09-06 — M4 (tests): 8 new structural tests in
+      `game-screen.test.tsx`'s "compact docked composition (CAM-21)"
+      describe block; all pre-existing suites green unmodified
+      (`game-screen.test.tsx` 59→67 tests, `room-screen.test.tsx`
+      untouched and green). `pnpm turbo build typecheck lint test` green
+      throughout.
+- [x] 2026-09-06 — M5 (rendered pass): design-gate `render.js` at
+      360×640 for 2/3/4/5 players plus game-over and regular (1280×900)
+      regression, via a scripted lobby/game setup against the live api
+      (docker postgres + realtime already running). Found the fold
+      budget didn't close for any player count at the initially-planned
+      values — see Surprises for the tuning cascade and the
+      `SeatWithHand` orientation fix that resulted from a mid-task user
+      interview. Found and fixed the game-over rest seam on the
+      extracted own seat (Surprises). Final state: 2–4 players fit the
+      360×640 floor exactly (no page scroll, full table visible); 5
+      players uses the sanctioned middle-scroll fallback; regular and
+      room screen unaffected (rendered + jsdom).
+- [x] 2026-09-06 — Canon revisions landed: `table-surface.md` r4,
+      `app-shell.md` r4, `turn-indicator.md` r2, `slam-timer.md` r3,
+      `tokens.md` (Shape section).
 
 ## Surprises & notes for the root plan
 
@@ -414,11 +452,61 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
   arithmetic, and 32px-wide tap targets (opponent slam slots,
   deck/discard) fail the 44px touch-target hard check on width — a
   genuine fold-fit vs touch-target tension to surface at the M5 gate
-  run, not auto-resolve.
+  run, not auto-resolve. **Still open at close-out** — the M5 rendered
+  pass confirmed the finding but the tension itself wasn't resolved
+  (out of this task's remaining time); flagged for `/review` or a
+  follow-up.
 - Planning: the toast stack (`fixed bottom-4 z-50`, bottom-center) will
   overlay the compact dock; toast placement is canon and out of scope —
-  M5 takes a rendered look and reports.
-- Planning: at compact game-over, the surface-scoped rest no longer
-  dims the extracted own-hand row (the ScoreSheet overlay still covers
-  it at z-30). If the rendered shot reads wrong, a matching rest on the
-  dock rows is a one-line addition needing a canon note.
+  M5 takes a rendered look and reports. **Not re-checked** — no toast
+  fired during the M5 rendered pass (no clipboard/error actions were
+  exercised); still open, flag for `/review`.
+- M5 (2026-09-06): the initial fold-budget numbers (art 160px, card-lg
+  64px, card-md 32px, gap-4 throughout) did NOT close for ANY player
+  count — even 2 players overflowed the scroll region by ~40px, worse
+  for 3–5. After applying every M1-authorized tuning knob (art
+  160→128px, card-lg 64→48px, the two compact-only `gap-4`→`gap-2`
+  instances — see `table-surface.tsx` and `game-screen.tsx`'s
+  `table-root`), 2p fit exactly but 3p was still short 10px, 4p 52px,
+  5p 95px — token tuning alone could not close the gap for 3+ players.
+  Root cause, found by measuring actual rendered opponent-group
+  dimensions: `SeatWithHand`'s flex direction was reused unprefixed from
+  `inwardSide` (the REGULAR-mode radial side), so a "left"/"right"
+  opponent rendered as a wide horizontal row (name beside hand, ~175px)
+  at compact too, even though compact never renders the arc at all. At
+  360px only ~2 such wide groups fit per line before wrapping, and each
+  wrapped row costs 100–140px the budget didn't have. **User decision
+  (interview, mid-implementation):** rather than cap player count or
+  redesign the table (both raised and set aside — capping is a real
+  rule change with no full backend enforcement, the table redesign
+  belongs to CAM-20's charter and was deferred there), force every
+  OPPONENT to the narrow "column" form at compact regardless of their
+  regular-mode side (`REGULAR_SIDE_FLEX_CLASS`, `game-screen.tsx`), via
+  a `regular:` prefix so regular is provably untouched and only the
+  viewer's own seat (already narrow-form) is exempted via a new `own`
+  prop on `SeatWithHand`. Re-measured: 2p/3p/4p now fit with margin
+  (~53px spare); 5p is unchanged (four ~95px-wide groups still need two
+  wrapped rows regardless of orientation) and keeps the sanctioned
+  middle-scroll fallback (clause 4) — chrome and dock stay pinned,
+  confirmed by driving `scrollTop` and reading the chrome/dock rects
+  before and after.
+- M5: reusing `viewerSeat="external"` unconditionally (not compact-only)
+  meant the viewer's own seat sits OUTSIDE TableSurface's square root at
+  regular too, so TableSurface's own game-over rest (`inset-0` of ITS
+  root) only overlapped whatever fraction of the extracted seat's box
+  fell inside that square — measured as a hard seam cutting straight
+  through the own hand's cards at regular (confirmed via
+  `elementFromPoint`/rect comparison against Bob's uniformly-dimmed
+  seat). Fixed with a matching rest INSIDE the extracted seat's own
+  wrapper (same z-20/`green-deep`/35% treatment), scoped to its own
+  bounds — not folded into table-surface.md's r3 rest since it's a
+  different element entirely now. First attempt at the fix put
+  `position:relative` on the OUTER wrapper (the one carrying the inline
+  `left`/`top` ring-point percentages) to give the rest a positioning
+  context — this resurrected those percentages as a relative offset at
+  COMPACT too (previously inert under `position:static`), shoving the
+  whole hand off-screen. Fixed for real by nesting an inner `relative`
+  div for the rest instead, leaving the outer wrapper's position
+  untouched at compact. Both breakpoints re-verified rendered
+  (`v2_gameover_compact.png` / `v2_gameover_regular.png`) after the
+  correction.
