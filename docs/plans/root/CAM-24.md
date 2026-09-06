@@ -81,12 +81,12 @@ render with no `waitFor`; the slam-timer suite already runs under
 
 ### Acceptance criteria
 
-- [ ] `apps/web/vitest.config.ts` sets `testTimeout: 30_000` with an
+- [x] `apps/web/vitest.config.ts` sets `testTimeout: 30_000` with an
       explanatory comment above it.
-- [ ] `packages/ui/vitest.config.ts` sets `testTimeout: 30_000` with an
+- [x] `packages/ui/vitest.config.ts` sets `testTimeout: 30_000` with an
       explanatory comment above it.
-- [ ] No `.test.ts`/`.test.tsx` file anywhere in the repo is modified.
-- [ ] `pnpm turbo build typecheck lint test` passes.
+- [x] No `.test.ts`/`.test.tsx` file anywhere in the repo is modified.
+- [x] `pnpm turbo build typecheck lint test` passes.
 
 ## Plan of work
 
@@ -112,7 +112,15 @@ the flake is gone — that is expected and not a gap in this task's closeout.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] YYYY-MM-DD HH:MM — step description
+- [x] 2026-09-06 13:42 — Added `testTimeout: 30_000` with the
+      CPU-contention comment to both `apps/web/vitest.config.ts` and
+      `packages/ui/vitest.config.ts`; diffs confirmed identical (4 lines
+      each) and no test file touched
+      (`git status --porcelain -- '**/*.test.ts' '**/*.test.tsx'` empty).
+- [x] 2026-09-06 13:43 — Full gate green: `pnpm turbo build typecheck lint
+    test` — 25/25 tasks successful. `@cambio/web:test` 20 files / 204
+      tests passed (including `score-sheet.test.tsx` and
+      `slam-timer.test.tsx`); `@cambio/ui:test` 6 files / 25 tests passed.
 
 ## Decision log
 
