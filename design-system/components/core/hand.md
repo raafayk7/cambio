@@ -53,16 +53,25 @@ A player's slot grid. Class: **Game object**.
 - No "cards you know" affordance on any slot, own or opponent (memory
   fidelity).
 - Every slot exposes a flight anchor (`slot:<playerId>:<slotIndex>`),
-  occupied or not — a vacancy is a valid flight destination (a give) and a
-  valid give-target click, never just a dead outline.
+  occupied or not — a vacancy is a valid flight destination (a give lands
+  in one) and, via `emptySlotsClickable`, a clickable target for a
+  consumer that needs one — never just a dead outline.
 
 ## Revisions
 
 - r1: initial, from the CAM-13 specimen board.
-- r2 (CAM-18, T2/T3): `selectedSlots` (targeting picks — 7/8/9/10 peeks,
-  J/Q swaps, the swap-held action) and `emptySlotsClickable` (the slam
-  give-target case, step 13) land as props; every slot, occupied or not,
-  now carries its flight anchor. Amended same day (gate fix cycle): the
+- r2 (CAM-18, T2/T3): `selectedSlots` and `emptySlotsClickable` land as
+  props; every slot, occupied or not, now carries its flight anchor.
+  _(Amended at review F4, 2026-09-06, to match what ships:
+  `selectedSlots` renders the selected treatment for in-progress
+  MULTI-pick targeting — the J/Q two-pick — and for the transient
+  public which-slot-was-peeked beat (review F3); single-click actions
+  (7/8/9/10 peeks, swap-held) send immediately and never populate a
+  selection. `emptySlotsClickable` widens clickability to vacancies for
+  a consumer that needs an empty-slot target — the shipped give flow
+  resolves on the slammer's own OCCUPIED slots, so today only the
+  gallery exercises it; it stays as the affordance the prop was built
+  for.)_ Amended same day (gate fix cycle): the
   dashed vacancy outline renders only for indices that are genuinely
   empty in game state — the grid's even-rounding filler cell beyond
   every real signal is an invisible spacer, never a painted vacancy

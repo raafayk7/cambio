@@ -47,35 +47,40 @@ export interface UseFlightsResult {
 
 export function useFlights(): UseFlightsResult {
   const [active, setActive] = React.useState<ReadonlyArray<FlightSpec>>([])
-  // Mirrors `active` for the unmount cleanup below: React may drop a
-  // functional setState updater on an already-unmounted component without
-  // ever invoking it, so cancel-on-unmount must not depend on that firing.
-  const activeRef = React.useRef(active)
-  activeRef.current = active
+  // The SYNCHRONOUS source of truth (review F7): every mutation updates
+  // this ref first and mirrors it into state with a plain value — never a
+  // functional updater with side effects, which React may double-invoke
+  // (StrictMode) or drop after unmount. `onDone` callbacks therefore fire
+  // exactly once, outside any updater: presence in the ref IS the
+  // not-yet-settled guard (ids are never reused), so a second settle for
+  // the same id finds nothing and no-ops.
+  const activeRef = React.useRef<ReadonlyArray<FlightSpec>>(active)
 
   const settle = React.useCallback((id: string, outcome: FlightOutcome) => {
-    setActive((current) => {
-      const settled = current.find((flight) => flight.id === id)
-      if (settled === undefined) return current
-      settled.onDone?.(outcome)
-      return current.filter((flight) => flight.id !== id)
-    })
+    const settled = activeRef.current.find((flight) => flight.id === id)
+    if (settled === undefined) return
+    activeRef.current = activeRef.current.filter((flight) => flight.id !== id)
+    setActive(activeRef.current)
+    settled.onDone?.(outcome)
   }, [])
 
   const cancelAll = React.useCallback(() => {
-    setActive((current) => {
-      current.forEach((flight) => flight.onDone?.("cancelled"))
-      return []
-    })
+    const cancelled = activeRef.current
+    activeRef.current = []
+    setActive(activeRef.current)
+    cancelled.forEach((flight) => flight.onDone?.("cancelled"))
   }, [])
 
   const enqueue = React.useCallback((spec: FlightSpec) => {
-    setActive((current) => [...current, spec])
+    activeRef.current = [...activeRef.current, spec]
+    setActive(activeRef.current)
   }, [])
 
   React.useEffect(() => {
     return () => {
-      activeRef.current.forEach((flight) => flight.onDone?.("cancelled"))
+      const remaining = activeRef.current
+      activeRef.current = []
+      remaining.forEach((flight) => flight.onDone?.("cancelled"))
     }
   }, [])
 
@@ -153,6 +158,12 @@ function HighlightBox({
   )
 }
 
+/** Mirrors `--duration-track` (packages/ui/src/styles.css, tokens.md
+ * `duration.track` = 340ms) — the flight's travel time, kept as a JS
+ * constant for the same reason as `PEEK_DURATION_MS` (it drives timers,
+ * not CSS transitions). Keep in sync by hand if the token changes. */
+const FLIGHT_TRACK_MS = 340
+
 function Flight({
   root,
   spec,
@@ -204,6 +215,22 @@ function Flight({
     const raf = requestAnimationFrame(() => setPlaying(true))
     return () => cancelAnimationFrame(raf)
   }, [])
+
+  // Settle by the CLOCK, not only by `transitionend` (review F1,
+  // probe-confirmed): under `prefers-reduced-motion` the highlight carries
+  // `motion-reduce:transition-none`, so no transition ever runs and no
+  // `transitionend` ever fires — the timeout IS the settle there, and it
+  // paces the highlight beat at exactly one `duration.track`. On the
+  // animated branch `transitionend` still settles precisely; the timeout
+  // (one extra track as margin) is the backstop for plans that produce no
+  // transition at all — an identity plan (origin rect == destination) or a
+  // browser that swallows the event. `settleOnce` guards the double.
+  React.useEffect(() => {
+    if (plan === null) return
+    const delay = reducedMotion ? FLIGHT_TRACK_MS : FLIGHT_TRACK_MS * 2
+    const handle = window.setTimeout(() => settleOnce("completed"), delay)
+    return () => window.clearTimeout(handle)
+  }, [plan, reducedMotion, settleOnce])
 
   if (plan === null) return null
 

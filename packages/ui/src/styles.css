@@ -60,6 +60,10 @@
   /* tokens.md §Motion r2 (CAM-18 G3): a reveal-hold, not an interaction
    * duration — how long a peeked card holds face-up before flipping back. */
   --duration-peek: 2800ms;
+  /* tokens.md §Motion r3 (CAM-18 review F6): the PUBLIC reveal-hold — the
+   * §1.5 slam reveal, the DrawSkipped beat, the which-slot-was-peeked
+   * beat. A glance, not a memorization window (that's duration-peek). */
+  --duration-reveal: 1200ms;
 }
 
 @theme {
@@ -267,6 +271,9 @@
 }
 @utility duration-peek {
   transition-duration: var(--duration-peek);
+}
+@utility duration-reveal {
+  transition-duration: var(--duration-reveal);
 }
 
 /* Interactive grounds with the one-step hover darken (button.md hover:

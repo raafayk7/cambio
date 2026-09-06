@@ -64,16 +64,15 @@ interface PeekReveal {
 }
 
 /**
- * SL2: the slam reveal beat — `SlamSucceeded`/`SlamFailed` both carry the
- * slammed card (cambio-rules §1.5: every slam attempt publicly reveals the
- * card, correct or not) and show it at its slot for this long before any
- * flight moves. No canon token exists for a *public* reveal (`duration.peek`
- * is explicitly the *private*, memory-fidelity hold — wrong semantics here);
- * scaled off `duration.track` (340ms, `packages/ui/src/styles.css`) at
- * roughly 3.5x, long enough to read a rank+suit at a glance, short next to
- * the peek's deliberate memorization window.
+ * Mirrors `--duration-reveal` (`packages/ui/src/styles.css`, tokens.md r3
+ * `duration.reveal` = 1200ms — the PUBLIC reveal-hold, minted at the CAM-18
+ * review's F6 creation-gate call, distinct from `duration.peek`'s private
+ * memorization hold). Paces every public glance: the §1.5 slam reveal, the
+ * DrawSkipped beat, and the public which-slot-was-peeked beat. Kept as a
+ * plain constant for the same reason as `PEEK_DURATION_MS`; keep in sync
+ * by hand if the token changes.
  */
-const SLAM_REVEAL_MS = 1200
+const REVEAL_DURATION_MS = 1200
 
 /** SL2: one slam's public reveal — the target slot and the revealed card,
  * shown via `Hand.faces` exactly like a peek but with `peeking` unset (a
@@ -199,6 +198,14 @@ export function useGame(gameId: string) {
   const [peek, setPeek] = React.useState<PeekReveal | null>(null)
   const peekTimeoutRef = React.useRef<number | null>(null)
 
+  // T4/F3 (review fix): the public half of a peek — WHICH SLOT was looked
+  // at is public information (`CardPeeked.target` on the wire) and part of
+  // the memory game, so the target slot shows the selected treatment for
+  // one public reveal beat. No value ever rides on it (the value goes only
+  // to the peeker's private channel).
+  const [publicPeekSlot, setPublicPeekSlot] = React.useState<SlotRef | null>(null)
+  const publicPeekTimeoutRef = React.useRef<number | null>(null)
+
   // T3: the public "seat acting" beat (a peek's target, a fizzle) — one
   // seat at a time is enough for this milestone; a second simultaneous beat
   // is a rare visual nicety, never a correctness concern (nothing hidden
@@ -262,7 +269,7 @@ export function useGame(gameId: string) {
 
   /**
    * Starts (or restarts, for a second slam in the same window) the SL2
-   * reveal beat: `target`'s slot shows `card` face-up for `SLAM_REVEAL_MS`,
+   * reveal beat: `target`'s slot shows `card` face-up for `REVEAL_DURATION_MS`,
    * `SlamTimer` goes `resolving` for the same span — the bar's drain math is
    * untouched (`SlamTimer` only pauses visually; ADR-0011's fixed `closesAt`
    * never moves). Whatever the caller queued via `runAfterReveal` while this
@@ -279,7 +286,7 @@ export function useGame(gameId: string) {
       const pending = pendingAfterRevealRef.current
       pendingAfterRevealRef.current = []
       pending.forEach((thunk) => thunk())
-    }, SLAM_REVEAL_MS)
+    }, REVEAL_DURATION_MS)
   }
 
   /** Runs `thunk` now, or queues it for the moment the active reveal clears
@@ -386,9 +393,16 @@ export function useGame(gameId: string) {
         })
         break
       }
-      case "CardPeeked":
+      case "CardPeeked": {
         pulseSeat(event.target.playerId)
+        if (publicPeekTimeoutRef.current !== null) window.clearTimeout(publicPeekTimeoutRef.current)
+        setPublicPeekSlot(event.target)
+        publicPeekTimeoutRef.current = window.setTimeout(() => {
+          publicPeekTimeoutRef.current = null
+          setPublicPeekSlot(null)
+        }, REVEAL_DURATION_MS)
         break
+      }
       case "PowerFizzled": {
         pulseSeat(event.playerId)
         const name = playersRef.current.find((player) => player.id === event.playerId)?.name
@@ -485,7 +499,7 @@ export function useGame(gameId: string) {
           slamBeatTimeoutRef.current = window.setTimeout(() => {
             slamBeatTimeoutRef.current = null
             setSlamBeatMessage(null)
-          }, SLAM_REVEAL_MS)
+          }, REVEAL_DURATION_MS)
         })
         break
       }
@@ -646,6 +660,7 @@ export function useGame(gameId: string) {
     sendCommand,
     flights,
     peek,
+    publicPeekSlot,
     actingPlayerId,
     fizzleMessage,
     commandError,

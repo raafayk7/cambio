@@ -194,8 +194,12 @@ imports (lint-enforced).
   `PowerPeek` (any occupied slot) then `ResolvingQueenSwap` →
   `PowerSwap` (pinned: Queen two-step in the engine suites). Selection
   state renders via the extended Hand props. `PowerFizzled` renders as
-  a public no-op beat. Non-holders see the seat acting + which power
-  (`phase` has no card for them — pinned `ViewFor.test.ts`).
+  a public no-op beat. Non-holders see the seat acting only — the
+  SPECIFIC power is not on the wire during resolution (`phase` has no
+  card for them, pinned `ViewFor.test.ts`, and no room event names the
+  power until `PowerDiscarded` lands after it resolves). _(Amended at
+  review F2, 2026-09-06: the original "+ which power" overclaimed the
+  wire — claim corrected, code unchanged.)_
 - T4. Peeks are memory-faithful: the entitled viewer's
   `PrivateCardPeeked` value flips the target card up for
   `duration.peek`, then back, never to return (round-1 decision);
@@ -414,6 +418,10 @@ timestamp each entry)_
       plus the ai-tells copy finding and the CAMBIO! pill overflow;
       canon r3/amendments landed with the code; re-rendered and
       re-verified; final forced full gate 25/25 green.
+- [x] 2026-09-06 03:30 — review fix cycle complete: F1–F7 resolved
+      (retrospective below states each branch taken); 5 new tests
+      (web 190); `duration.reveal` minted per the user's F6 call;
+      claim sweeps re-run; fresh forced gate green.
 
 ## Decision log
 
@@ -481,12 +489,20 @@ timestamp each entry)_
 - 2026-09-06 — (gate fix cycle) **The game-over "CAMBIO!" drops the
   poster text-shadow** — at the indicator's 15px it muddied and
   overflowed the pill; the display face alone carries the shout. The
-  shadow stays for the big display moments (SCORES, SLAM!).
+  shadow stays for the SLAM! banner's big display moment. _(Corrected
+  at review F4: only SLAM! carries `text-shadow-poster`; the SCORES
+  heading never did.)_
 - 2026-09-06 — (audit) ai-tells' one finding (the five-peat error-copy
   suffix) fixed by varying copy per voice.md's error formula; the
   judge's five controlled/allowed reads (hands-over-benches, face-down
   hands at ended, score-row stagger, wide flanks, deck-under-panel)
   deliberately left as-is.
+- 2026-09-06 — (review fix cycle) **`duration.reveal` = 1200ms minted**
+  — user-approved creation-gate call resolving review F6: the public
+  reveal-hold joins the vocabulary as a token (tokens.md r3,
+  slam-timer.md r2) rather than a documented exemption, on the same
+  principle that minted `duration.peek`. Rejected: an inline-justified
+  constant (contradicts the precedent this task set).
 - 2026-09-05 — (plan reconciliation) **Game-over composition: the
   score sheet renders as a screen-level sibling overlay above
   TableSurface** (which takes `state="game-over"` for the dim);
@@ -623,6 +639,56 @@ in a real browser.
   updaters — impure updaters double-fire under StrictMode. Not a live
   bug (no StrictMode today); fix by moving the callback invocation
   outside the updater.
+
+### Fix cycle 2026-09-06 — all findings RESOLVED
+
+- **F1 RESOLVED (code + tests strengthened):** flights settle by the
+  clock — a `plan`-keyed timeout (`FLIGHT_TRACK_MS` = 340, mirroring
+  `duration.track`) IS the settle under reduced motion (one track beat)
+  and the backstop at 2× track on the animated branch (identity plans,
+  swallowed transitionend); `transitionend` still settles the animated
+  branch precisely; `settleOnce` guards the double. Two new
+  flight-layer tests kill the mutants: removing the timeout fails the
+  reduce test at exactly 340ms, and the jsdom animated flight (where
+  transitionend never fires at all) now settles once on the fallback.
+- **F2 RESOLVED (claim amended by sweep):** the root T3 clause carries
+  an inline amendment note; the child plan's step-12 prose and T3
+  coverage row amended; sweep across "which power"/"acting + power"
+  phrasings re-run — the only remaining hit is this retrospective's own
+  finding record.
+- **F3 RESOLVED (code strengthened):** `CardPeeked.target` now drives a
+  public which-slot beat — the target slot renders the selected
+  treatment for one `duration.reveal` beat, value-free (merged into
+  `selectedSlots` at the wiring layer; hand.md r2 amendment covers the
+  widened meaning). Pinned by the new "a public CardPeeked marks the
+  peeked slot…" test.
+- **F4 RESOLVED (docs amended, one extra instance caught by sweep):**
+  table-surface.md r3 now states the viewer-dock exception as part of
+  `edge`'s contract; hand.md r2 rewritten to what ships (including a
+  fourth instance in its Rules section — "valid give-target click" —
+  the finding's own list missed); the Decision Log's SCORES
+  parenthetical corrected here and in the matching `game-screen.tsx`
+  comment; `affordances.ts` header and draw-deck.md attribute the
+  drawable rule to the T1 mapping, not H1.
+- **F5 RESOLVED (tests added + rows corrected):** new `PowerFizzled`
+  and `DrawSkipped` beat tests (render + clear, no movement); T3 row's
+  false fizzle-pin claim replaced with the real test; CH1 row now
+  states plainly that the event→enqueue wiring has no automated pin
+  and rests on the rendered path + walkthrough; S1 row drops the
+  deleted placeholder test; C1 row states the 300ms pre-delay is not
+  separately pinned.
+- **F6 RESOLVED (token minted — user-approved creation-gate call):**
+  `duration.reveal` = 1200ms (`--duration-reveal` + utility in
+  styles.css; tokens.md r3 with the decision line now "two interaction
+  durations + two holds"; slam-timer.md r2 names it as the `resolving`
+  beat's pace). `SLAM_REVEAL_MS` renamed `REVEAL_DURATION_MS`,
+  mirroring the token; it paces the slam reveal, the DrawSkipped beat,
+  and F3's public peek beat.
+- **F7 RESOLVED (code):** `useFlights` mutations flow through the
+  synchronous `activeRef` as the source of truth and mirror plain
+  values into state — `onDone` fires exactly once, outside any updater
+  (presence in the ref is the not-yet-settled guard); StrictMode
+  double-invocation can no longer double-fire callbacks.
 
 ### Advisory (defer allowed; log only)
 

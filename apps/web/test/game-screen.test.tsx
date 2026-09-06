@@ -673,6 +673,89 @@ describe("powers + peeks (T3/T4)", () => {
     })
   })
 
+  describe("public beats (T3/T4 — review F3/F5 fixes)", () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    // Review F3: CardPeeked.target is PUBLIC wire data — everyone learns
+    // which slot was looked at (part of the memory game), never the value.
+    it("a public CardPeeked marks the peeked slot with the selected treatment for one reveal beat — no value anywhere", async () => {
+      const fake = setupFake()
+      gameBootstrap()
+      renderGameApp(GAME_ID)
+      await screen.findByText(ME.name)
+      const { room } = await channelsReady(fake)
+      vi.useFakeTimers()
+
+      act(() => {
+        room.emit("CardPeeked", {
+          _tag: "CardPeeked",
+          viewerId: FRIEND.id,
+          target: { playerId: ME.userId, slotIndex: 2 },
+        })
+      })
+      const slot = document.querySelector(
+        `[data-flight-anchor="slot:${ME.userId}:2"] [data-selected="true"]`,
+      )
+      expect(slot).not.toBeNull()
+      expect(slot).toHaveAttribute("data-face", "down")
+
+      act(() => {
+        vi.advanceTimersByTime(1200)
+      })
+      expect(
+        document.querySelector(`[data-flight-anchor="slot:${ME.userId}:2"] [data-selected="true"]`),
+      ).toBeNull()
+    })
+
+    // Review F5a: the fizzle beat was implemented but unpinned.
+    it("PowerFizzled renders the public fizzle copy, then clears", async () => {
+      const fake = setupFake()
+      gameBootstrap()
+      renderGameApp(GAME_ID)
+      await screen.findByText(ME.name)
+      const { room } = await channelsReady(fake)
+      vi.useFakeTimers()
+
+      act(() => {
+        room.emit("PowerFizzled", { _tag: "PowerFizzled", playerId: FRIEND.id, power: "J" })
+      })
+      expect(
+        screen.getByText(`${FRIEND.name}'s power fizzled — no legal target.`),
+      ).toBeInTheDocument()
+
+      act(() => {
+        vi.advanceTimersByTime(2800)
+      })
+      expect(screen.queryByText(/power fizzled/)).not.toBeInTheDocument()
+    })
+
+    // Review F5b: the DrawSkipped beat was implemented but unpinned.
+    it("DrawSkipped renders its beat copy with no card movement, then clears", async () => {
+      const fake = setupFake()
+      gameBootstrap()
+      renderGameApp(GAME_ID)
+      await screen.findByText(ME.name)
+      const { room } = await channelsReady(fake)
+      vi.useFakeTimers()
+      const facesBefore = document.querySelectorAll("[data-face]").length
+
+      act(() => {
+        room.emit("DrawSkipped", { _tag: "DrawSkipped", playerId: FRIEND.id, kind: "penalty" })
+      })
+      expect(
+        screen.getByText(`No cards left to draw — ${FRIEND.name}'s penalty card was skipped.`),
+      ).toBeInTheDocument()
+      expect(document.querySelectorAll("[data-face]").length).toBe(facesBefore)
+
+      act(() => {
+        vi.advanceTimersByTime(1200)
+      })
+      expect(screen.queryByText(/was skipped/)).not.toBeInTheDocument()
+    })
+  })
+
   describe("the private peek reveal (T4, memory fidelity)", () => {
     afterEach(() => {
       vi.useRealTimers()

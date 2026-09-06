@@ -103,6 +103,49 @@ describe("FlightLayer", () => {
     expect(container.querySelector("[data-face]")).toBeNull()
   })
 
+  // Review F1 (probe-confirmed): the reduce branch disables its own
+  // transition (`motion-reduce:transition-none`), so `transitionend` can
+  // NEVER settle it — the clock must. Mutant killed: removing the timeout
+  // effect leaves onSettle uncalled and this test fails.
+  it("reduced motion settles by the clock — one duration.track beat, then onSettle fires completed", () => {
+    vi.useFakeTimers()
+    try {
+      mockMatchMedia(true)
+      const onSettle = vi.fn()
+      render(<Harness specs={[valueFreeSpec]} onSettle={onSettle} measure={fakeMeasure} />)
+      act(() => {
+        vi.advanceTimersByTime(339)
+      })
+      expect(onSettle).not.toHaveBeenCalled()
+      act(() => {
+        vi.advanceTimersByTime(1)
+      })
+      expect(onSettle).toHaveBeenCalledTimes(1)
+      expect(onSettle).toHaveBeenCalledWith("f1", "completed")
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Review F1, adjacent hazard: a non-degenerate plan that never fires
+  // `transitionend` (identity transform, a swallowed event — and jsdom,
+  // which never fires it at all) settles on the fallback timeout instead
+  // of hanging in `active` forever.
+  it("an animated flight with no transitionend settles on the fallback timeout, exactly once", () => {
+    vi.useFakeTimers()
+    try {
+      const onSettle = vi.fn()
+      render(<Harness specs={[entitledSpec]} onSettle={onSettle} measure={fakeMeasure} />)
+      act(() => {
+        vi.advanceTimersByTime(340 * 2)
+      })
+      expect(onSettle).toHaveBeenCalledTimes(1)
+      expect(onSettle).toHaveBeenCalledWith("f2", "completed")
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("a flight whose destination anchor never mounted cancels: nothing renders, onSettle fires", () => {
     const onSettle = vi.fn()
     const { container } = render(

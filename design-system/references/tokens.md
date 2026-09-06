@@ -129,12 +129,13 @@ game-state information players memorize. These tokens are gameplay-legibility
 values, not polish. Flourish (celebrations, ambient juice) is deferred to a
 later release and gets its own tokens then.
 
-| Token            | Value                        | Used for                                                      |
-| ---------------- | ---------------------------- | ------------------------------------------------------------- |
-| `ease.snap`      | `cubic-bezier(0.2, 0, 0, 1)` | every card/object movement — the papery snap                  |
-| `duration.snap`  | `140ms`                      | short moves: flip, select, discard, UI response               |
-| `duration.track` | `340ms`                      | moves players must follow: deals, J/Q swaps, slam resolutions |
-| `duration.peek`  | `2800ms`                     | how long a peeked card holds face-up before flipping back     |
+| Token             | Value                        | Used for                                                                            |
+| ----------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
+| `ease.snap`       | `cubic-bezier(0.2, 0, 0, 1)` | every card/object movement — the papery snap                                        |
+| `duration.snap`   | `140ms`                      | short moves: flip, select, discard, UI response                                     |
+| `duration.track`  | `340ms`                      | moves players must follow: deals, J/Q swaps, slam resolutions                       |
+| `duration.peek`   | `2800ms`                     | how long a peeked card holds face-up before flipping back                           |
+| `duration.reveal` | `1200ms`                     | the public reveal-hold: the slam reveal, skip beats, the which-slot-was-peeked beat |
 
 Decisions and rationales (CAM-13 interview):
 
@@ -146,7 +147,8 @@ Decisions and rationales (CAM-13 interview):
   there invites per-feature drift. `duration.peek` is a different kind of
   value — it holds a reveal open rather than gating a transition — so it
   joins the vocabulary as its own token instead of stretching `duration.snap`
-  or `duration.track` to mean something they don't (CAM-18 G3).
+  or `duration.track` to mean something they don't (CAM-18 G3; and
+  `duration.reveal` joins it as the public-glance hold, r3).
 - `prefers-reduced-motion`: movement collapses to cross-fades **plus** a
   `accent.focus` highlight on origin and destination slots — the information
   the animation carried must survive, only the motion goes.
@@ -162,6 +164,15 @@ Decisions and rationales (CAM-13 interview):
   a window the player is trying to memorize, not act on). The "two
   durations only" line is amended to "two interaction durations + one
   reveal-hold" — see above.
+- r3 (CAM-18 review F6, 2026-09-06, user-approved creation-gate call):
+  `duration.reveal` = `1200ms`, the PUBLIC reveal-hold — how long the
+  whole table stares at a publicly revealed card or beat (the §1.5 slam
+  reveal, the DrawSkipped beat, the public which-slot-was-peeked beat).
+  Distinct from `duration.peek` by semantics, not just length: peek is a
+  private MEMORIZATION window, reveal is a public GLANCE that keeps the
+  window moving. The decision line now reads "two interaction durations
+  - two holds (private peek, public reveal)"; a JS-timed hold is design
+    vocabulary — the same principle that minted `duration.peek` in r2.
 
 ## Breakpoints
 

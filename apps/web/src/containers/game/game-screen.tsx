@@ -129,8 +129,8 @@ function turnStatusCopy(status: TurnStatus, activePlayerName: string): React.Rea
     case "game-over":
       // The shout word takes the display face only — the poster shadow
       // reads as mud at the pill's 15px size and pushed the glyphs over
-      // the pill's frame (gate fix cycle); the shadow belongs to the big
-      // display moments (SCORES, SLAM!), not to inline indicator copy.
+      // the pill's frame (gate fix cycle); the shadow belongs to the
+      // SLAM! banner's big display moment, not to inline indicator copy.
       return (
         <>
           {activePlayerName} called <span className="font-display">CAMBIO!</span>
@@ -179,14 +179,28 @@ function handSlotWiring(params: {
    * decision), never while the value is still on screen. */
   peekActive: boolean
   selection: ReadonlyArray<SlotRef>
+  /** F3 (review fix): the transient public which-slot-was-peeked beat —
+   * merged into the selected treatment for the target's hand. */
+  publicPeekSlot: SlotRef | null
   onSelectTarget: (ref: SlotRef) => void
   onSwapHeld: (slot: SlotIndex) => void
 }): HandWiring {
-  const { affordances, playerId, viewerId, peekActive, selection, onSelectTarget, onSwapHeld } =
-    params
-  const selectedSlots = selection
-    .filter((ref) => ref.playerId === playerId)
-    .map((ref) => ref.slotIndex)
+  const {
+    affordances,
+    playerId,
+    viewerId,
+    peekActive,
+    selection,
+    publicPeekSlot,
+    onSelectTarget,
+    onSwapHeld,
+  } = params
+  const selectedSlots = [
+    ...selection.filter((ref) => ref.playerId === playerId).map((ref) => ref.slotIndex),
+    ...(publicPeekSlot !== null && publicPeekSlot.playerId === playerId
+      ? [publicPeekSlot.slotIndex]
+      : []),
+  ]
 
   if (
     affordances.phase === "HoldingCard" &&
@@ -266,6 +280,7 @@ function GameTable({
   flights,
   sendCommand,
   peek,
+  publicPeekSlot,
   actingPlayerId,
   fizzleMessage,
   commandError,
@@ -279,6 +294,7 @@ function GameTable({
   flights: ReturnType<typeof useGame>["flights"]
   sendCommand: ReturnType<typeof useGame>["sendCommand"]
   peek: ReturnType<typeof useGame>["peek"]
+  publicPeekSlot: ReturnType<typeof useGame>["publicPeekSlot"]
   actingPlayerId: ReturnType<typeof useGame>["actingPlayerId"]
   fizzleMessage: ReturnType<typeof useGame>["fizzleMessage"]
   commandError: ReturnType<typeof useGame>["commandError"]
@@ -431,6 +447,7 @@ function GameTable({
       viewerId,
       peekActive: peek !== null,
       selection,
+      publicPeekSlot,
       onSelectTarget: handleSelectTarget,
       onSwapHeld: handleSwapHeld,
     })
@@ -674,6 +691,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
     flights,
     sendCommand,
     peek,
+    publicPeekSlot,
     actingPlayerId,
     fizzleMessage,
     commandError,
@@ -733,6 +751,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
         flights={flights}
         sendCommand={sendCommand}
         peek={peek}
+        publicPeekSlot={publicPeekSlot}
         actingPlayerId={actingPlayerId}
         fizzleMessage={fizzleMessage}
         commandError={commandError}

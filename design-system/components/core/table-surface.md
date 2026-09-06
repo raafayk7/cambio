@@ -63,7 +63,11 @@ None.
   its ring point; `edge` (the game screen) anchors the node's outboard
   edge at the point so seat + hand grow inward toward the table — a
   centered seat+hand group escaped the surface and occluded the chrome
-  above it. (2) **Game-over rest** — "the table dims" now means the
+  above it. **Exception (part of `edge`'s contract):** the VIEWER's own
+  seat keeps the centered anchor even under `edge` — its dock hangs
+  below the table with the hand over the near bench (the gate-judged
+  controlled break), because a full own-size hand grown inward would
+  lie across the tabletop and occlude the deck and discard. (2) **Game-over rest** — "the table dims" now means the
   whole surface: alongside the tabletop-disc scrim, a full-region
   `green-deep` tint sits above the seat layer and below the score-sheet
   overlay, so the terminal state visibly subordinates hands, seats, and

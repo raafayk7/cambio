@@ -19,7 +19,9 @@ The slam window made visible. Class: **Game object**.
 - `open` — bar draining linearly from `closesAt`; slam-eligible cards pulse
   in sync.
 - `resolving` — a slam is being adjudicated: bar pauses visually, the
-  slammed card's public reveal plays.
+  slammed card's public reveal plays for `duration.reveal` (tokens.md
+  r3); the drain math itself never pauses — it recomputes from the fixed
+  `closesAt` when the reveal clears.
 - `closed` — snaps away at `duration.snap`; play proceeds.
 
 ## Variants
@@ -43,3 +45,7 @@ None.
 ## Revisions
 
 - r1: initial, from the CAM-13 specimen board.
+
+- r2 (CAM-18 review F6, 2026-09-06): the `resolving` reveal beat is
+  paced by the new `duration.reveal` token (1200ms, tokens.md r3) —
+  the duration this spec described but never carried.

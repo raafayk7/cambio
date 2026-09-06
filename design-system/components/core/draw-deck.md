@@ -37,7 +37,9 @@ None.
 - The reshuffle retains the current top discard — visibly: it stays put
   while the rest flights.
 - The click affordance (r2) is presentation only — legality is the server's
-  and the client mirrors it via H1 (`deckCount > 0 || discard.length > 1`);
+  and the client mirrors it in its affordance mapping (`deckCount > 0
+|| discard.length > 1` — a T1-specified rule, distinct from H1's two
+  helpers);
   omitting `onClick` entirely renders the deck as a static, non-interactive
   stack rather than a disabled button.
 - The stock exposes `data-flight-anchor="deck"` for the flight layer.

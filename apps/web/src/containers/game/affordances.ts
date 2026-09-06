@@ -1,8 +1,11 @@
 import type { CardSlug, PlayerGameView, Rank, SlotIndex, SlotRef } from "@cambio/contracts"
 
 /**
- * H1 — the two public-rule helpers, and the pure `ViewPhase` → affordance
- * mapping (CAM-18 root plan H1/T1-T3; frontend plan step 10). Every rule
+ * H1's two public-rule helpers (`rankOfSlug`/`isPowerRank` and
+ * `slamGiveSlotRequired`) plus the pure `ViewPhase` → affordance mapping
+ * (CAM-18 root plan H1/T1-T3; frontend plan step 10) — the mapping also
+ * mirrors the engine's drawable/keep/swap occupancy gating exactly as
+ * T1/T2 specify (those live here, not in H1). Every rule
  * encoded here comes straight from `.claude/skills/cambio-rules/SKILL.md`
  * (never memory, never another Cambio/Cabo variant) — the server remains
  * the legality authority via 422s; these helpers exist only so the client
