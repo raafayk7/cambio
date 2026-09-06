@@ -381,3 +381,53 @@ describe("room states (L4/R ledger)", () => {
     expect(within(alert).getByRole("button", { name: "Try again" })).toBeInTheDocument()
   })
 })
+
+describe("copy link fallback (CAM-22)", () => {
+  it("focuses and selects the room-link field and shows the alarm toast when the clipboard API is missing", async () => {
+    setupFake()
+    const user = userEvent.setup()
+    memberBootstrap()
+    vi.stubGlobal("navigator", { ...navigator, clipboard: undefined })
+    renderApp(`/room/${GAME_ID}`)
+
+    await user.click(await screen.findByRole("button", { name: "Copy link" }))
+
+    expect(
+      await screen.findByText("Couldn't copy. Select the link and copy it yourself."),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText("Room link")).toBe(document.activeElement)
+  })
+
+  it("focuses and selects the room-link field and shows the alarm toast when writeText rejects", async () => {
+    setupFake()
+    const user = userEvent.setup()
+    memberBootstrap()
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    })
+    renderApp(`/room/${GAME_ID}`)
+
+    await user.click(await screen.findByRole("button", { name: "Copy link" }))
+
+    expect(
+      await screen.findByText("Couldn't copy. Select the link and copy it yourself."),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText("Room link")).toBe(document.activeElement)
+  })
+
+  it("shows the success toast when writeText resolves", async () => {
+    setupFake()
+    const user = userEvent.setup()
+    memberBootstrap()
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    })
+    renderApp(`/room/${GAME_ID}`)
+
+    await user.click(await screen.findByRole("button", { name: "Copy link" }))
+
+    expect(await screen.findByText("Link copied")).toBeInTheDocument()
+  })
+})

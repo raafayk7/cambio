@@ -249,18 +249,37 @@ Run from the repo root. Package names (confirmed from `package.json`):
 
 _(maintained by `/implement`, verified by `/review`)_
 
-| Clause                                                                                         | Test (file + name)                                                                  | What is asserted         |
-| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------ |
-| 1. Missing `navigator.clipboard`/`writeText` → no throw, field focused+selected, alarm toast   | _(added by /implement, `apps/web/test/room-screen.test.tsx`)_                       | _(filled by /implement)_ |
-| 2. `writeText` rejects → identical outcome to clause 1                                         | _(added by /implement, `apps/web/test/room-screen.test.tsx`)_                       | _(filled by /implement)_ |
-| 3. `writeText` resolves → unchanged success toast, no focus assertion required                 | _(added by /implement, `apps/web/test/room-screen.test.tsx`)_                       | _(filled by /implement)_ |
-| 4. `TextField` accepts optional `ref`, forwards to `<input>`, no change for existing consumers | _(none dedicated — covered by the full-repo gate across all `TextField` consumers)_ | n/a                      |
+| Clause                                                                                         | Test (file + name)                                                                                                                                                           | What is asserted                                                                                                                                                                |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Missing `navigator.clipboard`/`writeText` → no throw, field focused+selected, alarm toast   | `apps/web/test/room-screen.test.tsx` > `copy link fallback (CAM-22)` > `focuses and selects the room-link field and shows the alarm toast when the clipboard API is missing` | Alarm toast text "Couldn't copy. Select the link and copy it yourself." appears (`findByText`); room-link input (`getByLabelText("Room link")`) equals `document.activeElement` |
+| 2. `writeText` rejects → identical outcome to clause 1                                         | `apps/web/test/room-screen.test.tsx` > `copy link fallback (CAM-22)` > `focuses and selects the room-link field and shows the alarm toast when writeText rejects`            | Same two assertions as clause 1, with `writeText` stubbed via `vi.fn().mockRejectedValue(...)` instead of an absent `navigator.clipboard`                                       |
+| 3. `writeText` resolves → unchanged success toast, no focus assertion required                 | `apps/web/test/room-screen.test.tsx` > `copy link fallback (CAM-22)` > `shows the success toast when writeText resolves`                                                     | Success toast text "Link copied" appears (`findByText`); no focus/selection assertion made                                                                                      |
+| 4. `TextField` accepts optional `ref`, forwards to `<input>`, no change for existing consumers | _(none dedicated — covered by the full-repo gate across all `TextField` consumers)_                                                                                          | n/a                                                                                                                                                                             |
 
 ## Progress
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
-- [ ] 2026-09-06 — child plan drafted from root/CAM-22.md, no code written
+- [x] 2026-09-06 — child plan drafted from root/CAM-22.md, no code written
+- [x] 2026-09-06 07:00 — step 1 done: `ref` prop added to `TextField`
+      (`packages/ui/src/components/text-field.tsx`), no `forwardRef`, per
+      the plan. `pnpm turbo build typecheck lint test --filter @cambio/ui`
+      green.
+- [x] 2026-09-06 07:02 — step 2 done: `linkRef` + guard wired into
+      `copyLink` (`apps/web/src/containers/room/room-screen.tsx`). The
+      guard branch and the `.then` rejection branch share one
+      `copyFailed()` local function (focus + alarm toast), so the toast
+      message string exists once, per the plan's constraint.
+      `pnpm turbo build typecheck lint --filter @cambio/web` green.
+- [x] 2026-09-06 07:05 — step 3 done: three tests added to
+      `apps/web/test/room-screen.test.tsx` under a new
+      `describe("copy link fallback (CAM-22)", ...)` block — missing API,
+      rejecting promise, resolving promise — following the 422 test's setup
+      pattern with `vi.stubGlobal("navigator", ...)` applied before
+      `renderApp`. `pnpm turbo test --filter @cambio/web` green (20 files,
+      193 tests, +3 from before).
+- [x] 2026-09-06 07:10 — Contract coverage table filled with real test
+      names and assertion phrases for clauses 1–3.
 
 ## Surprises & notes for the root plan
 
