@@ -141,14 +141,36 @@ composition):
 
 ### Acceptance criteria
 
-- [ ] All 12 contract clauses hold, with coverage rows filled in the child
-      plans as tests land.
-- [ ] The design-gate rendered path is re-run at 2, 3, and 4 players on
+- [x] All 12 contract clauses hold, with coverage rows filled in the child
+      plans as tests land. Backend owns clauses 1–4 and the rules-doc half
+      of 12 ([backend/CAM-20.md](../backend/CAM-20.md) Contract coverage,
+      all rows filled with real test names and assertions); frontend owns
+      clauses 5–12 ([frontend/CAM-20.md](../frontend/CAM-20.md) Contract
+      coverage, all rows filled, including clause 7's re-verified
+      rendered numbers post-creation-gate and post-fix-pass).
+- [x] The design-gate rendered path is re-run at 2, 3, and 4 players on
       both breakpoints (advisory verdicts recorded in this doc's Progress).
-- [ ] The quality gate passes: `pnpm turbo build typecheck lint test`
-      (run bare, never piped).
-- [ ] Dev-server verification obeys the freshness discipline in AGENTS.md
-      (curl a changed module before trusting any rendered check).
+      **Scope reduced by explicit user request** to 2 runs — 4 players
+      only, both breakpoints (the densest/most bench-loaded case per
+      breakpoint) — rather than the full 2/3/4 × regular/compact sweep;
+      the frontend child plan's M6 already covered 2/3/4 × both
+      breakpoints during implementation (see
+      [frontend/CAM-20.md](../frontend/CAM-20.md) M6 Progress). See the
+      "Design-gate rendered pass (verification-only follow-up)" Progress
+      entry below for both full reports: both verdicts flagged (advisory
+      per ADR-0029, does not block), zero constraint-tier failures, no
+      real bugs found.
+- [x] The quality gate passes: `pnpm turbo build typecheck lint test`
+      (run bare, never piped). Confirmed green repeatedly through the
+      task (25/25 tasks, exit 0) — most recently after the design-gate
+      fix pass, verified independently by the orchestrator outside any
+      subagent's own report.
+- [x] Dev-server verification obeys the freshness discipline in AGENTS.md
+      (curl a changed module before trusting any rendered check). Followed
+      at every rendered pass (M6, the creation-gate follow-up, the
+      mid-viewport bug investigation, the design-gate run, and the fix
+      pass) — see each lane's Surprises for the specific freshness checks
+      run.
 
 ## Plan of work
 
@@ -207,6 +229,228 @@ timestamp each entry)_
 - [x] 2026-09-06 — `/plan` pass: redefinition agreed, ADR-0036 written,
       explorer maps of geometry + cap touchpoints captured, child plans
       drafted.
+- [x] 2026-09-06 — `/implement` pass: backend and frontend lanes run in
+      parallel (contracts frozen, zero shared-file overlap). **Backend
+      (M1, clauses 1–4 + rules-doc half of 12):** the 2–5 pins moved to
+      2–4 test-first across `Deal.ts`, `Lobby.ts`
+      (`MAX_LOBBY_MEMBERS`), the sim harness (`testing/invariants.ts`,
+      `testing/driver.ts`'s `playerCountFor`), and the room-screen copy
+      (`use-room.ts`, `room-screen.tsx`); `docs/HANDOFF.md` §1.1 amended
+      on the task branch. Full backend-touched suite green throughout;
+      details and coverage rows in
+      [backend/CAM-20.md](../backend/CAM-20.md). **Frontend (M2–M6,
+      clauses 5–12):** `hand.tsx` reworked to row-major rows (M2);
+      `table-geometry.ts`'s polar engine replaced by a `Bench` +
+      `benchAssignment` model, `table-surface.tsx` anchored via exported
+      class maps, the CAM-21 dock-duplication dissolved, 5-player support
+      retired (M3); side-bench rotation added with the transform kept
+      strictly below flight anchors (M4); the regular table sized
+      fluidly up to `max-w-4xl` (M5); rendered verification at 2/3/4
+      players × both breakpoints plus canon revisions (`table-surface.md`
+      v5, `hand.md` v3) closed out M6. One real bug was caught and fixed
+      during M6 itself: the M4 rotation classes were unprefixed and leaked
+      into compact, breaking the fold at 3–4 players — fixed by scoping
+      the rotated presentation to `regular:` only. Full web suite green
+      throughout M2–M6 (227/227 at close); details and coverage rows in
+      [frontend/CAM-20.md](../frontend/CAM-20.md). **Creation-gate
+      follow-up:** M4 hit the pre-flagged STOP (the rotated side-bench
+      card footprint) and correctly did not invent a value — the user was
+      asked via `AskUserQuestion` and chose minting a new canonical
+      utility, `card-frame-rotated` (`aspect-ratio: 7/5`, mirroring
+      `card-frame`'s `5/7`), over a shared-variable or spacing-only
+      alternative. Added to `packages/ui/src/styles.css` and
+      `design-system/references/tokens.md`; wiring it required keeping
+      the flight anchor on plain upright `card-frame` (the grid's real
+      track space) while only the card visual inside took the rotated
+      utility — an anchor/visual split discovered by rendered measurement
+      after a first attempt (matching the plan's literal sketch) fixed
+      one clearance axis while silently breaking the other. Rendered
+      clearance for a 12-card rotated hand improved from ~2px to ~50px
+      (upright: ~86px), closing the asymmetry that originally flagged the
+      gap. **Mid-viewport bug investigation:** the user reported the
+      table rendering far smaller than the fold allows at two DevTools
+      viewport sizes outside this task's reference viewports (723×770,
+      421×770). Investigation found two unrelated causes: 723×770 (just
+      inside the `regular` breakpoint, `--breakpoint-regular: 720px`)
+      could not be reproduced against fresh code after a thorough sweep —
+      almost certainly a stale dev server on the reporter's side, since
+      pre-M5 code lacked the height bound and would produce exactly that
+      symptom; 421×770 (compact) reproduced a real ~200px dead-space gap,
+      but was confirmed byte-identical to `release-v0` via `git diff` —
+      a pre-existing CAM-21-era "accepted flex residue" mechanism
+      (their own code comment) that scales linearly with viewport height
+      beyond CAM-21's one validated height (640px), not something this
+      task's diff touched or worsened. Filed separately as
+      [CAM-27](https://linear.app/raafayk7/issue/CAM-27/compact-game-screen-flex-residue-leaves-growing-dead-space-above-the)
+      rather than fixed under this task's scope, following the same
+      precedent as CAM-26. Full gate green (25/25) confirmed before and
+      after this investigation; no source files touched.
+- [x] 2026-09-06 — Design-gate rendered pass (verification-only follow-up;
+      the frontend child plan's M6 already ran the gate at 2/3/4 players
+      × both breakpoints during implementation — this is a separate,
+      later pass closing this root doc's acceptance box). **Scope
+      explicitly narrowed by user request to 2 runs**, not the full
+      6-combination sweep: 4 players at regular (1280×900) and 4 players
+      at compact (360×640) — the densest/most bench-loaded case at each
+      breakpoint, since all four benches are occupied only at 4P. Setup
+      followed the established recipe from
+      [frontend/CAM-20.md](../frontend/CAM-20.md)'s M6/follow-up Progress
+      entries: `docker compose -f docker/docker-compose.yml up -d`
+      confirmed already healthy; found and killed a stray orphaned
+      `apps/api` dev process (pid 855963, no listening port, a crashed
+      leftover from an earlier session) before starting a fresh
+      `pnpm dev` (api :3001, web :3100 per this repo's `.env`
+      `WEB_PORT=3100` — a real per-checkout value, not the
+      AGENTS.md-documented default :3000); freshness verified per
+      AGENTS.md before trusting anything rendered (curled
+      `table-surface.tsx` through Vite and grepped for `bench`, got
+      `benchAssignment`/`BENCH_POSITION_CLASS`/`BENCH_ANCHOR_CLASS` hits,
+      confirming the served module was current). A live 4-player game was
+      created directly via the API (`POST /users` ×4 with separate cookie
+      jars, then `POST /lobbies`, `POST /lobbies/:id/join` ×3,
+      `POST /lobbies/:id/start`), landing in `AwaitingDraw` (Zara's turn)
+      with a fresh 4-card deal at every seat — accepted per the task's
+      own time-constrained allowance rather than growing hands via false
+      slams, since the frontend M6 pass already stress-tested 12–16-card
+      hands at every bench. Both renders were captured via
+      `.agents/scripts/design-gate/render.js --cookie` (Zara's session)
+      against the live game at each viewport, then the full
+      decompose-map-judge pipeline run as three separate subagent calls
+      per breakpoint (six calls total), JSON passed verbatim between
+      stages per the `gate` skill's orchestration contract. Both verdicts
+      came back flagged, but advisory per ADR-0029 — neither blocks
+      shipping — and **both had zero constraint-tier (C1/C2) failures**;
+      every flag is an accidental default-tier polish item or a
+      controlled break tied to documented Cambio/CAM-21 canon. Slop
+      convergence (C3) did not trigger at either breakpoint (2
+      medium-weight markers each, against a threshold of 3, or 2
+      high-weight). Regular breakpoint (1280×900, 4 players) — flagged on
+      3 points: hard checks measured 0 contrast fails (sole advisory is
+      an invisible 1×1px sr-only `h1`) and all 3 sampled touch targets
+      clear 44px. The 3 accidental findings: (1) Zara's own-seat group
+      extends 3px past the 900px viewport bottom inside an
+      `overflow-hidden` wrapper, clipping the seat pill's border and its
+      signature 3px/3px hard offset shadow (fix: raise the group 4px, one
+      step on the existing 4px scale, and assert the bottom edge
+      directly); (2) the Call Cambio button sits alone at
+      (1104,816), 260–415px from the own hand/pill it acts on rather than
+      docked beside them (fix: right-align it to the own hand's edge,
+      same vertical band); (3) on the rotated side-bench hands the middle
+      two of four cards land over the dark shadow gap between bench and
+      tabletop instead of on the painted bench itself, a straight card
+      column registered against a curved arc — invisible to hard-checks
+      since it's misregistration against raster art, not a CSS grid (fix:
+      offset the middle cards outward by the arc's sagitta). Everything
+      else initially read as irregular was called controlled: hands
+      overlapping the table art (applied identically at all 4 seats,
+      stripe direction encodes bench orientation); the flat 15px chrome
+      with no visible heading (hierarchy relocated to the card layer — a
+      1.5x viewer-card size step, not an absent hierarchy); the
+      once-only display face on the discard rank (documented Cambio
+      identity — poster face reserved for card ranks); two radius
+      vocabularies, rectangular plates vs. round tokens (a legible
+      physical metaphor applied without exception, worth documenting
+      explicitly); three chrome elements in three separate corners except
+      for the Call Cambio placement above; the 235px of empty paving on
+      each side of the table (expected at low visual density, nothing
+      decorative fills it); and the unlabelled connection dot (a
+      near-universal convention). Personality (D7) was actively
+      considered and not flagged — convergence wasn't met and a
+      repo-wide sweep found zero hits across the entire default-AI-stack
+      vocabulary; the Judge's own words were that "this surface could not
+      belong to another product." Compact breakpoint (360×640, 4
+      players) — flagged on 7 points: hard checks again measured 0
+      contrast fails; Call Cambio clears 44px and the DrawDeck/DiscardPile
+      measure 32×44.8, inside the 24–44px advisory band (not a constraint
+      fail, C2's hard floor is 24px); fold-fit was confirmed by
+      measurement (`document.scrollHeight` 640 equals `clientHeight` 640,
+      no page-level scroll on either axis). The 7 accidental findings
+      collapse into three root causes per the Judge's own read: first,
+      Sam's and Priya's opponent hands sit exactly the same 8px apart as
+      the gap used inside each hand, so all 8 face-down cards read as one
+      continuous strip with no visual seam — in a hidden-information
+      memory game, card-to-owner attribution is load-bearing, not
+      cosmetic (fix: tighten the intra-hand gap to 4px and spend the
+      recovered width on a ≥24px inter-seat gap, and/or give each hand a
+      common-region ground). Second, the "35" deck-count badge escapes
+      the deck card it labels, extending 4px onto the discard's left edge
+      and 8px below both cards with no offset-shadow treatment separating
+      the layers — readable as belonging to the wrong pile, and a D8
+      execution miss on the same element (fix: inset the badge fully
+      inside the deck card, or move it below as a labelled line). Third,
+      the compact table-art size cap (`--size-table-art-compact`) is too
+      small for its own contents: the deck+discard pair spans 68px of a
+      69.1px disc (~0.5px clearance per side), the same two cards are the
+      smallest touch targets on screen at 32px with only a 4px gutter
+      between them (a mis-tap between draw and take-discard is not
+      undoable), and 78.7px of empty paving sits unclaimed between the
+      table art and the own hand as leftover flex slack rather than
+      authored padding — one size lever (raising the art cap) addresses
+      all three symptoms together. The seventh, independent finding: the
+      top-right connection dot is the one place on this screen that falls
+      back to color alone for status, inconsistent with how redundantly
+      the rest of the screen encodes turn state (text plus dot plus ring
+      plus position plus size) — it needs an accessible name, not a
+      position change. The controlled-break calls here were the flat
+      15px type band and missing visible title (both judged as the right
+      trade against the stated no-page-scroll fold budget, though the
+      Judge flagged the type-band excuse as fragile if wider breakpoints
+      show the same flatness); the CAM-21-era 2+1 opponent wrap and its
+      stacking above the table art (width-forced, documented, applied
+      consistently, though a designer may prefer a different compact
+      expression); the mixed Alfa Slab One/Archivo card face at 12px
+      (documented rule applied uniformly, though "at 12px the slab's
+      character is lost"); the redundant card-count on the viewer's own
+      pill (uniform component application outweighs the one-seat
+      redundancy); and the connection dot's position off the shared
+      x=180 centerline (a recognized corner-pinned-status convention —
+      the real problem is the missing label, counted above). No real
+      (non-advisory) bugs were found at either breakpoint: every flagged
+      item is either a controlled break tied to documented Cambio/CAM-21
+      canon or an accidental default-tier polish item (spacing,
+      proximity, a badge overlap, a missing a11y label), none is a
+      constraint-tier failure, none is structurally broken, and per
+      ADR-0029 none blocks shipping. The one cross-breakpoint pattern
+      worth a human's eye: the deck-count-badge overlap (compact) and the
+      side-bench card registration gap (regular) are both small-scale
+      rendering details invisible to hard-checks because they're measured
+      against raster art or a flush size cap rather than a CSS grid,
+      consistent with this task's own ADR-0030 rationale for routing
+      geometry claims to the rendered path. No source files were touched
+      (verification-only, per instruction); the dev server was stopped
+      after the pass.
+- [x] 2026-09-06 — Design-gate fix pass: the user chose to fix all 7
+      accidental findings now rather than defer them. **Regular:** the
+      own-seat wrapper's translate was nudged an extra 4px so the group's
+      bottom edge (including the seat pill's border/shadow) sits at
+      899.38px, inside the 900px viewport (was 903.38px); Call Cambio
+      moved from a fixed stage corner to `left-[calc(50%+324px)]`,
+      derived from the hand's column-width ceiling, cutting the gap from
+      260.5px to 120px; the rotated side-bench hands gained a per-row
+      margin (`SIDE_BENCH_MARGIN_CLASS`) fit to the bench's measured
+      crescent shape, applied to the card visual only (never the flight
+      anchor) — two real bugs surfaced only on the rendered path while
+      building this (a flex-centered margin moves content by half its
+      value, so every table entry had to be doubled; the right bench's
+      positive margin collapsed the visual to 0×0 via default
+      `flex-shrink`, fixed with `regular:shrink-0`). **Compact:** the
+      intra-hand card gap dropped to 4px and the inter-seat gap rose to
+      24px, giving opponent hands a visible seam; the deck-count badge
+      now insets flush to the deck's own corner instead of bleeding onto
+      the discard; `--size-table-art-compact` rose from 128px to 158px (a
+      re-measured value, not a revert to an old constant), re-verified
+      against CAM-21's fold-fit invariant at 2, 3, and 4 players; the
+      connection-dot color-alone finding turned out to already be fixed
+      (byte-identical to `release-v0`, with an existing accessible-name
+      assertion) — logged as a likely stale-render artifact in the
+      Judge's source, not a real gap. New structural jsdom coverage added
+      for the own-seat overshoot, the CTA's docked position, and the
+      inter-/intra-hand gap difference. Canon revised again: `hand.md` →
+      v4, `table-surface.md` → v6, `tokens.md` updated, each with
+      changelog entries — not silent edits. Full gate green throughout
+      (25/25, confirmed independently by the orchestrator after the pass,
+      not just accepted from the subagent's own report); web suite
+      230/230 (227 + 3 new), UI suite 25/25.
 
 ## Decision log
 
@@ -233,6 +477,21 @@ timestamp each entry)_
 - 2026-09-06 — **Slam-window liveness bug filed separately** — engine
   verified faithful to §1.5; the observed "couldn't draw" maps to a
   client/application liveness hole documented in the bug issue. User call.
+- 2026-09-06 — **Rotated side-bench card footprint: new canonical
+  `card-frame-rotated` utility** (`aspect-ratio: 7/5`), over a shared
+  `--card-aspect` variable on `card-frame` or a spacing-only fix — user
+  call via `AskUserQuestion` at the M4 creation-gate STOP. Decision Log
+  tier, not an ADR; recorded in `hand.md`'s Revisions and `tokens.md`.
+- 2026-09-06 — **Design-gate acceptance criterion: run 2 configurations,
+  not the full 2/3/4 × regular/compact sweep** — 4 players at each
+  breakpoint (the densest, most bench-loaded case), since gate verdicts
+  are advisory-only (ADR-0029) and the frontend M6 pass already covered
+  the full sweep during implementation. User call.
+- 2026-09-06 — **Fix all 7 accidental design-gate findings now, in this
+  task** — rather than deferring to a follow-up issue (the CAM-26/CAM-27
+  precedent), given the findings were small and precisely located by the
+  gate, and one (compact opponent-hand spacing) had real gameplay
+  consequence in a hidden-information memory game. User call.
 
 ## Surprises & discoveries
 

@@ -97,10 +97,21 @@ describe("hand & seat integrity checker (C2.2, §4.5 restated)", () => {
     expect(handIntegrityViolations(extra, players3)).not.toStrictEqual([])
   })
 
-  it("rejects rosters outside 2–5 players (§1.1)", () => {
+  it("rejects rosters outside 2–4 players (§1.1)", () => {
     const state = healthy()
     const one = { ...state, players: state.players.slice(0, 1) }
     expect(handIntegrityViolations(one, players3.slice(0, 1))).not.toStrictEqual([])
+
+    const roster5 = [...players3, uid(3), uid(4)]
+    const five: GameState = {
+      ...state,
+      players: [
+        ...state.players,
+        { id: uid(3), hand: [{ slotIndex: slot(0), card: card("AS") }] },
+        { id: uid(4), hand: [{ slotIndex: slot(0), card: card("AD") }] },
+      ],
+    }
+    expect(handIntegrityViolations(five, roster5)).not.toStrictEqual([])
   })
 
   it("stepViolations combines both checkers", () => {

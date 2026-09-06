@@ -65,20 +65,34 @@
    * beat. A glance, not a memorization window (that's duration-peek). */
   --duration-reveal: 1200ms;
 
-  /* tokens.md §Shape (CAM-21): the compact game screen's table-art
-   * max-width cap — a square asset, so this is also the height cap. Fits
-   * the 360×640 fold budget alongside the compact card scale below;
-   * gate-approved, interview 2026-09-06. Compact only (game-screen.tsx
-   * cancels it at regular via max-w-none). Tuned down from the plan's
-   * starting 160px at the M5 rendered pass (measured fold-budget
-   * shortfall, see root plan Surprises) — 128px is the first escalation
-   * step the child plan names. Off the spacing scale deliberately: it is
-   * a measured fold-budget constant (viewport minus chrome, dock, and
+  /* tokens.md §Shape (CAM-21, revised CAM-20 gate fix finding 3): the
+   * compact game screen's table-art max-width cap — a square asset, so
+   * this is also the height cap. Compact only (game-screen.tsx cancels
+   * it at regular via max-w-none). Off the spacing scale deliberately: it
+   * is a measured fold-budget constant (viewport minus chrome, dock, and
    * opponent rows at the tuned card scale), not a rhythm step — and it
    * stays a bare primitive (no @theme role) because exactly one consumer
    * exists, table-surface.tsx's docked-composition art cap (review F5.8;
-   * promote to a role if a second consumer ever appears). */
-  --size-table-art-compact: 128px;
+   * promote to a role if a second consumer ever appears).
+   *
+   * CAM-21 originally tuned this DOWN from 160px to 128px at the M5
+   * rendered pass (measured fold-budget shortfall, root plan Surprises).
+   * CAM-20's design-gate pass measured the CONSEQUENCE of that 128px cap
+   * directly: at `TABLE_DISC_FRACTION` (0.54), the tabletop disc is only
+   * 69.1px across, leaving ~0.5px of clearance around the deck+discard
+   * pair (68px combined, card-sm 32px × 2 + the center row's compact
+   * `gap-1`) — effectively flush, and the draw deck's count badge (fix
+   * 2, draw-deck.tsx) had nowhere to sit without crossing into the
+   * discard's own space. Raised to 158px — the minimum that clears the
+   * pair by >=8px on both sides (158×0.54=85.3px disc; 85.3-68=17.3px,
+   * ~8.7px/side) rather than jumping back to the original 160px — so
+   * this is a genuinely new, re-measured value, not a revert. Re-verified
+   * against the CAM-21 fold-fit invariant (360×640, 2-4 players, live
+   * rendered pass, 2026-09-06): still zero page-level scroll — the row-
+   * major hand and tightened compact card scale (card-lg 48px, card-md
+   * 32px) this task already landed freed enough of the same budget that
+   * the M5-era shortfall does not reproduce at 158px. */
+  --size-table-art-compact: 158px;
 }
 
 @theme {
@@ -239,6 +253,20 @@
 @utility card-frame {
   width: var(--card-width);
   aspect-ratio: 5 / 7;
+  border-radius: calc(var(--card-width) * var(--radius-card-ratio));
+}
+/* Rotated sibling (CAM-20, gate-approved, creation-gate interview
+ * 2026-09-06): a side-bench opponent's hand reads rotated (hand.md r3,
+ * ADR-0036 §5). The card VISUAL (never the flight anchor — ADR-0035/0036)
+ * uses this instead of card-frame's upright 5/7 at the same --card-width;
+ * rotated 90°, its painted footprint lands width/height-reversed from
+ * card-frame's own box, which is what the anchor still reserves (hand.tsx)
+ * — comfortably inside it, instead of the upright placeholder's near-zero
+ * clearance. Same conventions as card-frame otherwise; only the
+ * aspect-ratio flips. */
+@utility card-frame-rotated {
+  width: var(--card-width);
+  aspect-ratio: 7 / 5;
   border-radius: calc(var(--card-width) * var(--radius-card-ratio));
 }
 /* Compact card scale (CAM-21, gate-approved, interview 2026-09-06): the

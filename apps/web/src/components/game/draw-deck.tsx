@@ -83,7 +83,17 @@ export function DrawDeck({ count, onClick, state, className }: DrawDeckProps) {
         variant="count"
         aria-label={`${count} cards in the draw deck`}
         className={cn(
-          "absolute -right-2 -bottom-2 z-10",
+          // CAM-20 gate fix (compact, finding 2): the corner-overhang
+          // treatment (`-right-2 -bottom-2`, pushing the badge 8px past
+          // the deck's own edge on both axes) reads fine at regular's
+          // larger card-md (64px) with a full gap-4 to the discard pile,
+          // but at compact's 32px deck and 4px gutter it crossed into the
+          // discard's own space and hung 8px below both cards — visually
+          // ambiguous about which pile it was counting. Compact insets it
+          // flush to the deck's own corner instead (`right-0 bottom-0`,
+          // measured to sit entirely within the deck's rendered box);
+          // regular keeps the original overhang, unchanged.
+          "absolute right-0 bottom-0 z-10 regular:-right-2 regular:-bottom-2",
           low && count > 0 && "text-accent-alarm-deep",
         )}
       >

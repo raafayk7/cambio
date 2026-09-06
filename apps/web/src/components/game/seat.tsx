@@ -12,7 +12,9 @@ import { cn } from "@cambio/ui"
  */
 export type SeatState = "default" | "active-turn" | "acting" | "disconnected" | "left"
 
-/** Palette cycle for avatar discs: primitives only (seat.md), 5 ≥ max seats. */
+/** Palette cycle for avatar discs: primitives only (seat.md) — 5 entries,
+ * longer than the 4-player cap (ADR-0036) needs, so it never wraps in
+ * practice; the cycle itself is seat.md canon and stays this length. */
 const AVATAR_CYCLE = [
   { ground: "var(--green-table)", ink: "text-ink-inverse" },
   { ground: "var(--terracotta)", ink: "text-ink-inverse" },

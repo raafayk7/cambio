@@ -30,6 +30,14 @@ export type PlayingCardProps = FaceProps & {
   slamEligible?: boolean
   inFlight?: boolean
   leavingPlay?: boolean
+  /** Side-bench rotated reading (hand.md r3, ADR-0036 §5): layers
+   * `card-frame-rotated` (7/5, the canonical sibling utility —
+   * packages/ui/src/styles.css) over every internal `card-frame` layer,
+   * `regular:`-prefixed to match the rotate transform's own
+   * regular-only scope (Hand's `cardRotateClass`) — compact stays
+   * upright regardless. Callers still apply the `rotate-90` transform
+   * via `className`; this only swaps which footprint the box reserves. */
+  rotated?: boolean
   className?: string
 }
 
@@ -49,11 +57,13 @@ export function PlayingCard(props: PlayingCardProps) {
     slamEligible = false,
     inFlight = false,
     leavingPlay = false,
+    rotated = false,
     className,
   } = props
   const showFace = props.face !== "down"
   const parsed = props.face === "down" ? undefined : splitSlug(props.card)
   const sizeClass = size === "lg" ? "card-lg" : size === "sm" ? "card-sm" : "card-md"
+  const frameClass = rotated ? "card-frame regular:card-frame-rotated" : "card-frame"
 
   return (
     <div
@@ -63,9 +73,10 @@ export function PlayingCard(props: PlayingCardProps) {
       data-in-flight={inFlight ? "true" : undefined}
       data-leaving-play={leavingPlay ? "true" : undefined}
       className={cn(
+        frameClass,
         // motion-reduce: state transitions jump — the lifted/rotated state
         // itself survives, only the movement goes (tokens.md §Motion).
-        "card-frame relative transition duration-snap ease-snap perspective-normal motion-reduce:transition-none",
+        "relative transition duration-snap ease-snap perspective-normal motion-reduce:transition-none",
         sizeClass,
         // selected: lift + accent.focus ring — same visual language as
         // keyboard focus (playing-card.md state 4; review finding R3a).
@@ -88,7 +99,9 @@ export function PlayingCard(props: PlayingCardProps) {
         <span
           aria-hidden
           className={cn(
-            "absolute inset-0 border-interactive card-frame card-back-mark backface-hidden",
+            "absolute inset-0 border-interactive",
+            frameClass,
+            "card-back-mark backface-hidden",
             "motion-reduce:transition-opacity motion-reduce:duration-snap motion-reduce:ease-snap",
             showFace ? "motion-reduce:opacity-0" : "motion-reduce:opacity-100",
             selected || inFlight || leavingPlay ? "shadow-float" : "shadow-raised",
@@ -96,7 +109,9 @@ export function PlayingCard(props: PlayingCardProps) {
         />
         <span
           className={cn(
-            "absolute inset-0 rotate-y-180 border-interactive card-frame bg-surface-raised backface-hidden",
+            "absolute inset-0 rotate-y-180 border-interactive",
+            frameClass,
+            "bg-surface-raised backface-hidden",
             "motion-reduce:transition-opacity motion-reduce:duration-snap motion-reduce:ease-snap motion-reduce:transform-none",
             showFace ? "motion-reduce:opacity-100" : "motion-reduce:opacity-0",
             selected || inFlight || leavingPlay ? "shadow-float" : "shadow-raised",
@@ -123,7 +138,11 @@ export function PlayingCard(props: PlayingCardProps) {
         {slamEligible ? (
           <span
             aria-hidden
-            className="absolute inset-0 border-2 border-accent-alarm card-frame animate-pulse-soft"
+            className={cn(
+              "absolute inset-0 border-2 border-accent-alarm",
+              frameClass,
+              "animate-pulse-soft",
+            )}
           />
         ) : null}
       </div>

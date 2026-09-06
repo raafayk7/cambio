@@ -25,7 +25,7 @@ import { makeDriverRng } from "./rng.js"
 export interface SimParams {
   readonly gameSeed: number
   readonly driverSeed: number
-  /** 2–5 (§1.1); roster is `uid(0)…uid(n-1)` unless `initial` overrides it. */
+  /** 2–4 (§1.1, ADR-0036); roster is `uid(0)…uid(n-1)` unless `initial` overrides it. */
   readonly playerCount: number
   readonly config: GameConfig
   /** Hard termination backstop (C1.4); default 5000 (EndToEnd precedent). */
@@ -101,8 +101,8 @@ export const seedPair = (base: number, i: number): readonly [number, number] => 
   base + 2 * i + 1,
 ]
 
-/** Cycle player counts 2→5 across a batch so every table size gets exercised. */
-export const playerCountFor = (i: number): number => 2 + (i % 4)
+/** Cycle player counts 2→4 across a batch so every table size gets exercised. */
+export const playerCountFor = (i: number): number => 2 + (i % 3)
 
 /** Simulated ms between ordinary steps; slam windows use their own instants. */
 const STEP_MS = 25

@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import { BENCH_ANCHOR_CLASS } from "../src/components/game/table-surface.js"
 import { setRealtimeClientForTests } from "../src/services/realtime.js"
 import { FakeRealtimeClient } from "./support/fake-realtime.js"
 import {
@@ -1890,23 +1891,33 @@ describe("compact docked composition (CAM-21)", () => {
     expect(tableSurfaceRoot?.contains(ownSeatWrapper)).toBe(false)
   })
 
-  it("carries no scale-transform class on any ancestor of the flight root (ADR-0035)", async () => {
+  it("carries no scale-or-rotate transform class from every flight anchor up through the root's ancestors (ADR-0035, widened to rotation by ADR-0036 §5)", async () => {
     const fake = setupFake()
     gameBootstrap()
     renderGameApp(GAME_ID)
     await screen.findByText(ME.name)
     await channelsReady(fake)
 
-    const tableRoot = document.querySelector('[data-region="table-root"]')
-    if (tableRoot === null) throw new Error("table-root region not found")
-    for (let node: Element | null = tableRoot; node !== null; node = node.parentElement) {
-      // Review F5.1 widened the net: variant-prefixed (`regular:scale-*`)
-      // and negative (`-scale-x-*`) utilities, arbitrary transform
-      // utilities, and inline transform styles are all ADR-0035 breaches
-      // the original `/(^|\s)scale-/` couldn't see.
-      expect(node.className).not.toMatch(/(^|\s|:)-?scale-/)
-      expect(node.className).not.toMatch(/transform-\[/)
-      expect((node as HTMLElement).style.transform ?? "").toBe("")
+    // CAM-20/ADR-0036 §5 widens the CAM-21 pin two ways: it now walks from
+    // EVERY flight anchor (not just the table-root down) and it now checks
+    // for rotate too, not just scale — the FLIP layer measures
+    // post-transform pixels, so a rotated ancestor of an anchor corrupts a
+    // flight the same way a scaled one does. Anchors' DESCENDANTS stay
+    // exempt (playing-card's own `rotate-6`/`rotate-y-180`, the discard
+    // fan, and CAM-20's own side-bench card rotate are all BELOW their
+    // anchor and legal) — the walk only ever goes from an anchor upward.
+    const anchors = document.querySelectorAll("[data-flight-anchor]")
+    expect(anchors.length).toBeGreaterThan(0)
+    for (const anchor of anchors) {
+      for (let node: Element | null = anchor; node !== null; node = node.parentElement) {
+        // Review F5.1 widened the net: variant-prefixed (`regular:scale-*`)
+        // and negative (`-scale-x-*`) utilities, arbitrary transform
+        // utilities, and inline transform styles are all ADR-0035/0036
+        // breaches the original `/(^|\s)scale-/` couldn't see.
+        expect(node.className).not.toMatch(/(^|\s|:)-?(scale|rotate)-/)
+        expect(node.className).not.toMatch(/transform-\[/)
+        expect((node as HTMLElement).style.transform ?? "").toBe("")
+      }
     }
   })
 
@@ -1950,5 +1961,191 @@ describe("compact docked composition (CAM-21)", () => {
     expect(rest?.closest("[data-seat-index]")).not.toBeNull()
     expect(rest?.closest('[data-state="game-over"]')).toBeNull()
     expect(rest?.className).toContain("regular:hidden")
+  })
+})
+
+// ---- CAM-20 M4: side-bench rotation (ADR-0036 §5) ------------------------
+
+describe("side-bench rotation (CAM-20)", () => {
+  const THIRD = { id: "33333333-3333-4333-8333-333333333333", name: "Zara" }
+
+  const threePlayerBootstrap = () =>
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+            { id: THIRD.id, name: THIRD.name, hand: [0, 1] },
+          ],
+        }),
+      ),
+    })
+
+  it("actually exercises rotation: a left-bench and a right-bench opponent each get a rotate class on the card visual, below their anchor", async () => {
+    const fake = setupFake()
+    threePlayerBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    // Viewer (index 0) is seat-arc order 0 → bottom; the next seat (FRIEND,
+    // index 1) takes the leftmost occupied bench for a 3-seat table (left);
+    // THIRD (index 2) takes right (table-geometry.ts benchAssignment).
+    const friendAnchor = document.querySelector(`[data-flight-anchor="slot:${FRIEND.id}:0"]`)
+    const thirdAnchor = document.querySelector(`[data-flight-anchor="slot:${THIRD.id}:0"]`)
+    expect(friendAnchor).not.toBeNull()
+    expect(thirdAnchor).not.toBeNull()
+
+    // The rotate class lives on the card visual INSIDE the anchor, never on
+    // the anchor div itself.
+    expect(friendAnchor?.className ?? "").not.toMatch(/rotate-/)
+    expect(thirdAnchor?.className ?? "").not.toMatch(/rotate-/)
+    expect(friendAnchor?.querySelector("[data-face]")).toHaveClass("regular:-rotate-90")
+    expect(thirdAnchor?.querySelector("[data-face]")).toHaveClass("regular:rotate-90")
+
+    // And the viewer's own hand (always the bottom bench) never rotates.
+    const ownAnchor = document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"]`)
+    expect(ownAnchor?.querySelector("[data-face]")?.className ?? "").not.toMatch(/rotate-/)
+  })
+
+  it("still carries no scale-or-rotate transform above any flight anchor with a rotated hand on the table (ADR-0035/0036 §5)", async () => {
+    const fake = setupFake()
+    threePlayerBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const anchors = document.querySelectorAll("[data-flight-anchor]")
+    expect(anchors.length).toBeGreaterThan(0)
+    for (const anchor of anchors) {
+      for (let node: Element | null = anchor; node !== null; node = node.parentElement) {
+        expect(node.className).not.toMatch(/(^|\s|:)-?(scale|rotate)-/)
+        expect(node.className).not.toMatch(/transform-\[/)
+        expect((node as HTMLElement).style.transform ?? "").toBe("")
+      }
+    }
+  })
+})
+
+// ---- CAM-20 M5: the fluid regular table (clause 9), scoped to the docked
+// composition only (mirrors CAM-21's viewerSeat scoping pins) --------------
+
+describe("fluid regular table (CAM-20 M5)", () => {
+  it("sizes the table square from height at regular (flex-grown, max-w-4xl), never the pre-CAM-20 width-driven max-w-2xl", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    // `document.querySelector("[data-state]")` would DOM-first-match
+    // TurnIndicator's own `[role=status][data-state]` in the chrome band
+    // (same ambiguity the game-over walk test above routes around) — find
+    // TableSurface's root via a still-internal opponent seat wrapper.
+    const opponentSeatWrapper = screen.getByText(FRIEND.name).closest("[data-seat-index]")
+    const tableSurfaceRoot = opponentSeatWrapper?.closest("[data-state]")
+    expect(tableSurfaceRoot).not.toBeNull()
+    const className = tableSurfaceRoot?.className ?? ""
+    expect(className).toContain("regular:flex-1")
+    expect(className).toContain("regular:min-h-0")
+    expect(className).toContain("regular:max-w-4xl")
+    expect(className).not.toContain("regular:max-w-2xl")
+    expect(className).not.toContain("regular:block")
+  })
+})
+
+// ---- CAM-20 design-gate fix cycle: the Judge's accidental findings at the
+// regular (1280×900) and compact (360×640) reference viewports. Real pixel
+// claims are rendered-path evidence (ADR-0030 — jsdom computes no layout);
+// these are the structural pins that would catch a REGRESSION even though
+// they can't themselves prove the rendered outcome — see
+// docs/plans/frontend/CAM-20.md's Progress for the measured numbers. -------
+
+describe("design-gate fix cycle, regular findings (CAM-20)", () => {
+  it("nudges the own-seat group's vertical translate one 4px step past the shared bench anchor's plain -50% (finding 1 — the group measured 3px past the 900px regular reference viewport before this fix)", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const ownSeatWrapper = screen.getByText(ME.name).closest("[data-seat-index]")
+    expect(ownSeatWrapper).not.toBeNull()
+    const className = ownSeatWrapper?.className ?? ""
+    // The extra 4px nudge — NOT the shared BENCH_ANCHOR_CLASS.bottom's bare
+    // `-translate-y-1/2` alone, which is what let the overshoot through
+    // undetected (nothing pinned the actual bottom coordinate). jsdom
+    // cannot compute the real bottom edge (ADR-0030); the rendered pass
+    // (plan doc Progress) is the pixel evidence this pin can only guard.
+    expect(className).toContain("regular:translate-y-[calc(-50%-4px)]")
+    expect(className).not.toContain("regular:-translate-y-1/2")
+    // The shared constant itself must stay untouched — TableSurface's own
+    // internal seatWrapper (room screen) still applies it unmodified.
+    expect(BENCH_ANCHOR_CLASS.bottom).toBe("regular:-translate-x-1/2 regular:-translate-y-1/2")
+  })
+
+  it("docks the Call Cambio affordance near the own-seat group's horizontal center instead of the stage's bottom-right corner (finding 2 — measured 260px away at a 4-card hand before this fix)", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const callCambio = screen.getByRole("button", { name: "Call Cambio" })
+    const wrapper = callCambio.parentElement
+    const className = wrapper?.className ?? ""
+    expect(className).toContain("regular:left-[calc(50%+324px)]")
+    expect(className).not.toContain("regular:right-5")
+    // Still docked inside the bottom dock region, not the chrome band —
+    // the pre-existing structural pin for this element's DOM location
+    // (mirrors "compact docked composition (CAM-21)"'s own dockActions()).
+    const dock = document.querySelector('[data-region="dock-actions"]')
+    expect(dock).not.toBeNull()
+    expect(dock?.contains(callCambio)).toBe(true)
+  })
+})
+
+describe("design-gate fix cycle, compact findings (CAM-20)", () => {
+  const THIRD = { id: "44444444-4444-4444-8444-444444444444", name: "Priya" }
+
+  it("gives the compact opponents row a wider gap BETWEEN hands than the gap INSIDE each hand (finding 4 — the two used to match, reading as one continuous card strip)", async () => {
+    const fake = setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1, 2, 3] },
+            { id: THIRD.id, name: THIRD.name, hand: [0, 1, 2, 3] },
+          ],
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const friendHand = document
+      .querySelector(`[data-flight-anchor="slot:${FRIEND.id}:0"]`)
+      ?.closest('[data-variant="opponent"]')
+    expect(friendHand).not.toBeNull()
+    // Intra-hand: gap-1 (4px) at compact, unchanged gap-2 (8px) at regular.
+    expect(friendHand?.className ?? "").toContain("gap-1")
+    expect(friendHand?.className ?? "").not.toMatch(/(^|\s)gap-2(\s|$)/)
+    expect(friendHand?.className ?? "").toContain("regular:gap-2")
+
+    // Inter-seat: the opponents row wrapper widens to gap-x-5 (24px) —
+    // strictly larger than the 4px intra-hand gap above (a structural,
+    // numeric pin, not just "a gap class exists").
+    const opponentsRow = friendHand?.closest("[data-seat-index]")?.parentElement
+    expect(opponentsRow?.className ?? "").toContain("gap-x-5")
+    const INTRA_HAND_GAP_PX = 4 // spacing-1, gap-1
+    const INTER_SEAT_GAP_PX = 24 // spacing-5, gap-x-5
+    expect(INTER_SEAT_GAP_PX).toBeGreaterThan(INTRA_HAND_GAP_PX)
   })
 })

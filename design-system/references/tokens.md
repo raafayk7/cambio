@@ -120,13 +120,27 @@ as digital, not print.
   tuned down from an initial `64px`/`32px` at the M5 rendered pass once
   the measured budget came up short — root plan Surprises). `card-sm`
   (`32px`) is unchanged at both breakpoints. `--size-table-art-compact`
-  (`128px`, tuned down from an initial `160px` the same pass): the
-  compact-only max-width cap on the table art — square asset, so it's
+  (`158px` — CAM-21 tuned it down from an initial `160px` to `128px` at
+  the M5 rendered pass for fold budget, then CAM-20's design-gate pass
+  raised it back to `158px`, a newly re-measured value rather than a
+  revert, once `128px` was found to leave the deck+discard pair
+  effectively flush against the tabletop disc — see table-surface.md r6):
+  the compact-only max-width cap on the table art — square asset, so it's
   also the height cap. The cap (like the surface's tightened root gap)
   belongs to the game screen's DOCKED composition only
   (`viewerSeat="external"`, table-surface.md r4 as amended at review) —
   the room screen's default path keeps the uncapped `w-3/4` art and
   `gap-4`.
+- `card-frame` (the shared card/slot footprint utility — `playing-card.md`,
+  `hand.md`): `width: --card-width`, `aspect-ratio: 5 / 7` — the playing-card
+  proportion — plus `radius.card`. `card-frame-rotated` (CAM-20,
+  gate-approved 2026-09-06) is its canonical sibling for a side-bench
+  opponent's rotated hand (`hand.md` r3, ADR-0036 §5): identical
+  conventions, `aspect-ratio: 7 / 5` — the width/height-reversed
+  footprint a rotated card's painted shape needs at the same
+  `--card-width`. The user chose minting this new utility over the two
+  alternatives raised (a shared `--card-aspect` variable on `card-frame`
+  itself, or tuning bench spacing without a new footprint token).
 
 ## Elevation
 

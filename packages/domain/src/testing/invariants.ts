@@ -46,15 +46,16 @@ export const cardPartitionViolations = (
 /**
  * §4.5 restated for the domain shape (root plan, Context & orientation):
  * slot indices unique and sorted ascending per hand; the roster (count, ids,
- * seat order) identical to the dealt roster; player count within 2–5.
+ * seat order) identical to the dealt roster; player count within 2–4
+ * (§1.1, ADR-0036).
  */
 export const handIntegrityViolations = (
   state: GameState,
   roster: ReadonlyArray<UserId>,
 ): ReadonlyArray<string> => {
   const violations: Array<string> = []
-  if (state.players.length < 2 || state.players.length > 5) {
-    violations.push(`player count ${state.players.length} outside 2–5 (C2.2, §1.1)`)
+  if (state.players.length < 2 || state.players.length > 4) {
+    violations.push(`player count ${state.players.length} outside 2–4 (C2.2, §1.1)`)
   }
   if (
     state.players.length !== roster.length ||

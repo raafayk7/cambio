@@ -247,13 +247,13 @@ written by `/implement` when the test actually lands. A plan-time row that
 invents a test title and assertion is an overclaim waiting to become a
 review finding.)_
 
-| Clause                                        | Test (file + name)                                                                                                           | What is asserted |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| 1 — deal rejects outside 2–4; 2/3/4 accepted  | _planned: move the two `Deal.test.ts` pins (rejection loop gains 5; acceptance loop shrinks to 2–4)_                         | _at implement_   |
-| 2 — fourth member fills lobby; fifth refused  | _planned: rewrite the `Lobby.test.ts` join-ceiling pin around `MAX_LOBBY_MEMBERS = 4`_                                       | _at implement_   |
-| 3 — harness rosters span exactly 2–4          | _planned: `sim/Invariants.test.ts` bound pin gains a 5-player probe; `playerCountFor` yields 2–4 for all sim/fuzz/roundtrip_ | _at implement_   |
-| 4 — room copy states 2–4 everywhere spoken    | _planned: `room-screen.test.tsx` BadPlayerCount alert pin updated; lobby-full body copy gains an assertion_                  | _at implement_   |
-| 12 (rules-doc half) — HANDOFF + skill amended | _planned: no test can pin prose; verified by review reading HANDOFF §1.1 and the skill's setup line + merge-down evidence_   | _at implement_   |
+| Clause                                        | Test (file + name)                                                                                                                                                                                   | What is asserted                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — deal rejects outside 2–4; 2/3/4 accepted  | `Deal.test.ts::dealGame > rejects player counts outside 2–4 (C1.1, §1.1)`; `Deal.test.ts::dealGame > deals 4 cards to slots 0–3 per player, one discard, rest as deck (C1.2, §1.1)`                  | 0, 1, 5, 6 rejected as `BadPlayerCount`; 2, 3, 4 accepted with the correct hand/discard/deck shape                                                                                                                                                                                                       |
+| 2 — fourth member fills lobby; fifth refused  | `Lobby.test.ts::joinLobby (clause 2) > a fourth member fills the lobby; a fifth is LobbyFull (§1.1 ceiling)`                                                                                         | a fourth join brings the lobby to `MAX_LOBBY_MEMBERS` (4); a fifth join attempt is `LobbyFull`                                                                                                                                                                                                           |
+| 3 — harness rosters span exactly 2–4          | `sim/Invariants.test.ts::hand & seat integrity checker (C2.2, §4.5 restated) > rejects rosters outside 2–4 players (§1.1)`                                                                           | a 5-player roster is flagged by `handIntegrityViolations`; `playerCountFor` cycles 2→4 (`2 + (i % 3)`), so every sim/fuzz/roundtrip roster it drives stays in bound                                                                                                                                      |
+| 4 — room copy states 2–4 everywhere spoken    | `room-screen.test.tsx::start (R5) > surfaces a 422 BadPlayerCount as the inline alert with the 2–4 copy`; `room-screen.test.tsx > renders the no-access panel when the room is full (409 LobbyFull)` | the inline alert reads "The game needs 2 to 4 players at the table…"; the full-room panel body reads "Four players are already seated — the table takes no more…"                                                                                                                                        |
+| 12 (rules-doc half) — HANDOFF + skill amended | _none — prose, no test can pin it; verified by review reading the doc directly_                                                                                                                      | HANDOFF §1.1 gains an amendment blockquote naming ADR-0036 (done, this task branch); the `cambio-rules` skill's setup line amendment + merge-down (`main` → `development` → `release-v0`) is a separate `main`-branch step per ADR-0028, coordinated by the orchestrator — not yet done as of this entry |
 
 ## Progress
 
@@ -262,6 +262,38 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 - [x] 2026-09-06 — plan written during `/plan`; all touchpoints re-verified
       against source (one addition to the explorer map: `Deal.test.ts`'s
       partition test calls `dealt(5)` and must move to `dealt(4)`).
+- [x] 2026-09-06 — `/implement` steps 1–6 executed test-first, in order.
+      Step 1: `Deal.test.ts` pins moved (rejection loop gains 5, acceptance
+      loop shrinks to 2–4, `dealt(5)` → `dealt(4)`), confirmed red for the
+      right reason, then `Deal.ts`'s gate and doc comment changed to 2–4.
+      Step 2: `Lobby.test.ts`'s join-ceiling test rewritten around a 3→4
+      roster and `MAX_LOBBY_MEMBERS`, confirmed red, then
+      `MAX_LOBBY_MEMBERS = 4` plus its three doc comments. Step 3:
+      `sim/Invariants.test.ts` retitled and gained the 5-player probe
+      (extended state + matching 5-id roster, isolating the count check
+      from roster-drift), confirmed red, then `invariants.ts`'s bound/string
+      and `driver.ts`'s `playerCountFor`/docs updated to 2–4. Step 4:
+      comment-only sweep on `GameError.ts` and `StartGame.ts`; grep guard
+      run twice (before and after) — see below. Step 5: `room-screen.test.tsx`
+      retitled and extended (the full-room body copy gained its first
+      assertion), confirmed red, then `use-room.ts` and `room-screen.tsx`
+      copy updated per voice.md register (sentence case, unchanged). Step 6:
+      HANDOFF §1.1 amendment blockquote added, matching the idiom at
+      HANDOFF.md:209-213 (`> **Amended:** … superseded …`); the
+      `main`-branch `cambio-rules` skill amendment + merge-down is explicitly
+      out of scope for this session (coordinated separately by the
+      orchestrator per the task briefing).
+      Validation: `pnpm turbo test --filter @cambio/domain` (23 files, 194
+      tests, green), `--filter @cambio/application` (14 files, 86 tests,
+      green), `--filter @cambio/api` (20 files, 118 tests, green, Postgres
+      on :5433 already up), `--filter @cambio/web` (20 files, 213 tests,
+      green). Grep guard
+      (`grep -rn "2–5" packages/ apps/ --include="*.ts" --include="*.tsx"`,
+      excluding `dist/` build output) came back clean: every remaining hit
+      is in a frontend-lane file this plan explicitly does not touch
+      (`table-geometry.ts`/`.test.ts`, `gallery/game.tsx`, `table-surface.tsx`
+      — all commented as scenery/seat-arc geometry, clauses 5/9/11, owned by
+      the frontend child plan's M3/M5/M6).
 
 ## Surprises & notes for the root plan
 
@@ -280,3 +312,31 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
   sim/fuzz traces differ from previous runs under identical seeds —
   expected, count-independent invariants still hold; not a determinism
   regression.
+- The grep guard turned up one stray "2–5" the explorer map and this plan
+  didn't list: a comment in
+  `packages/application/test/StartGame.test.ts:89` ("Passed through from
+  dealGame — the single source of the 2–5 rule"). Not frontend-owned, so
+  fixed in the same comment-only sweep as step 4.
+- `.agents/scripts/fill-coverage-row.mjs` assumes a 4-column coverage table
+  (`Clause | Planned approach | Test | Asserted`, per its own comment), but
+  this plan's table (like several other backend plans — CAM-3, CAM-4,
+  CAM-5, CAM-6, CAM-8, CAM-10) has only 3 columns
+  (`Clause | Test | Asserted`), with the plan-time "planned" note living
+  inside the Test cell. Running the script against a 3-column row (verified
+  on a scratch copy first, not the live doc) corrupts the row: it writes
+  into `cells[3]`/`cells[4]` assuming those are Test/Asserted, but for a
+  3-column table `cells[3]` is already Asserted and `cells[4]` is the empty
+  string after the closing pipe — the result is a malformed 4-cell row
+  under a 3-column header. Filled the table by hand instead (Edit tool);
+  the PostToolUse markdown-format hook reflowed it correctly afterward.
+  Flagging for whoever maintains the script: it needs either a column-count
+  autodetect or a `--no-planned-column` flag before it's safe on the
+  3-column table shape most backend plans use.
+- HANDOFF.md carries two more player-count mentions outside §1.1 that this
+  task's scope (the §1.1 amendment only) deliberately leaves untouched:
+  §4.1 ("This locks the game to one deck. That's acceptable at a 5-player
+  maximum.") and the out-of-scope list near line 343 ("more than 5
+  players"). Both are now stale under the 2–4 cap. Not fixed here because
+  the task briefing scoped step 6 to §1.1 specifically; noting for the
+  root plan / a future cleanup pass rather than improvising a broader doc
+  sweep.
