@@ -82,6 +82,11 @@ interface SlamReveal {
   readonly card: CardSlug
 }
 
+/** CAM-23: shared with the `WrongPhase`-on-a-late-`Slam` remap below, so
+ * both copies stay byte-identical by construction rather than by
+ * convention. */
+const SLAM_TOO_LATE_COPY = "Too slow. The slam window had already closed."
+
 /** T5: a 422's tag mapped to voice.md-register inline copy — what went
  * wrong, then how to fix, per the error formula. The refreshed table
  * already shows the current state, so most tags need no resync clause
@@ -90,11 +95,26 @@ interface SlamReveal {
 const COMMAND_ERROR_COPY: Record<string, string> = {
   NotYourTurn: "It's not your turn.",
   WrongPhase: "That move isn't available right now.",
-  SlamTooLate: "Too slow. The slam window had already closed.",
+  SlamTooLate: SLAM_TOO_LATE_COPY,
 }
 
-function commandErrorCopy(error: unknown): string {
+/**
+ * CAM-23: the server only tags a bounced slam `SlamTooLate` in the narrow
+ * gap before its timer fiber closes the window; once the fiber's already
+ * flipped the stored phase, the same late slam gets the generic
+ * `WrongPhase` tag instead — indistinguishable from any other phase
+ * mismatch by the wire alone. The client knows better: it just sent a
+ * `Slam`, and the only way a `SlamWindow`-only command comes back
+ * `WrongPhase` is the window having closed underneath it. `lastCommand` is
+ * `sendCommand.variables` at the call site — the mutation's own
+ * last-submitted command, already populated through `onError` by
+ * TanStack Query, no new state needed.
+ */
+function commandErrorCopy(error: unknown, lastCommand: WireCommand | undefined): string {
   if (error instanceof ApiError) {
+    if (error.tag === "WrongPhase" && lastCommand?._tag === "Slam") {
+      return SLAM_TOO_LATE_COPY
+    }
     return (
       COMMAND_ERROR_COPY[error.tag] ??
       "That move didn't go through. The table shows where things stand."
@@ -628,11 +648,17 @@ export function useGame(gameId: string) {
           : { ...previous, view: reply.view, version: reply.version },
       )
     },
-    onError: (error: unknown) => {
+    onError: (error: unknown, command: WireCommand) => {
       // T5: a 422 (or any command failure) never breaks the table — resync
       // first, then surface the failure inline (never a toast).
       scheduleRefetch()
-      setCommandError(commandErrorCopy(error))
+      // CAM-23: `command` is TanStack Query's own second `onError` argument
+      // — the exact variables this failed `.mutate()` call was given —
+      // rather than reading `sendCommand.variables` back off the mutation
+      // object, which would work too (it's populated through `onError`)
+      // but is one indirection further from "the command that just failed"
+      // than the parameter already sitting here.
+      setCommandError(commandErrorCopy(error, command))
     },
   })
 

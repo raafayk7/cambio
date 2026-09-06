@@ -873,7 +873,7 @@ describe("slam window rendering + targeting (SL1)", () => {
     })
   })
 
-  it("slamming an opponent's card with a non-empty hand requires a give pick, then sends exactly one Slam command", async () => {
+  it("(CAM-23 fallback) slamming an opponent's card with nothing armed holds the target, then one own-hand tap sends exactly one Slam command", async () => {
     const fake = setupFake()
     const closesAt = Date.now() + 8000
     const { handlers, fetchMock } = stubApi({
@@ -886,7 +886,9 @@ describe("slam window rendering + targeting (SL1)", () => {
     await channelsReady(fake)
 
     fireEvent.click(slotButton(FRIEND.id, 0))
-    expect(await screen.findByText("Pick a card to give")).toBeInTheDocument()
+    expect(
+      await screen.findByText("If you're right, which card do you give them?"),
+    ).toBeInTheDocument()
     expect(postedCommands(fetchMock)).toEqual([])
 
     fireEvent.click(slotButton(ME.userId, 1))
@@ -899,10 +901,12 @@ describe("slam window rendering + targeting (SL1)", () => {
         },
       ])
     })
-    expect(screen.queryByText("Pick a card to give")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText("If you're right, which card do you give them?"),
+    ).not.toBeInTheDocument()
   })
 
-  it("a zero-card slammer's opponent slam sends giveSlot null immediately — no give pick (ADR-0009)", async () => {
+  it("a zero-card slammer's opponent slam sends giveSlot null immediately — no give pick, no 'Ready a give' control (ADR-0009)", async () => {
     const fake = setupFake()
     const closesAt = Date.now() + 8000
     const { handlers, fetchMock } = stubApi({
@@ -924,13 +928,188 @@ describe("slam window rendering + targeting (SL1)", () => {
     await screen.findByText(ME.name)
     await channelsReady(fake)
 
+    // Clause 3: with an empty hand there's nothing to arm — the control
+    // never appears at all.
+    expect(screen.queryByRole("button", { name: "Ready a give" })).not.toBeInTheDocument()
+
     fireEvent.click(slotButton(FRIEND.id, 0))
     await waitFor(() => {
       expect(postedCommands(fetchMock)).toEqual([
         { _tag: "Slam", target: { playerId: FRIEND.id, slotIndex: 0 }, giveSlot: null },
       ])
     })
-    expect(screen.queryByText("Pick a card to give")).not.toBeInTheDocument()
+    expect(
+      screen.queryByText("If you're right, which card do you give them?"),
+    ).not.toBeInTheDocument()
+  })
+
+  it("(CAM-23) the 'Ready a give' control appears during an open slam window when the viewer holds cards", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    expect(await screen.findByRole("button", { name: "Ready a give" })).toBeInTheDocument()
+  })
+
+  it("(CAM-23) the 'Ready a give' control is absent outside a slam window", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    expect(screen.queryByRole("button", { name: "Ready a give" })).not.toBeInTheDocument()
+  })
+
+  it("(CAM-23) the 'Ready a give' control hides once the two-tap fallback already holds a pending target", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+    expect(await screen.findByRole("button", { name: "Ready a give" })).toBeInTheDocument()
+
+    fireEvent.click(slotButton(FRIEND.id, 0))
+    expect(
+      await screen.findByText("If you're right, which card do you give them?"),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Ready a give" })).not.toBeInTheDocument()
+  })
+
+  it("(CAM-23) arming a give-slot sends no command, highlights the slot, and offers a way to cancel the arm", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(screen.getByRole("button", { name: "Ready a give" }))
+    fireEvent.click(slotButton(ME.userId, 1))
+
+    expect(postedCommands(fetchMock)).toEqual([])
+    expect(
+      document.querySelector(`[data-flight-anchor="slot:${ME.userId}:1"] [data-selected="true"]`),
+    ).not.toBeNull()
+    expect(await screen.findByRole("button", { name: "Cancel give" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Ready a give" })).not.toBeInTheDocument()
+  })
+
+  it("(CAM-23) canceling from ready-mode before anything is armed sends no command and returns to 'Ready a give'", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(screen.getByRole("button", { name: "Ready a give" }))
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }))
+
+    expect(postedCommands(fetchMock)).toEqual([])
+    expect(await screen.findByRole("button", { name: "Ready a give" })).toBeInTheDocument()
+  })
+
+  it("(CAM-23) canceling an armed give-slot un-arms it, sending no command", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(screen.getByRole("button", { name: "Ready a give" }))
+    fireEvent.click(slotButton(ME.userId, 1))
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel give" }))
+
+    expect(postedCommands(fetchMock)).toEqual([])
+    expect(await screen.findByRole("button", { name: "Ready a give" })).toBeInTheDocument()
+    expect(
+      document.querySelector(`[data-flight-anchor="slot:${ME.userId}:1"] [data-selected="true"]`),
+    ).toBeNull()
+  })
+
+  it("(CAM-23) a valid armed give-slot is consumed by a single opponent tap — one Slam command, no fallback prompt", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { fetchMock } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(screen.getByRole("button", { name: "Ready a give" }))
+    fireEvent.click(slotButton(ME.userId, 1))
+    fireEvent.click(slotButton(FRIEND.id, 0))
+
+    await waitFor(() => {
+      expect(postedCommands(fetchMock)).toEqual([
+        { _tag: "Slam", target: { playerId: FRIEND.id, slotIndex: 0 }, giveSlot: 1 },
+      ])
+    })
+    expect(
+      screen.queryByText("If you're right, which card do you give them?"),
+    ).not.toBeInTheDocument()
+  })
+
+  it("(CAM-23) an armed give-slot clears automatically if it's slammed away (by the viewer's own case-1 slam) before it's spent", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { handlers } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(screen.getByRole("button", { name: "Ready a give" }))
+    fireEvent.click(slotButton(ME.userId, 1))
+    expect(await screen.findByRole("button", { name: "Cancel give" })).toBeInTheDocument()
+
+    // Own-hand taps outside ready mode are unaffected by the armed state
+    // (clause 1) — tapping the armed slot itself fires an immediate
+    // own-card slam, which vacates it once the reply lands.
+    handlers[POST_COMMANDS] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        deckCount: 37,
+        discard: ["7H"],
+        phase: { _tag: "SlamWindow", turnPlayerId: ME.userId, closesAt, rank: "7" },
+        version: 5,
+      }),
+    )
+    fireEvent.click(slotButton(ME.userId, 1))
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Cancel give" })).not.toBeInTheDocument()
+    })
+    expect(screen.getByRole("button", { name: "Ready a give" })).toBeInTheDocument()
   })
 
   it("marks every face-down card slam-eligible for a viewer who isn't the turn player — slamming isn't turn-gated", async () => {
@@ -1128,6 +1307,79 @@ describe("late slams and window close (SL3)", () => {
     })
     expect(screen.getByText(ME.name)).toBeInTheDocument()
     expect(screen.getByText(FRIEND.name)).toBeInTheDocument()
+  })
+
+  it("(CAM-23) a 422 WrongPhase on a just-sent Slam surfaces the SlamTooLate copy — the server's timer fiber already won the race", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { handlers } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    handlers[POST_COMMANDS] = json(422, errorBody("WrongPhase", "illegal move"))
+    fireEvent.click(slotButton(ME.userId, 0))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Too slow. The slam window had already closed.",
+    )
+  })
+
+  it("(CAM-23) a 422 WrongPhase on a non-Slam command still shows the generic copy — the remap is Slam-specific", async () => {
+    const fake = setupFake()
+    const { handlers } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    handlers[POST_COMMANDS] = json(422, errorBody("WrongPhase", "illegal move"))
+    fireEvent.click(screen.getByRole("button", { name: "Draw a card" }))
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "That move isn't available right now.",
+    )
+  })
+
+  it("(CAM-23) ready-mode and an armed give-slot reset the moment the acting phase moves on from SlamWindow", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    const { handlers } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+
+    fireEvent.click(screen.getByRole("button", { name: "Ready a give" }))
+    fireEvent.click(slotButton(ME.userId, 1))
+    expect(await screen.findByRole("button", { name: "Cancel give" })).toBeInTheDocument()
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        deckCount: 37,
+        discard: ["7H"],
+        phase: { _tag: "AwaitingDraw", playerId: FRIEND.id },
+        version: 5,
+      }),
+    )
+    act(() => {
+      room.emit("SlamWindowClosed", { _tag: "SlamWindowClosed" })
+      room.emit("TurnAdvanced", { _tag: "TurnAdvanced", playerId: FRIEND.id })
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Cancel give" })).not.toBeInTheDocument()
+    })
+    expect(screen.queryByRole("button", { name: "Ready a give" })).not.toBeInTheDocument()
   })
 
   it("SlamWindowClosed + TurnAdvanced arrive as one batch: one refetch moves play on and slam display state is swept", async () => {

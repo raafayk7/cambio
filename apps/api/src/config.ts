@@ -36,9 +36,11 @@ export const AppConfig = Config.all({
   )("SESSION_COOKIE_SAMESITE").pipe(Config.withDefault("lax" as const)),
   /**
    * Slam window duration fed into `GameConfig` at start (ADR-0011: config,
-   * never a literal). The 5000 default is a placeholder pending playtesting.
+   * never a literal). The 10000 default is a placeholder pending further
+   * playtesting (raised from 5000, CAM-23 — the give-pick flow was burning
+   * the window before a player could complete it).
    */
-  slamWindowMs: Config.integer("SLAM_WINDOW_MS").pipe(Config.withDefault(5000)),
+  slamWindowMs: Config.integer("SLAM_WINDOW_MS").pipe(Config.withDefault(10000)),
   /**
    * Supabase Realtime base URL (ADR-0024). The tenant is resolved from the
    * Host's first label, so locally this must be realtime-dev.localhost, not

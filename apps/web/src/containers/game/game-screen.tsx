@@ -15,7 +15,12 @@ import { SlamTimer } from "../../components/game/slam-timer.js"
 import { inwardSide, seatArc, type InwardSide } from "../../components/game/table-geometry.js"
 import { TableSurface } from "../../components/game/table-surface.js"
 import { TurnIndicator } from "../../components/game/turn-indicator.js"
-import { affordancesFor, slamGiveSlotRequired, type Affordances } from "./affordances.js"
+import {
+  affordancesFor,
+  isOccupiedSlot,
+  slamGiveSlotRequired,
+  type Affordances,
+} from "./affordances.js"
 import { useConnection } from "../../hooks/use-connection.js"
 import { sessionErrorCopy } from "../../hooks/use-session.js"
 import { useGame } from "./use-game.js"
@@ -344,10 +349,34 @@ function GameTable({
   // once an opponent-slam's give is owed (H1 `slamGiveSlotRequired`) — reset
   // on the same phase transitions as the power-targeting selection above.
   const [slamPendingGive, setSlamPendingGive] = React.useState<SlotRef | null>(null)
+  // CAM-23: arm-first give-pick — "ready mode" gates whether an own-hand tap
+  // arms a give-slot (below) instead of attempting an own-card slam
+  // (unchanged elsewhere); the armed slot itself survives leaving ready
+  // mode, so it can be prepared calmly ahead of spotting a slam and spent
+  // later in a single opponent tap. Both reset on the same phase
+  // transitions as `selection`/`slamPendingGive` above.
+  const [slamReadyMode, setSlamReadyMode] = React.useState(false)
+  const [slamArmedGive, setSlamArmedGive] = React.useState<SlotIndex | null>(null)
   if (selectionPhaseKey !== phaseKey) {
     setSelectionPhaseKey(phaseKey)
     setSelection([])
     setSlamPendingGive(null)
+    setSlamReadyMode(false)
+    setSlamArmedGive(null)
+  }
+
+  const viewerHand = view.players.find((player) => player.id === viewerId)?.hand ?? []
+
+  // CAM-23: an armed give-slot can go stale mid-window — any player (not
+  // just the viewer) may slam that exact slot away before it's spent. A
+  // render-time occupancy check (sibling to the `phaseKey` reset above, but
+  // keyed on occupancy rather than phase identity) clears it the moment
+  // that happens, rather than letting the control/highlight lie.
+  if (
+    slamArmedGive !== null &&
+    !isOccupiedSlot(view, { playerId: viewerId, slotIndex: slamArmedGive })
+  ) {
+    setSlamArmedGive(null)
   }
 
   const handleSlamClick = (ref: SlotRef) => {
@@ -360,14 +389,36 @@ function GameTable({
       setSlamPendingGive(null)
       return
     }
+    // CAM-23: ready mode claims own-hand taps for arming, ahead of the
+    // existing own-slam branch below — this is the disambiguation between
+    // "slam my own card" and "arm this as my give" (both target the same
+    // gesture; an explicit mode is what tells them apart, see root plan
+    // Decision Log).
+    if (slamReadyMode && ref.playerId === viewerId) {
+      setSlamArmedGive(ref.slotIndex)
+      setSlamReadyMode(false)
+      return
+    }
     if (ref.playerId === viewerId) {
       // Own card: no give ever follows a correct own-slam (cambio-rules).
+      // Unaffected by any armed give-slot — if this happens to be the
+      // armed slot, the staleness check above cleans it up next render.
       sendCommand.mutate({ _tag: "Slam", target: ref, giveSlot: null })
       return
     }
-    const viewerHand = view.players.find((player) => player.id === viewerId)?.hand ?? []
     if (slamGiveSlotRequired(viewerId, ref.playerId, viewerHand)) {
+      if (slamArmedGive !== null) {
+        // CAM-23: consume the pre-armed give — the single-tap path this
+        // task exists to add.
+        sendCommand.mutate({ _tag: "Slam", target: ref, giveSlot: slamArmedGive })
+        setSlamArmedGive(null)
+        return
+      }
+      // Nothing armed: fall back to today's two-tap flow. Also drops ready
+      // mode, if somehow still engaged — ready mode and a pending fallback
+      // target are mutually exclusive (root plan clause 9).
       setSlamPendingGive(ref)
+      setSlamReadyMode(false)
     } else {
       // Zero-card slammer (ADR-0009): the server draws-then-gives, unseen —
       // `giveSlot` stays null even though a give still happens.
@@ -493,7 +544,17 @@ function GameTable({
             slots={handSlots}
             faces={facesFor(player.id)}
             inert={!wiring.interactive && slamOnSlotClick === undefined}
-            selectedSlots={wiring.selectedSlots}
+            // CAM-23: the armed give-slot renders with the same
+            // `selectedSlots` treatment `Hand` already uses for an
+            // in-progress power-target pick — `wiring.selectedSlots` is
+            // always empty for the viewer's own seat while a SlamWindow is
+            // open (it only ever holds power-targeting/peek state), so
+            // there's nothing to de-duplicate against.
+            selectedSlots={
+              own && slamArmedGive !== null
+                ? [...wiring.selectedSlots, slamArmedGive]
+                : wiring.selectedSlots
+            }
             {...(slamPhase !== undefined ? { slamWindow: true } : {})}
             {...(awaitingGive !== null && awaitingGive.playerId === player.id
               ? { awaitingGiveSlot: awaitingGive.slotIndex }
@@ -526,9 +587,34 @@ function GameTable({
           resolving={slamReveal !== null}
         />
       ) : null}
+      {/* CAM-23: lets the slammer pre-arm which own card they'll give ahead
+          of spotting an opponent to slam, so the opponent tap itself fires
+          in one action. Hidden while the two-tap fallback (below) already
+          holds a pending target — the two sub-states are mutually
+          exclusive (root plan clause 9), and showing both prompts at once
+          would be confusing. */}
+      {slamPhase !== undefined && slamPendingGive === null && viewerHand.length > 0 ? (
+        <div className="flex items-center gap-2">
+          {slamArmedGive !== null ? (
+            <Button variant="ghost" onClick={() => setSlamArmedGive(null)}>
+              Cancel give
+            </Button>
+          ) : slamReadyMode ? (
+            <Button variant="ghost" onClick={() => setSlamReadyMode(false)}>
+              Cancel
+            </Button>
+          ) : (
+            <Button variant="ghost" onClick={() => setSlamReadyMode(true)}>
+              Ready a give
+            </Button>
+          )}
+        </div>
+      ) : null}
       {slamPendingGive !== null ? (
         <div className="flex items-center gap-2">
-          <p className="font-ui text-sm text-ink-primary">Pick a card to give</p>
+          <p className="font-ui text-sm text-ink-primary">
+            If you&apos;re right, which card do you give them?
+          </p>
           <Button variant="ghost" onClick={() => setSlamPendingGive(null)}>
             Cancel
           </Button>

@@ -87,7 +87,7 @@ describe("AppConfig realtime entries (CAM-6, C5.2)", () => {
     const result = load([DB, REALTIME, TOPIC, ["SESSION_SECRET", "s3cret"]])
     expect(Either.isRight(result)).toBe(true)
     if (Either.isRight(result)) {
-      expect(result.right.slamWindowMs).toBe(5000)
+      expect(result.right.slamWindowMs).toBe(10000)
       expect(result.right.realtimeUrl).toBe("http://realtime-dev.localhost:4000")
     }
   })

@@ -31,21 +31,27 @@ immediately with no second tap needed.
 ## Context & orientation
 
 - `apps/web/src/containers/game/game-screen.tsx` (`GameTable` component) owns
-  all slam-click wiring: `handleSlamClick` (lines 353-376), the
-  `slamPendingGive` local state (346, reset at 347-351 alongside `selection`
-  whenever the acting phase's tag/playerId changes — `SlamWindow` has no
-  `playerId` field, so this reset only fires on an actual transition away
-  from `SlamWindow`, not per individual slam attempt within one still-open
-  window), the give-pick prompt JSX (529-536), and the per-seat
-  `slamOnSlotClick` wiring in `seatNodes.map` (458-461, which already gates
-  opponent hands `inert` and unclickable the moment `slamPendingGive` is
-  non-null — the `ref.playerId !== viewerId` guard inside `handleSlamClick`
-  is unreachable via the UI today).
+  all slam-click wiring: `handleSlamClick` (as built: lines 382-427, before
+  this task 353-376), the `slamPendingGive` local state (as built: line 351,
+  reset at 360-366 alongside `selection`, `slamReadyMode`, and
+  `slamArmedGive` — the two pieces of state this task added — whenever the
+  acting phase's tag/playerId changes; `SlamWindow` has no `playerId` field,
+  so this reset only fires on an actual transition away from `SlamWindow`,
+  not per individual slam attempt within one still-open window), the
+  fallback give-pick prompt JSX (as built: lines 613-622) and the new
+  "Ready a give" control (as built: lines 596-612), and the per-seat
+  `slamOnSlotClick` wiring in `seatNodes.map` (as built: lines 509-513,
+  which already gates opponent hands `inert` and unclickable the moment
+  `slamPendingGive` is non-null — the `ref.playerId !== viewerId` guard
+  inside `handleSlamClick` is unreachable via the UI today).
 - `apps/web/src/containers/game/use-game.ts` owns command-error copy:
-  `COMMAND_ERROR_COPY`/`commandErrorCopy` (90-104) and the `sendCommand`
-  mutation (612-637, a plain `useMutation` — `sendCommand.variables` already
-  holds the last-submitted `WireCommand` through `onError`, unused today by
-  anything in the codebase).
+  `COMMAND_ERROR_COPY`/`commandErrorCopy` (as built: lines 88-122, before
+  this task 90-104 — `commandErrorCopy` now takes the last-submitted
+  command as a second parameter) and the `sendCommand` mutation (as built:
+  lines 632-663, a plain `useMutation`; its `onError` now reads the failed
+  command straight from TanStack Query's own second `onError` argument
+  rather than `sendCommand.variables`, which would also have worked but is
+  one indirection further away — see Decision Log).
 - `apps/web/src/containers/game/affordances.ts` owns the pure rule helper
   `slamGiveSlotRequired` (62-69, opponent-target + non-empty slammer hand →
   `true`; same-player or zero-card slammer → `false`, ADR-0009) and
@@ -64,11 +70,12 @@ immediately with no second tap needed.
   is atomic — `{target, giveSlot}` — with no `AwaitingGive` server phase;
   this task does not touch the wire, only how the client assembles that one
   command.
-- `apps/api/src/config.ts:41` / `.env.example:41` both default
-  `SLAM_WINDOW_MS` to `5000`; `apps/api/test/Config.test.ts:90` pins that
+- `apps/api/src/config.ts` / `.env.example` both defaulted `SLAM_WINDOW_MS`
+  to `5000` before this task; `apps/api/test/Config.test.ts:90` pinned that
   default in an assertion. A dev-only bump to `10000` was already applied
-  locally in `.env` ahead of this ticket (user call, 2026-09-06) — this task
-  makes that the checked-in default.
+  locally in `.env` ahead of this ticket (user call, 2026-09-06); this task
+  made that the checked-in default (as built: `config.ts:43`,
+  `.env.example:42`, `Config.test.ts:90` now asserting `10000`).
 - Governing skills: `frontend-architecture` (containers own state, hooks
   co-located, no `domain`/`application` imports), `design-system` (no new
   component states without a creation-gate stop — resolved during planning
@@ -134,7 +141,7 @@ immediately with no second tap needed.
 11. **State lifecycle.** Ready-mode and the armed give-slot reset whenever
     the acting phase transitions away from `SlamWindow` — the same
     render-time `phaseKey`-comparison mechanism that already resets
-    `selection`/`slamPendingGive` (`game-screen.tsx:340-351`).
+    `selection`/`slamPendingGive` (as built: `game-screen.tsx:345-366`).
 12. **Late-slam copy.** A command failure tagged `WrongPhase` whose
     just-submitted command was a `Slam` displays the same copy `SlamTooLate`
     already uses ("Too slow. The slam window had already closed.") instead
@@ -146,9 +153,9 @@ immediately with no second tap needed.
 
 ### Acceptance criteria
 
-- [ ] All 13 contract clauses above hold, each covered by a test (frontend
+- [x] All 13 contract clauses above hold, each covered by a test (frontend
       child plan's Contract coverage table).
-- [ ] `pnpm turbo build typecheck lint test` passes.
+- [x] `pnpm turbo build typecheck lint test` passes.
 
 ## Plan of work
 
@@ -207,7 +214,26 @@ current (non-docked) game-screen layout at every width (Decision Log).
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-06 — plan drafted and signed off.
+- [x] 2026-09-06 — plan drafted and signed off.
+- [x] 2026-09-06 08:05 — all 8 plan-of-work steps implemented on
+      `raafaykazmi/cam-23-opponent-slam-give-pick-flow-too-slow-for-the-window-copy`:
+      ready-mode/armed-give state + staleness check, "Ready a give" control,
+      `handleSlamClick` branch reordering, `selectedSlots` highlight reuse,
+      copy swap, late-slam error remap, `SLAM_WINDOW_MS` default bump, and
+      the full test suite (13 new/rewritten cases across SL1/SL3 plus the
+      `Config.test.ts` assertion).
+- [x] 2026-09-06 08:10 — gate green:
+      `pnpm turbo build typecheck lint test` (25/25 tasks); `@cambio/web`
+      204/204 tests, `@cambio/api` 118/118 tests.
+- [x] 2026-09-06 08:20 — both plan docs reconciled with as-built code (line
+      citations updated where this task's diff shifted them; the frontend
+      child plan's Contract coverage table restructured to the 4-column
+      Clause/Planned-approach/Test/Asserted shape `fill-coverage-row.mjs`
+      expects — the 3-column shape the child-plan template currently
+      produces isn't compatible with that script, see Surprises — then
+      filled for all 13 clauses). Manual browser walkthrough not run this
+      session (see Surprises); everything else in the root plan's
+      Validation section is green.
 
 ## Decision log
 
@@ -247,6 +273,14 @@ timestamp each entry)_
   child plan — it touches one config default, one `.env.example` line, and
   one test assertion, with no new use case, port, or architectural
   decision. User call.
+- 2026-09-06 — Implementation: the late-slam error remap reads the failed
+  command from TanStack Query's own second `onError` callback argument
+  (`onError: (error, command) => ...`) rather than `sendCommand.variables`
+  as the frontend child plan's advisory sketch suggested — both carry the
+  same value here, but the callback argument is guaranteed correct
+  per-invocation with no dependence on `sendCommand` not having started a
+  newer overlapping mutation before this `onError` fires. Small tactical
+  deviation, logged per `/implement`'s rules of engagement.
 - 2026-09-06 — No ADR: this task changes client-side interaction/copy only;
   it neither resolves a HANDOFF §9 item nor deviates from an existing ADR,
   and the road not taken (option (c) above) is recorded here, not promoted,
@@ -256,6 +290,33 @@ timestamp each entry)_
 
 _(anything found mid-implementation that the plan didn't predict — wrong
 assumptions, upstream bugs, better approaches. Evidence included.)_
+
+- 2026-09-06 — `.agents/templates/child-plan.md`'s Contract coverage table
+  is 3 columns (`Clause | Test (file + name) | What is asserted`), but
+  `.agents/scripts/fill-coverage-row.mjs` is hard-coded to a 4-column shape
+  (`Clause | Planned approach | Test | What is asserted` — see its own
+  header comment and CAM-18's plan, which the script was written against).
+  Following the current template produced a table the fill script cannot
+  correctly write into (it would overwrite the Test/Asserted columns with
+  the wrong values, since the column indices don't line up). Worked around
+  it here by restructuring this task's frontend child plan to the
+  4-column shape before filling it — but the template and script are out
+  of sync repo-wide, and every plan written since the template moved to 3
+  columns (this task's own frontend plan started that way, before this
+  fix) would have the same problem. Worth a harness fix (either updating
+  the template back to 4 columns, or updating the script to handle 3), out
+  of scope for this task.
+- 2026-09-06 — The root plan's Validation section's manual two-browser
+  walkthrough was not run this session. The automated coverage added
+  (`game-screen.test.tsx`'s 13 new/rewritten cases) renders the real
+  `GameScreen` component tree against a real DOM via testing-library, at
+  high fidelity for the interaction/state/copy logic that changed — no CSS
+  or visual layout changed, so a live rendered check would mostly confirm
+  what the integration tests already exercise. Reaching an actual
+  `SlamWindow` phase in a live two-player game requires playing turns
+  until a drawn card matches the discard top, which isn't directly
+  controllable through the UI — flagged for `/review` or a follow-up
+  manual pass rather than attempted here under this turn's scope.
 
 ## Outcomes & retrospective
 
