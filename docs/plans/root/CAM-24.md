@@ -117,10 +117,21 @@ timestamp each entry)_
       `packages/ui/vitest.config.ts`; diffs confirmed identical (4 lines
       each) and no test file touched
       (`git status --porcelain -- '**/*.test.ts' '**/*.test.tsx'` empty).
-- [x] 2026-09-06 13:43 — Full gate green: `pnpm turbo build typecheck lint
-  test` — 25/25 tasks successful. `@cambio/web:test` 20 files / 204
-      tests passed (including `score-sheet.test.tsx` and
-      `slam-timer.test.tsx`); `@cambio/ui:test` 6 files / 25 tests passed.
+- [x] 2026-09-06 13:43 — Full gate green:
+      `pnpm turbo build typecheck lint test` — 25/25 tasks successful.
+      `@cambio/web:test` 20 files / 204 tests passed (including
+      `score-sheet.test.tsx` and `slam-timer.test.tsx`); `@cambio/ui:test`
+      6 files / 25 tests passed.
+- [x] 2026-09-06 13:56 — Fix cycle (Finding 1): rewrapped the Progress
+      entry above so the `pnpm turbo build typecheck lint test` code span
+      stays on one line. Swept both `docs/plans/root/CAM-24.md` and
+      `docs/plans/frontend/CAM-24.md` with `npx prettier --check` — both
+      clean, no other instance of the same defect. Forced fresh
+      `pnpm turbo build typecheck lint test --filter=@cambio/web
+--filter=@cambio/ui --force` then passed (9/9 tasks, 0 cached); full
+      unfiltered `pnpm turbo build typecheck lint test` also passed clean
+      (6/6 tasks). See Surprises below for a transient, unrelated failure
+      hit mid-verification and its resolution.
 
 ## Decision log
 
@@ -146,8 +157,24 @@ timestamp each entry)_
 
 ## Surprises & discoveries
 
-_(anything found mid-implementation that the plan didn't predict — wrong
-assumptions, upstream bugs, better approaches. Evidence included.)_
+- 2026-09-06 (fix cycle) — Re-verifying the gate fresh hit a transient,
+  unrelated failure: `apps/web/test/lobby-screen.test.tsx` > "lobby
+  identity (W2, L1) > renders the name form for an unauthenticated visitor
+  (401 from /me)" failed with `Unable to find a label with the text of:
+Your name` from a `findByLabelText` call. Re-run in isolation immediately
+  after: `test/lobby-screen.test.tsx` — 10/10 passed in 1308ms. Same class
+  of CPU-contention flake CAM-24 targets, but a **different mechanism**:
+  `findByLabelText`/`waitFor` from `@testing-library/dom` carry their own
+  internal default timeout (1000ms), which is independent of vitest's
+  `testTimeout` — raising `testTimeout: 30_000` (this task's whole fix)
+  does not extend that internal timeout at all. A second forced fresh run
+  immediately after passed clean (9/9 tasks), confirming the transiency.
+  Out of scope for this task's fix cycle (CAM-24's contract and the
+  original issue both scope the fix to `testTimeout`, not
+  testing-library's async-utility timeout), so left unfixed here and not
+  swept into this finding — but it's a second, distinct crack in the same
+  wall, worth a follow-up task. Flagged via `spawn_task` rather than
+  silently absorbed into this diff.
 
 ## Outcomes & retrospective
 
@@ -159,7 +186,20 @@ Functional contract exactly, no test file was touched, no import or layer
 boundary was crossed, and the "no ADR needed" call was independently
 judged correct. Full findings below.
 
-### Finding 1 — gate does not actually pass (contract violation, since fixed)
+### Finding 1 — gate does not actually pass (contract violation) — **RESOLVED**
+
+**Resolution (2026-09-06, fix cycle):** rewrapped the Progress entry so the
+code span stays on one line (no claim was wrong — the underlying gate-green
+claim was true at the moment it was recorded; the doc's own formatting was
+the defect, so this closed by fixing the formatting, not by amending any
+claim). Swept both `docs/plans/root/CAM-24.md` and
+`docs/plans/frontend/CAM-24.md` with `npx prettier --check` — clean, no
+second instance. Re-verified fresh: forced
+`pnpm turbo build typecheck lint test --filter=@cambio/web
+--filter=@cambio/ui --force` passed (9/9), full unfiltered gate passed
+(6/6, mostly cached since nothing else changed). See Surprises above for a
+transient, unrelated flake hit during this re-verification (not part of
+this finding, not fixed here).
 
 The root plan's last acceptance criterion,
 `pnpm turbo build typecheck lint test` passes, was checked off based on a
