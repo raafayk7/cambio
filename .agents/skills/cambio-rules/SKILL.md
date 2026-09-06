@@ -15,6 +15,14 @@ Cambio is a hidden-information, memory-based card game. **Lowest score wins.**
 ## Setup
 
 - 2–5 players, single standard 52-card deck, no jokers.
+
+  > **Amended:** ADR-0036 caps games at **2–4 players**, enforced in the
+  > domain (`Deal.ts`'s player-count gate, `Lobby.ts`'s
+  > `MAX_LOBBY_MEMBERS`) — the bench-anchored table layout makes the
+  > visual metaphor load-bearing, and the rule bends to it. The "2–5
+  > players" line above is superseded; a fifth player is no longer
+  > accepted.
+
 - Each player is dealt **4 face-down cards** and does **not** look at any of
   them. **There is no opening peek phase — do not add one.**
 - One card is turned face up to start the discard pile; the rest is the
