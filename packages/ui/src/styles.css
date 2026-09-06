@@ -262,13 +262,17 @@
   --card-width: var(--spacing-6);
 }
 
-/* Rank and pip scale with the card, not the page (playing-card.md). */
+/* Rank and pip scale with the card, not the page (playing-card.md),
+ * floored at the type scale's smallest step (--text-xs, CAM-21 design-gate
+ * fix) — below the compact card-sm/card-md width the derived ratio fell
+ * under 12px (9.6px rank / 8.32px pip on a 32px card), the smallest
+ * legible size the type scale allows anywhere else. */
 @utility card-rank {
-  font-size: calc(var(--card-width, 100px) * 0.3);
+  font-size: max(calc(var(--card-width, 100px) * 0.3), var(--text-xs));
   line-height: 1.1;
 }
 @utility card-pip {
-  font-size: calc(var(--card-width, 100px) * 0.26);
+  font-size: max(calc(var(--card-width, 100px) * 0.26), var(--text-xs));
 }
 
 /* Poster text on alarm grounds (slam-timer.md): display face in

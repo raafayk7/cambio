@@ -150,7 +150,9 @@ slam give prompts ("Ready a give" / give-pick prompt).
       surfaced not auto-resolved). Verdict: flagged, 0 blocking —
       12 default-tier calls (4 accidental, cheap/local fixes; 8
       controlled or advisory-only). See the Surprises entry and the
-      full report shared with the user 2026-09-06.
+      full report shared with the user 2026-09-06. **The 4 accidental
+      findings were fixed** on user request (same day) — see the
+      follow-up Decision Log entry.
 - [x] Canon revision notes landed in `table-surface.md`, `app-shell.md`,
       `turn-indicator.md`, `slam-timer.md`.
 - [ ] The quality gate passes: `pnpm turbo build typecheck lint test`
@@ -216,6 +218,14 @@ timestamp each entry)_
       Regular and room screen confirmed unchanged, rendered and jsdom.
       Canon revisions landed. See the Decision Log for the mid-task
       redirect this required.
+- [x] 2026-09-06 — Design-gate's 4 accidental default-tier findings
+      fixed (user request, post-gate): the discard rank/pip type floor,
+      the deck/discard center gap (disc overhang), the pinned-band
+      vertical padding (CTA shadow clip), and the un-tokened void
+      (partially reclaimed, remainder documented as intentional). Full
+      gate green; 2–4p fit re-verified byte-for-byte (scrollContentH ==
+      scrollClientH); regular re-rendered and confirmed unchanged in
+      layout. See Decision Log for the specific values and trade-offs.
 
 ## Decision log
 
@@ -288,6 +298,31 @@ timestamp each entry)_
   root at every breakpoint, not just compact — see frontend plan
   Surprises for the fix and the positioning bug the first attempt at it
   introduced (caught and corrected before landing).
+- 2026-09-06 — User requested the 4 accidental design-gate findings be
+  fixed before `/review`. Fixed all 4, each chosen to spend zero of the
+  fold budget the M5 tuning cascade had already spent down to exactly
+  zero slack for 2–4 players: (1) `card-rank`/`card-pip` floored at
+  `--text-xs` (12px) via `max()` — a pure legibility fix, applies at
+  both breakpoints since `card-sm` is 32px everywhere (a deliberate,
+  narrow exception to "regular untouched," which governs layout, not
+  incidental type-floor bugs). (2) The deck/discard center gap dropped
+  compact-only from `gap-4` (16px) to `gap-1` (4px), closing the ~5.5px
+  overhang onto the bench art at the 128px art cap — a horizontal-only
+  change, zero cost to the vertical fold budget. (3) The screen
+  wrapper's compact padding raised `py-0`→`py-2` (16px), fixing the
+  Call-Cambio shadow clip — paid for by reclaiming 16px of the ~53.5px
+  slack the scroll region's `flex-1` was leaving unclaimed at 2–4
+  players (verified: `scrollContentH` still equals `scrollClientH`
+  exactly post-fix, i.e. still zero overflow). (4) The remaining ~37.5px
+  of that slack was left as-is and documented in a code comment as
+  intentional grouping space (shared table vs. the viewer's own zone) —
+  a full flex restructure to eliminate it was judged not worth the risk
+  this late against the fold budget. Did NOT touch the 8 controlled/
+  advisory-only findings (flat type tier, four-benches scenery, seat-
+  pill ring ambiguity, badge overlap, connection dot, the pre-existing
+  32px touch-target tension, one avatar's aria-hidden contrast) — those
+  read as legitimate design choices or were already-known, separately-
+  tracked tensions, not bugs to fix reflexively.
 
 ## Surprises & discoveries
 

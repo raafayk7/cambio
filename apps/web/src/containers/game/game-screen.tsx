@@ -647,7 +647,20 @@ function GameTable({
           seat, docked directly beneath it (the dock's hand half).
           `regular:block` restores plain document flow, matching today's
           `relative w-full` exactly (align-items/gap/flex-* all become
-          inert once display leaves flex). */}
+          inert once display leaves flex).
+          Design-gate note (2026-09-06): the scroll region below is
+          `flex-1`, so at 2–4 players (where its content is shorter than
+          its allocation) it grows past its content and leaves empty
+          paving between the table and the own-hand dock — read as a
+          deliberate common-region split (shared table vs. the viewer's
+          own zone) rather than residue: it's identical across every
+          player count that fits the fold (the opponent-orientation fix
+          makes all of them render one row), and a chunk of it is now
+          claimed as real padding on the pinned bands (see the screen
+          wrapper's `py-2`). Fully eliminating the rest would mean
+          moving flex-grow off this element entirely, which relocates
+          the same slack elsewhere in the column for no clear gain — not
+          worth the risk this late against the fold budget. */}
       <div
         ref={setTableRoot}
         data-region="table-root"
@@ -668,7 +681,13 @@ function GameTable({
             seatAnchor="edge"
             viewerSeat="external"
             center={
-              <div className="flex items-center gap-4">
+              // CAM-21 design-gate fix: compact-only gap-1 (was the shared
+              // gap-4) — at the 128px compact art cap the painted disc is
+              // only 69px (TABLE_DISC_FRACTION 0.54), and the deck+discard
+              // pair at gap-4 (80px total) hung ~5.5px off each edge onto
+              // the bench art. gap-1 brings the pair to 68px, inside the
+              // disc; regular keeps gap-4 (its disc has plenty of room).
+              <div className="flex items-center gap-1 regular:gap-4">
                 <DrawDeck
                   count={view.deckCount}
                   {...(reshuffling
@@ -977,13 +996,21 @@ export function GameScreen({ gameId }: { gameId: string }) {
           lobby/room screens don't use this wrapper and inherit nothing
           (root plan decision 1). `max-h-dvh` + the `min-h-0` flex chain
           give GameTable's stage a real height to bound itself against;
-          the compact vertical padding is trimmed (every pixel counts, see
-          the child plan's fold budget) and restored at regular, where the
+          the compact vertical padding is restored at regular, where the
           bound itself is cancelled — this screen keeps scrolling normally
           there (clause 10). Known residual: `max-h-dvh` ignores the
           shell's safe-area inset padding, so on notched devices the bound
-          is generous by that amount; exact at the 360×640 floor. */}
-      <div className="flex max-h-dvh w-full flex-1 min-h-0 flex-col justify-center gap-4 overflow-hidden px-4 py-0 regular:max-h-none regular:overflow-visible regular:py-4">
+          is generous by that amount; exact at the 360×640 floor.
+          `py-2` (design-gate fix, was `py-0`): the scroll region
+          (table-root's `table-scroll`) is flex-grown past its own
+          content at 2–4 players by ~53px — unclaimed slack, not a
+          decision — which left the pinned top/bottom bands flush with
+          the viewport edges and clipped the dock's button shadow. This
+          claims 16px of that same slack as real padding instead
+          (verified: still exactly fits at 2–4 players; 5 players was
+          already relying on its scroll fallback and is unaffected in
+          practice). */}
+      <div className="flex max-h-dvh w-full flex-1 min-h-0 flex-col justify-center gap-4 overflow-hidden px-4 py-2 regular:max-h-none regular:overflow-visible regular:py-4">
         {ownHeading ? null : <h1 className="sr-only">Game</h1>}
         {content}
       </div>
