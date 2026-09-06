@@ -1343,7 +1343,7 @@ describe("late slams and window close (SL3)", () => {
     )
   })
 
-  it("(CAM-23) ready-mode and an armed give-slot reset the moment the acting phase moves on from SlamWindow", async () => {
+  it("(CAM-23) ready-mode and an armed give-slot reset the moment the acting phase moves on from SlamWindow, and don't leak into the next one", async () => {
     const fake = setupFake()
     const closesAt = Date.now() + 8000
     const { handlers } = stubApi({
@@ -1380,6 +1380,37 @@ describe("late slams and window close (SL3)", () => {
       expect(screen.queryByRole("button", { name: "Cancel give" })).not.toBeInTheDocument()
     })
     expect(screen.queryByRole("button", { name: "Ready a give" })).not.toBeInTheDocument()
+
+    // Review finding: the assertions above would pass even if the reset
+    // itself were deleted, since the control's own `slamPhase !== undefined`
+    // render guard already hides it outside any window regardless of
+    // `slamReadyMode`/`slamArmedGive`. The round-trip below is what actually
+    // discriminates a real reset from a leak: if slot 1 stayed armed across
+    // the transition, a later window would show "Cancel give" for a slot the
+    // player never touched this time around.
+    const closesAt2 = Date.now() + 8000
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        deckCount: 37,
+        discard: ["9H"],
+        // Version must beat the AwaitingDraw view's `version: 5` above, or
+        // the query's staleness guard (ADR-0033) silently discards this
+        // response and the round-trip never observes the new window.
+        version: 6,
+        phase: { _tag: "SlamWindow", turnPlayerId: ME.userId, closesAt: closesAt2, rank: "9" },
+      }),
+    )
+    act(() => {
+      room.emit("TurnAdvanced", { _tag: "TurnAdvanced", playerId: ME.userId })
+    })
+
+    expect(await screen.findByRole("button", { name: "Ready a give" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Cancel give" })).not.toBeInTheDocument()
   })
 
   it("SlamWindowClosed + TurnAdvanced arrive as one batch: one refetch moves play on and slam display state is swept", async () => {

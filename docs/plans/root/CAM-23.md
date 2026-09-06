@@ -234,6 +234,16 @@ timestamp each entry)_
       filled for all 13 clauses). Manual browser walkthrough not run this
       session (see Surprises); everything else in the root plan's
       Validation section is green.
+- [x] 2026-09-06 08:30 — `/review`: fix-then-ship verdict, one test-coverage
+      finding on clause 11 (see Outcomes & Retrospective).
+- [x] 2026-09-06 08:45 — fix cycle: strengthened clause 11's test with a
+      real phase round-trip, verified by an actual mutant kill (temporarily
+      deleted the two reset lines, confirmed the test fails, restored,
+      confirmed it passes and `game-screen.tsx` is byte-identical to
+      pre-fix-cycle HEAD). Fixed an incidental version-guard bug in the new
+      test fixture along the way (see retrospective). Fresh gate re-run:
+      `@cambio/web` 204/204 (`--force`),
+      `pnpm turbo build typecheck lint test` 25/25. Verdict updated to ship.
 
 ## Decision log
 
@@ -320,7 +330,8 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-**Verdict: fix-then-ship.** One finding, otherwise clean.
+**Verdict: ship** (updated after the fix cycle — was fix-then-ship). One
+finding, resolved.
 
 **What shipped:** exactly the 13-clause contract, implemented as planned —
 arm-first give-pick with the two-tap fallback preserved, the late-slam
@@ -397,6 +408,30 @@ cannot fire for a non-`Slam` command.
   reappears as unarmed `"Ready a give"` rather than `"Cancel give"` — that
   version would fail if the reset lines were removed, because a real leak
   would carry the old armed slot index into the new window.
+
+  **RESOLVED (fix cycle, 2026-09-06):** test strengthened, not the claim —
+  the underlying behavior was always correct, only the regression guard was
+  weak. `apps/web/test/game-screen.test.tsx`'s test (renamed "...and don't
+  leak into the next one") now reopens a second `SlamWindow` after the
+  first closes and asserts the control comes back reading "Ready a give,"
+  not "Cancel give." Verified by an actual mutant kill, not just reasoning:
+  temporarily deleted the two reset lines
+  (`setSlamReadyMode(false)`/`setSlamArmedGive(null)`,
+  `game-screen.tsx:364-365`) — the strengthened test failed as expected;
+  restored the lines — it passed. `game-screen.tsx` diffs to byte-identical
+  with pre-fix-cycle HEAD (confirmed via `git diff --stat`), so the mutant
+  probe left no residue. One incidental bug caught while writing the
+  round-trip: the second `SlamWindow` fixture initially reused the
+  `slamWindowView()` helper, whose default `version: 3`
+  (`test/support/harness.tsx:198`) is lower than the intervening
+  `AwaitingDraw` view's explicit `version: 5` — ADR-0033's staleness guard
+  silently discarded it, which masked the real assertion behind a
+  version-guard artifact having nothing to do with clause 11. Fixed by
+  building the second fixture with an explicit `version: 6`. Full gate
+  re-run clean afterward: `@cambio/web` 204/204 fresh (`--force`),
+  `pnpm turbo build typecheck lint test` 25/25.
+  Both citing locations (this clause's text and the frontend plan's
+  Contract coverage table row 11) are updated to name the new test title.
 
 **Deferred, not a finding:** the root plan's Validation section's manual
 two-browser walkthrough still hasn't been run (flagged at `/implement`
