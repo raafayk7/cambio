@@ -118,7 +118,7 @@ timestamp each entry)_
       each) and no test file touched
       (`git status --porcelain -- '**/*.test.ts' '**/*.test.tsx'` empty).
 - [x] 2026-09-06 13:43 — Full gate green: `pnpm turbo build typecheck lint
-    test` — 25/25 tasks successful. `@cambio/web:test` 20 files / 204
+  test` — 25/25 tasks successful. `@cambio/web:test` 20 files / 204
       tests passed (including `score-sheet.test.tsx` and
       `slam-timer.test.tsx`); `@cambio/ui:test` 6 files / 25 tests passed.
 
@@ -151,5 +151,58 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+**Verdict: fix-then-ship** (2026-09-06 review).
+
+Two parallel reviewers (contract, architecture) found **no** contract or
+architecture violations: both `vitest.config.ts` changes match the
+Functional contract exactly, no test file was touched, no import or layer
+boundary was crossed, and the "no ADR needed" call was independently
+judged correct. Full findings below.
+
+### Finding 1 — gate does not actually pass (contract violation, since fixed)
+
+The root plan's last acceptance criterion,
+`pnpm turbo build typecheck lint test` passes, was checked off based on a
+gate run executed **before** this document's own closeout edit. That
+closeout edit (the Progress entry directly above, timestamped 13:43)
+introduced a `//:format:check` (prettier) failure in this very file: an
+inline code span — `` `pnpm turbo build typecheck lint test` `` — was
+broken across two lines inside a Progress list item. This is precisely the
+non-convergent-prettier trap AGENTS.md's Development section already warns
+about ("an inline code span broken across lines inside a list item makes
+prettier non-convergent — `--write` output still fails `--check`, forever").
+No gate run happened after that edit, so the break went unnoticed.
+
+Independently reproduced: `npx prettier --check docs/plans/root/CAM-24.md`
+failed with exit 1 on this file alone; a forced fresh
+`pnpm turbo build typecheck lint test --filter=@cambio/web --filter=@cambio/ui --force`
+also failed with the same `//:format:check` error. Rewrapping the Progress
+entry so the code span stays on one line (verified locally, then reverted
+so this review reports rather than fixes) made both
+`npx prettier --check` and the full `pnpm turbo build typecheck lint test`
+pass clean (25/25 tasks, 0 uncached). The fix is mechanical and
+unambiguous — no design judgment involved.
+
+**Root cause for the fix cycle to also address:** the `/implement`
+workflow's "run gate, then update Progress to record it" order leaves a
+window where a doc edit _after_ the last green run can silently break the
+gate with nothing left to catch it before commit. This task's own closeout
+is the evidence. No skill or command text is factually wrong here (AGENTS.md
+already documents the trap precisely) — this is a process-sequencing gap,
+not a stale doc, so no skill-staleness fix is owed this cycle.
+
+### What shipped
+
+The functional change itself — `testTimeout: 30_000` with a matching
+explanatory comment in both `apps/web/vitest.config.ts` and
+`packages/ui/vitest.config.ts` — is correct, minimal, and exactly as
+planned. Nothing here is in question; only the plan doc's own formatting
+needs a follow-up commit.
+
+### What should carry into the next task
+
+Consider adding "re-run the gate (or at least `prettier --check` on
+touched docs) after any post-gate plan-doc edit, before committing" as an
+explicit closing step in the `/implement` workflow — this exact failure
+mode (gate-passing claim recorded via an edit that itself breaks the gate)
+is generic to every task, not specific to CAM-24.
