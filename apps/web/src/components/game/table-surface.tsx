@@ -44,6 +44,16 @@ export interface TableSurfaceProps {
    * the turn indicator and the Call Cambio control).
    */
   seatAnchor?: "center" | "edge"
+  /**
+   * Whether the viewer's own seat renders inside this component (CAM-21).
+   * `"internal"` (default) is the room screen's pre-game view — every seat,
+   * own included, renders here. `"external"` is the game screen's docked
+   * composition: the viewer's own hand lives in the screen's bottom dock,
+   * so this component skips it (while still deriving every position from
+   * the full `seats.length`) and the screen renders it itself, reusing the
+   * same geometry.
+   */
+  viewerSeat?: "internal" | "external"
   className?: string
 }
 
@@ -67,6 +77,7 @@ export function TableSurface({
   center,
   state = "in-game",
   seatAnchor = "center",
+  viewerSeat = "internal",
   className,
 }: TableSurfaceProps) {
   const positions = seatArc(seats.length, viewerSeatIndex)
@@ -107,8 +118,17 @@ export function TableSurface({
     <div
       data-state={state}
       className={cn(
-        "flex w-full flex-col items-center gap-4",
-        "regular:relative regular:mx-auto regular:block regular:aspect-square regular:max-w-2xl",
+        // Unconditionally relative (CAM-21, was `regular:relative`): the
+        // compact docked composition needs this as a positioned ancestor
+        // too, so the game-over full-region rest below scopes to the
+        // surface at every breakpoint instead of escaping to whatever
+        // positioned ancestor is next up the tree.
+        // `gap-2` (compact-only in effect: regular absolutely-positions
+        // every child, so flow gap never applies there) — tightened at
+        // the M5 rendered pass alongside the art cap and card scale
+        // (root plan Surprises: the fold budget was short at 160/64/gap-4).
+        "relative flex w-full flex-col items-center gap-2",
+        "regular:mx-auto regular:block regular:aspect-square regular:max-w-2xl",
         className,
       )}
     >
@@ -118,7 +138,13 @@ export function TableSurface({
 
       {/* The painted table + benches (shadows baked into the asset);
           center content and scrim overlay the tabletop disc only. */}
-      <div className="relative w-3/4 regular:absolute regular:top-1/2 regular:left-1/2 regular:-translate-x-1/2 regular:-translate-y-1/2">
+      <div
+        // CAM-21: compact caps the art at a token max-width (the asset is
+        // square, so this is also the height cap — root plan fold budget);
+        // regular cancels the cap and keeps today's w-3/4-of-aspect-square
+        // sizing untouched (clause 10).
+        className="relative w-3/4 max-w-(--size-table-art-compact) regular:max-w-none regular:absolute regular:top-1/2 regular:left-1/2 regular:-translate-x-1/2 regular:-translate-y-1/2"
+      >
         <img src={tableArt} alt="" aria-hidden className="block h-auto w-full" />
         <div
           className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
@@ -140,7 +166,7 @@ export function TableSurface({
         ) : null}
       </div>
 
-      {seats.length > 0 ? seatWrapper(viewerSeatIndex) : null}
+      {seats.length > 0 && viewerSeat === "internal" ? seatWrapper(viewerSeatIndex) : null}
 
       {state === "game-over" ? (
         // The full-region rest (table-surface.md r3): the disc scrim above

@@ -64,6 +64,16 @@
    * §1.5 slam reveal, the DrawSkipped beat, the which-slot-was-peeked
    * beat. A glance, not a memorization window (that's duration-peek). */
   --duration-reveal: 1200ms;
+
+  /* tokens.md §Shape (CAM-21): the compact game screen's table-art
+   * max-width cap — a square asset, so this is also the height cap. Fits
+   * the 360×640 fold budget alongside the compact card scale below;
+   * gate-approved, interview 2026-09-06. Compact only (game-screen.tsx
+   * cancels it at regular via max-w-none). Tuned down from the plan's
+   * starting 160px at the M5 rendered pass (measured fold-budget
+   * shortfall, see root plan Surprises) — 128px is the first escalation
+   * step the child plan names.  */
+  --size-table-art-compact: 128px;
 }
 
 @theme {
@@ -226,11 +236,27 @@
   aspect-ratio: 5 / 7;
   border-radius: calc(var(--card-width) * var(--radius-card-ratio));
 }
+/* Compact card scale (CAM-21, gate-approved, interview 2026-09-06): the
+ * 360×640 fold budget forces smaller footprints than regular's — card-lg
+ * shrinks one spacing step, card-md two, so five opponent hands and the
+ * viewer's own still fit one screen height. Regular values (96px/64px)
+ * are unchanged (root plan clause 10); card-sm is already the same
+ * physical size compact and regular need, so it stays flat. */
 @utility card-lg {
-  --card-width: calc(var(--spacing-7) * 2);
+  /* Tuned down from --spacing-8 (64px) at the M5 rendered pass: the
+   * measured fold budget was short even after the art cap and gap
+   * reductions (root plan Surprises) — the child plan's next escalation
+   * step. */
+  --card-width: var(--spacing-7);
+  @media (width >= theme(--breakpoint-regular)) {
+    --card-width: calc(var(--spacing-7) * 2);
+  }
 }
 @utility card-md {
-  --card-width: var(--spacing-8);
+  --card-width: var(--spacing-6);
+  @media (width >= theme(--breakpoint-regular)) {
+    --card-width: var(--spacing-8);
+  }
 }
 @utility card-sm {
   --card-width: var(--spacing-6);

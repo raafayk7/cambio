@@ -1703,3 +1703,180 @@ describe("game-over composition and exit (E3)", () => {
     expect(screen.getByTestId("index-route-stub")).toBeInTheDocument()
   })
 })
+
+// ---- CAM-21: the compact docked composition — structural containment
+// only (ADR-0030 routes every geometry/fit claim to the design-gate
+// rendered pass; these pin the DOM shape that composition depends on). ---
+
+describe("compact docked composition (CAM-21)", () => {
+  const chromeBand = (): HTMLElement => {
+    const band = document.querySelector('[data-region="chrome"]')
+    if (band === null) throw new Error("chrome band not found")
+    return band as HTMLElement
+  }
+
+  const dockActions = (): HTMLElement => {
+    const dock = document.querySelector('[data-region="dock-actions"]')
+    if (dock === null) throw new Error("dock-actions region not found")
+    return dock as HTMLElement
+  }
+
+  it("keeps the turn indicator and an open slam timer inside the pinned chrome band", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const band = chromeBand()
+    expect(within(band).getByText(/Slam window open/)).toBeInTheDocument()
+    expect(within(band).getByRole("progressbar", { name: "Slam window" })).toBeInTheDocument()
+  })
+
+  it("keeps a command-error and a public-fizzle message inside the chrome band once they render", async () => {
+    const fake = setupFake()
+    const { handlers } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+
+    handlers[POST_COMMANDS] = json(422, errorBody("NotYourTurn", "illegal move"))
+    fireEvent.click(screen.getByRole("button", { name: "Draw a card" }))
+    await screen.findByRole("alert")
+
+    const band = chromeBand()
+    expect(within(band).getByRole("alert")).toHaveTextContent("It's not your turn.")
+
+    act(() => {
+      room.emit("PowerFizzled", { _tag: "PowerFizzled", playerId: FRIEND.id, power: "J" })
+    })
+    expect(
+      within(band).getByText(`${FRIEND.name}'s power fizzled — no legal target.`),
+    ).toBeInTheDocument()
+  })
+
+  it("keeps the give-pick prompt inside the bottom dock, never the chrome band", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    fireEvent.click(slotButton(FRIEND.id, 0))
+    const prompt = await screen.findByText("If you're right, which card do you give them?")
+
+    expect(dockActions().contains(prompt)).toBe(true)
+    expect(chromeBand().contains(prompt)).toBe(false)
+  })
+
+  it("renders Call Cambio inside the bottom dock, not the chrome band", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const callCambio = screen.getByRole("button", { name: "Call Cambio" })
+    expect(dockActions().contains(callCambio)).toBe(true)
+    expect(chromeBand().contains(callCambio)).toBe(false)
+  })
+
+  it("renders Keep/Discard inside the bottom dock in the holding phase", async () => {
+    const fake = setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+          ],
+          phase: { _tag: "HoldingCard", playerId: ME.userId, source: "deck", card: "3S" },
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const keep = screen.getByRole("button", { name: "Keep" })
+    expect(dockActions().contains(keep)).toBe(true)
+  })
+
+  it("keeps the viewer's own hand anchors outside the scroll region but inside the flight root", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const tableRoot = document.querySelector('[data-region="table-root"]')
+    const scrollRegion = document.querySelector('[data-region="table-scroll"]')
+    if (tableRoot === null || scrollRegion === null) {
+      throw new Error("table-root/table-scroll region not found")
+    }
+
+    const ownAnchor = document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"]`)
+    const opponentAnchor = document.querySelector(`[data-flight-anchor="slot:${FRIEND.id}:0"]`)
+    const deckAnchor = document.querySelector('[data-flight-anchor="deck"]')
+    const discardAnchor = document.querySelector('[data-flight-anchor="discard"]')
+    for (const anchor of [ownAnchor, opponentAnchor, deckAnchor, discardAnchor]) {
+      expect(anchor).not.toBeNull()
+      expect(tableRoot.contains(anchor)).toBe(true)
+    }
+    // Only the own-hand anchor lives OUTSIDE the scrollable middle region —
+    // it's the dock's hand half, extracted from TableSurface (clause 3/5).
+    expect(scrollRegion.contains(ownAnchor)).toBe(false)
+    expect(scrollRegion.contains(opponentAnchor)).toBe(true)
+    expect(scrollRegion.contains(deckAnchor)).toBe(true)
+    expect(scrollRegion.contains(discardAnchor)).toBe(true)
+  })
+
+  it("no longer renders the viewer's own seat wrapper inside TableSurface — it's extracted to the screen's dock", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    // TableSurface's own root carries `data-state` — found via the
+    // opponent's still-internal seat wrapper (`[role=status][data-state]`
+    // on TurnIndicator would otherwise be the DOM-first false match, the
+    // same ambiguity the game-over walk test above already routes around).
+    // The viewer's seat wrapper must NOT be a descendant of it — it
+    // renders as a sibling in the screen's dock instead (decision 3).
+    // Room-screen's default `viewerSeat="internal"` path is unaffected and
+    // stays pinned by room-screen.test.tsx's own seat-index assertion.
+    const opponentSeatWrapper = screen.getByText(FRIEND.name).closest("[data-seat-index]")
+    const tableSurfaceRoot = opponentSeatWrapper?.closest("[data-state]")
+    expect(tableSurfaceRoot).not.toBeNull()
+    expect(tableSurfaceRoot?.contains(opponentSeatWrapper)).toBe(true)
+
+    const ownSeatWrapper = screen.getByText(ME.name).closest("[data-seat-index]")
+    expect(ownSeatWrapper).not.toBeNull()
+    expect(tableSurfaceRoot?.contains(ownSeatWrapper)).toBe(false)
+  })
+
+  it("carries no scale-transform class on any ancestor of the flight root (ADR-0035)", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const tableRoot = document.querySelector('[data-region="table-root"]')
+    if (tableRoot === null) throw new Error("table-root region not found")
+    for (let node: Element | null = tableRoot; node !== null; node = node.parentElement) {
+      expect(node.className).not.toMatch(/(^|\s)scale-/)
+    }
+  })
+})
