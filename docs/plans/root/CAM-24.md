@@ -178,7 +178,9 @@ Your name` from a `findByLabelText` call. Re-run in isolation immediately
 
 ## Outcomes & retrospective
 
-**Verdict: fix-then-ship** (2026-09-06 review).
+**Verdict: ship** (2026-09-06 review; fix-then-ship at first pass, flipped
+to ship after the fix cycle resolved Finding 1 and re-verification passed
+clean — see the RESOLVED note on Finding 1 below).
 
 Two parallel reviewers (contract, architecture) found **no** contract or
 architecture violations: both `vitest.config.ts` changes match the
