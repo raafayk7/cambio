@@ -10,6 +10,7 @@ import {
 import { render } from "@testing-library/react"
 import { vi } from "vitest"
 
+import { GameScreen } from "../../src/containers/game/game-screen.js"
 import { LobbyScreen } from "../../src/containers/lobby/lobby-screen.js"
 import { RoomScreen } from "../../src/containers/room/room-screen.js"
 
@@ -39,6 +40,55 @@ export function renderApp(initialPath: string) {
     getParentRoute: () => rootRoute,
     path: "/game/$gameId",
     component: () => <div data-testid="game-route-stub" />,
+  })
+
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([indexRoute, roomRoute, gameRoute]),
+    history: createMemoryHistory({ initialEntries: [initialPath] }),
+  })
+
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
+  return { router, queryClient }
+}
+
+/**
+ * The game render path (CAM-18 step 5, root plan hazard 5): mounts the
+ * real `GameScreen` at `/game/$gameId` instead of `renderApp`'s stub — the
+ * room/lobby suites depend on that stub staying cheap and untouched, so
+ * this is a separate entry point rather than a replacement. Stub routes
+ * for `/` (the E3 back-to-lobby exit) and `/room/$gameId` (unreachable
+ * from the game screen today, kept for parity) so a stray navigation
+ * fails loudly instead of throwing a missing-route error.
+ */
+export function renderGameApp(gameId: string, initialPath: string = `/game/${gameId}`) {
+  const rootRoute = createRootRoute({ component: Outlet })
+  const indexRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/",
+    component: () => <div data-testid="index-route-stub" />,
+  })
+  const roomRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/room/$gameId",
+    component: () => <div data-testid="room-route-stub" />,
+  })
+  const gameRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/game/$gameId",
+    component: function GamePage() {
+      const { gameId: routeGameId } = gameRoute.useParams()
+      return <GameScreen gameId={routeGameId} />
+    },
   })
 
   const queryClient = new QueryClient({
@@ -110,15 +160,41 @@ export const lobbyResponse = (
 
 export const errorBody = (tag: string, message: string) => ({ error: { tag, message } })
 
-/** A minimal valid ViewResponse for the started-game fallback (R2). */
-export const viewResponse = () => ({
+export interface ViewResponseOverrides {
+  players?: ReadonlyArray<{ id: string; name: string; hand: ReadonlyArray<number> }>
+  deckCount?: number
+  discard?: ReadonlyArray<string>
+  /** A plain `{_tag, ...}` literal for one `ViewPhase` variant — the real
+   * decode (`decodeViewResponse`, exercised by the game-screen suite) is
+   * what actually checks the shape; the fixture only needs to carry it. */
+  phase?: Record<string, unknown>
+  version?: number
+  slamWindowMs?: number
+  reveal?: {
+    hands: ReadonlyArray<{
+      playerId: string
+      cards: ReadonlyArray<{ slotIndex: number; card: string }>
+    }>
+    scores: ReadonlyArray<{ playerId: string; total: number }>
+    winners: ReadonlyArray<string>
+  }
+}
+
+/**
+ * A valid `ViewResponse` (CAM-17 R2 started-game fallback; CAM-18 the game
+ * screen's bootstrap). Defaults to a minimal `AwaitingDraw` view for one
+ * player; every field is overridable so later suites can drive any phase
+ * (step 5, root plan).
+ */
+export const viewResponse = (overrides: ViewResponseOverrides = {}) => ({
   view: {
-    players: [{ id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] }],
-    deckCount: 40,
-    discard: ["KH"],
-    phase: { _tag: "AwaitingDraw", playerId: ME.userId },
-    config: { slamWindowMs: 8000 },
+    players: overrides.players ?? [{ id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] }],
+    deckCount: overrides.deckCount ?? 40,
+    discard: overrides.discard ?? ["KH"],
+    phase: overrides.phase ?? { _tag: "AwaitingDraw", playerId: ME.userId },
+    config: { slamWindowMs: overrides.slamWindowMs ?? 8000 },
+    ...(overrides.reveal !== undefined ? { reveal: overrides.reveal } : {}),
   },
-  version: 3,
+  version: overrides.version ?? 3,
   grants: GRANTS,
 })

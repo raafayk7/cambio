@@ -194,8 +194,12 @@ imports (lint-enforced).
   `PowerPeek` (any occupied slot) then `ResolvingQueenSwap` →
   `PowerSwap` (pinned: Queen two-step in the engine suites). Selection
   state renders via the extended Hand props. `PowerFizzled` renders as
-  a public no-op beat. Non-holders see the seat acting + which power
-  (`phase` has no card for them — pinned `ViewFor.test.ts`).
+  a public no-op beat. Non-holders see the seat acting only — the
+  SPECIFIC power is not on the wire during resolution (`phase` has no
+  card for them, pinned `ViewFor.test.ts`, and no room event names the
+  power until `PowerDiscarded` lands after it resolves). _(Amended at
+  review F2, 2026-09-06: the original "+ which power" overclaimed the
+  wire — claim corrected, code unchanged.)_
 - T4. Peeks are memory-faithful: the entitled viewer's
   `PrivateCardPeeked` value flips the target card up for
   `duration.peek`, then back, never to return (round-1 decision);
@@ -278,29 +282,44 @@ imports (lint-enforced).
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes, run bare (no
-      pipes).
-- [ ] Full live game (round-1 user decision): two sessions
-      (in-app browser + second cookie-jar session or second browser)
-      play a real game to a Cambio call against `pnpm dev` — covering
-      draws, at least one power of each dealt class, at least one
-      slam (with a give or penalty), the reshuffle if reached, and
-      the score sheet → back-to-lobby exit. Reconnect kill/restart
-      shows the in-game reconnecting treatment and a correct table
-      after recovery.
-- [ ] The 8-state MVS ledger answered in the frontend child plan
-      (built or justified N/A), including the partial-failure N/A
-      with its surfaced canon conflict.
-- [ ] Hidden-information sweep: jsdom tests assert face-down renders
-      carry no value anywhere in the DOM, peeked values disappear
-      after the reveal and never re-render, and the screen makes no
-      requests beyond the view GET + commands POST.
-- [ ] Design-gate pipeline (decompose→map→judge) on the game screen
-      with zero blocking findings; `ai-tells` on the new surfaces;
-      impeccable audit run; canon conflicts surfaced, never
-      auto-fixed. Reduced-motion pass verified in the rendered path.
-- [ ] All canon revisions from the approved batch landed as proper
-      r-revisions in `design-system/` alongside their code.
+- [x] `pnpm turbo build typecheck lint test` passes, run bare (no
+      pipes) — forced, 25/25 tasks, 0 cached: api 118, domain 194,
+      application 86, contracts 11, config 16, ui 25, web 185 = 635
+      tests.
+- [x] Full live game executed (in-app browser + cookie-jar HTTP
+      session): create → join-on-visit → start → played to a Cambio
+      call. Covered: draws both ways; every DEALT power class (9/10
+      peeks, Queen two-step with a cross-player swap, J two-pick from
+      the browser — 7/8 never drawn, so per "if dealt" satisfied); a
+      failed slam → penalty (closesAt fixed through the attempt,
+      ADR-0011 live); reshuffle not reached (deck never emptied — "if
+      reached"); confirm-modal call → CAMBIO! indicator → score sheet
+      byte-identical to the server reveal → back to lobby; ended-game
+      reload re-renders the sheet. Realtime kill/restart mid-game
+      showed the in-game reconnecting treatment and a correct table on
+      recovery.
+- [x] The 8-state MVS ledger answered in the frontend child plan
+      (5 built with branch tests, 3 N/A justified), including the
+      partial-failure N/A with its surfaced canon conflict.
+- [x] Hidden-information sweep green: face-down renders carry no
+      value anywhere in the DOM, penalty values never exist
+      client-side, peeked values disappear after the reveal and never
+      re-render, and recorded calls are limited to the view GET +
+      commands POST (+ /me).
+- [x] Design-gate pipeline (decompose→map→judge) run on live
+      authenticated renders (mid-game, ended, compact): hard checks
+      PASS everywhere (0 constraint fails), verdict flagged with 6
+      accidental default-tier points and ZERO blocking findings — all
+      six fixed in the same cycle and re-verified rendered (child plan
+      step-15 Progress); 5 further findings judged controlled/allowed
+      and left as-is. `ai-tells` 1/30 (invisible; its one finding
+      fixed); impeccable deterministic detector clean on all changed
+      UI files. Reduced-motion verified: flight-layer structural tests + a clean render under emulated prefers-reduced-motion.
+- [x] All canon revisions landed as r-revisions alongside their code:
+      tokens.md r2 (duration.peek), playing-card.md r2, hand.md r2
+      (+amendment), draw-deck.md r2, discard-pile.md r2, held-card.md
+      r1 (new), score-sheet.md r2 (+footer amendment), app-shell.md
+      r3, table-surface.md r3.
 
 ## Plan of work
 
@@ -373,6 +392,36 @@ _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
 - [x] 2026-09-05 — plan written
+- [x] 2026-09-05 17:00–17:30 — M1 (flight layer + one-radius geometry +
+      duration.peek 2800ms) and M2 (AppShell orthogonal reconnecting +
+      hollow-ring dot, app-shell.md r3) complete, parallel lanes.
+- [x] 2026-09-05 18:00 — M3 complete: game container per ADR-0033
+      (refetch authority, version guard, debounced batch refetch),
+      harness render path, MVS branches, route swap. web 111.
+- [x] 2026-09-05 19:00 — M4 complete: H1 helpers + affordances, canon
+      interaction extensions (hand.md/draw-deck.md/discard-pile.md r2,
+      held-card.md r1), Cambio confirm modal, memory-faithful peeks,
+      Queen two-step. web 164.
+- [x] 2026-09-05 20:00–20:30 — M5 (slam window SL1–SL3 + reshuffle
+      CH2) and M6 endgame (E1–E3, score-sheet revealing, sibling
+      overlay, back-to-lobby) complete. web 185.
+- [x] 2026-09-06 02:00 — M6 close: full forced gate 25/25 (635 tests);
+      live two-session full game to a Cambio call (details in the
+      child plan step-15 Progress); ai-tells 1/30; impeccable detector
+      clean; design-gate pipeline on live authenticated renders —
+      hard checks PASS (mid-game, ended, compact), verdict flagged 6
+      accidental / 0 blocking.
+- [x] 2026-09-06 02:45 — gate fix cycle: all six flagged points
+      resolved (seat edge-anchoring + viewer-dock exception, Call
+      Cambio docked by the viewer, full-region game-over rest,
+      score-sheet footer slot, phantom-slot spacer, badge clearance)
+      plus the ai-tells copy finding and the CAMBIO! pill overflow;
+      canon r3/amendments landed with the code; re-rendered and
+      re-verified; final forced full gate 25/25 green.
+- [x] 2026-09-06 03:30 — review fix cycle complete: F1–F7 resolved
+      (retrospective below states each branch taken); 5 new tests
+      (web 190); `duration.reveal` minted per the user's F6 call;
+      claim sweeps re-run; fresh forced gate green.
 
 ## Decision log
 
@@ -419,6 +468,41 @@ timestamp each entry)_
   refetches on `GameEnded`. Rejected: adding hands to the `GameEnded`
   event (legal — endgame is public — but a contract change with no
   v0 need).
+- 2026-09-06 — (gate fix cycle) **Seat anchoring is asymmetric by
+  design**: non-viewer seats edge-anchor at the ring point growing
+  inward (fixes the chrome occlusion — the judged top defect); the
+  viewer's dock stays centered because an own-size hand grown inward
+  covers the deck/discard (caught in the first fix re-render). The
+  hands-over-benches read the judge ruled a controlled break is kept.
+  table-surface.md r3.
+- 2026-09-06 — (gate fix cycle) **Call Cambio docks at the stage's
+  bottom-right at regular** — it is the viewer's action and lives by
+  their hand; removing it from the top band is also what brings the
+  viewer's own seat inside the fold mid-game. Compact keeps it in
+  flow.
+- 2026-09-06 — (gate fix cycle) **Game-over dims the whole surface**:
+  a full-region green-deep rest above the seat layer joins the disc
+  scrim (which the score sheet almost entirely covered) —
+  table-surface.md r3. The ended state's own-hand tail below the fold
+  is accepted as an authored scroll (no countdown post-game; child
+  plan Surprises).
+- 2026-09-06 — (gate fix cycle) **The game-over "CAMBIO!" drops the
+  poster text-shadow** — at the indicator's 15px it muddied and
+  overflowed the pill; the display face alone carries the shout. The
+  shadow stays for the SLAM! banner's big display moment. _(Corrected
+  at review F4: only SLAM! carries `text-shadow-poster`; the SCORES
+  heading never did.)_
+- 2026-09-06 — (audit) ai-tells' one finding (the five-peat error-copy
+  suffix) fixed by varying copy per voice.md's error formula; the
+  judge's five controlled/allowed reads (hands-over-benches, face-down
+  hands at ended, score-row stagger, wide flanks, deck-under-panel)
+  deliberately left as-is.
+- 2026-09-06 — (review fix cycle) **`duration.reveal` = 1200ms minted**
+  — user-approved creation-gate call resolving review F6: the public
+  reveal-hold joins the vocabulary as a token (tokens.md r3,
+  slam-timer.md r2) rather than a documented exemption, on the same
+  principle that minted `duration.peek`. Rejected: an inline-justified
+  constant (contradicts the precedent this task set).
 - 2026-09-05 — (plan reconciliation) **Game-over composition: the
   score sheet renders as a screen-level sibling overlay above
   TableSurface** (which takes `state="game-over"` for the dim);
@@ -457,4 +541,176 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+**Review 2026-09-06 — verdict: fix-then-ship.** Two reviewers (contract +
+architecture) plus independent verification; one finding probe-confirmed
+in a real browser.
+
+### What passed
+
+- **No contract clause is violated.** Every clause G1–CH3 satisfied or
+  satisfied-with-a-named-gap (T3/T4 below); coverage-table tests
+  body-verified row by row; all gate-fix-cycle deviations match their
+  Decision Log entries; no unrequested network surface (pinned by the
+  recorded-calls test).
+- **Hidden information and memory fidelity fully clean**: no card value
+  constructed, inferred, cached, or persisted beyond its window; peeks
+  are timer-cleared React state only — the only `setQueryData` calls are
+  HTTP-response paths; penalty/give flights face-down structurally;
+  channel discipline exact (granted topics only, contracts decoders,
+  malformed dropped); no payload logging anywhere in the diff.
+- **ADR-0033 conformance verified branch-by-branch**: every
+  `handleRoomEvent`/`handlePlayerEvent` arm enqueues choreography +
+  schedules one debounced refetch and never touches the snapshot; one
+  version guard used by both HTTP paths; the client never closes the
+  slam window itself.
+- Import boundaries clean (full sweep of added imports); hardcoded-value
+  audit clean (both forms); ADR-0030 test discipline held; canon batch
+  conformant except the two doc overclaims below.
+- Independent verification: fresh forced full gate **25/25, 0 cached**,
+  635 tests, api suite against live Postgres + Realtime this cycle.
+
+### Findings (fix cycle works from THIS list)
+
+- **F1 — Reduced-motion flights never settle (probe-confirmed bug).**
+  `flight-layer.tsx` HighlightBox carries `motion-reduce:transition-none`
+  while the reduced-motion branch settles on `onTransitionEnd` — under
+  `prefers-reduced-motion` (the only condition that branch renders) no
+  transition ever runs, `settleOnce("completed")` never fires, the
+  flight stays in `useFlights().active` forever, and the derived
+  `drawing`/`reshuffling`/`receiving` states latch until unmount.
+  Probe: real Chromium, gallery flight demo — 2 highlight nodes still
+  live 1.5s post-flight under reduce; 0 under normal motion. Adjacent
+  hazard, same mechanism: an identity plan (origin rect == destination)
+  also never fires `transitionend` and there is no timeout fallback.
+  Fix: settle reduced-motion flights on a `duration.track`-scale timeout
+  (not transitionend), and add a generic settle-timeout fallback; pin
+  both with tests (fake timers; the injectable `measure` makes a
+  non-degenerate plan drivable in jsdom).
+- **F2 — T3's non-holder clause overclaims the wire.** "Non-holders see
+  the seat acting **+ which power**" is unimplementable during
+  resolution: `phase.card` is absent for non-holders (as the clause
+  itself parenthesizes) and no room event names the power until
+  `PowerDiscarded` lands (after resolution). The code shows the acting
+  seat only — correct given the wire. Fix branch: amend the CLAIM (with
+  an inline amendment note at T3) — sweep every phrasing: root T3, the
+  child plan's ViewPhase table row and step-12 prose, the T3 coverage
+  row.
+- **F3 — The public peek beat drops the slot.** `CardPeeked` carries
+  `target: SlotRef` (public info — which card was looked at is part of
+  the memory game) but `use-game.ts` discards `target.slotIndex` and
+  pulses the target's seat only; root T4 says everyone sees "which
+  slot". Fix branch: STRENGTHEN THE CODE — render a brief slot-level
+  beat (the accent treatment on the target slot for the public beat
+  duration), and pin it; the wire already provides everything needed.
+- **F4 — Canon/doc-vs-code batch (all doc amendments).**
+  (a) table-surface.md r3 states `edge` anchors every seat's outboard
+  edge; the shipped code deliberately centers the viewer's dock (the
+  gate fix's viewer-dock exception, documented only in a code comment) —
+  amend r3 to record the exception. (b) hand.md r2 claims
+  `emptySlotsClickable` serves the shipped give-target flow (the give
+  resolves on the slammer's OWN occupied slots; the prop is
+  gallery-only today) and lists `selectedSlots` consumers that never
+  populate a selection (peeks, swap-held are single-click) — align the
+  wording with what ships. (c) The root Decision Log's "the shadow
+  stays for … SCORES" parenthetical is imprecise (SCORES never carried
+  `text-shadow-poster`; only SLAM! does) — correct it. (d)
+  `affordances.ts`'s "two public-rule helpers" header and draw-deck.md
+  r2's "via H1" phrasing attribute the drawable rule to H1 where it
+  does not live — one-line precision fixes.
+- **F5 — Coverage-claim corrections + two missing beats' tests.**
+  (a) The T3 coverage row claims "fizzle beats pinned in
+  affordances.test.ts" — no fizzle test exists anywhere; add a
+  `PowerFizzled` beat test and correct the row. (b) SL2's `DrawSkipped`
+  beat is implemented but untested — add the test. (c) The CH1 row
+  overstates: no interaction test asserts a flight enqueue (jsdom
+  auto-cancels degenerate plans); reword the row to what is actually
+  pinned, or add an enqueue-level pin via the injectable measure.
+  (d) The S1 row still cites the deleted placeholder test — reword.
+  (e) C1's "300ms no-flash" test doesn't assert pre-300ms absence —
+  reword the row or strengthen the test.
+- **F6 — `SLAM_REVEAL_MS = 1200` is a second, off-token reveal-hold.**
+  This task promoted the peek hold to `duration.peek` precisely because
+  JS-timed holds are design vocabulary, then shipped another one
+  inline-justified. Needs a canon call (creation gate — user decides):
+  promote to a token (e.g. `duration.reveal`) with a tokens.md
+  amendment, or record a deliberate exemption in slam-timer.md.
+- **F7 — Side effects inside `setState` updaters.** `useFlights`'
+  `settle`/`cancelAll` invoke `onDone` callbacks inside their state
+  updaters — impure updaters double-fire under StrictMode. Not a live
+  bug (no StrictMode today); fix by moving the callback invocation
+  outside the updater.
+
+### Fix cycle 2026-09-06 — all findings RESOLVED
+
+- **F1 RESOLVED (code + tests strengthened):** flights settle by the
+  clock — a `plan`-keyed timeout (`FLIGHT_TRACK_MS` = 340, mirroring
+  `duration.track`) IS the settle under reduced motion (one track beat)
+  and the backstop at 2× track on the animated branch (identity plans,
+  swallowed transitionend); `transitionend` still settles the animated
+  branch precisely; `settleOnce` guards the double. Two new
+  flight-layer tests kill the mutants: removing the timeout fails the
+  reduce test at exactly 340ms, and the jsdom animated flight (where
+  transitionend never fires at all) now settles once on the fallback.
+- **F2 RESOLVED (claim amended by sweep):** the root T3 clause carries
+  an inline amendment note; the child plan's step-12 prose and T3
+  coverage row amended; sweep across "which power"/"acting + power"
+  phrasings re-run — the only remaining hit is this retrospective's own
+  finding record.
+- **F3 RESOLVED (code strengthened):** `CardPeeked.target` now drives a
+  public which-slot beat — the target slot renders the selected
+  treatment for one `duration.reveal` beat, value-free (merged into
+  `selectedSlots` at the wiring layer; hand.md r2 amendment covers the
+  widened meaning). Pinned by the new "a public CardPeeked marks the
+  peeked slot…" test.
+- **F4 RESOLVED (docs amended, one extra instance caught by sweep):**
+  table-surface.md r3 now states the viewer-dock exception as part of
+  `edge`'s contract; hand.md r2 rewritten to what ships (including a
+  fourth instance in its Rules section — "valid give-target click" —
+  the finding's own list missed); the Decision Log's SCORES
+  parenthetical corrected here and in the matching `game-screen.tsx`
+  comment; `affordances.ts` header and draw-deck.md attribute the
+  drawable rule to the T1 mapping, not H1.
+- **F5 RESOLVED (tests added + rows corrected):** new `PowerFizzled`
+  and `DrawSkipped` beat tests (render + clear, no movement); T3 row's
+  false fizzle-pin claim replaced with the real test; CH1 row now
+  states plainly that the event→enqueue wiring has no automated pin
+  and rests on the rendered path + walkthrough; S1 row drops the
+  deleted placeholder test; C1 row states the 300ms pre-delay is not
+  separately pinned.
+- **F6 RESOLVED (token minted — user-approved creation-gate call):**
+  `duration.reveal` = 1200ms (`--duration-reveal` + utility in
+  styles.css; tokens.md r3 with the decision line now "two interaction
+  durations + two holds"; slam-timer.md r2 names it as the `resolving`
+  beat's pace). `SLAM_REVEAL_MS` renamed `REVEAL_DURATION_MS`,
+  mirroring the token; it paces the slam reveal, the DrawSkipped beat,
+  and F3's public peek beat.
+- **F7 RESOLVED (code):** `useFlights` mutations flow through the
+  synchronous `activeRef` as the source of truth and mirror plain
+  values into state — `onDone` fires exactly once, outside any updater
+  (presence in the ref is the not-yet-settled guard); StrictMode
+  double-invocation can no longer double-fire callbacks.
+
+### Advisory (defer allowed; log only)
+
+DrawDeck's `reshuffling` pulse treatment is unreachable at the one
+moment it fires for real (deckCount still 0 pre-refetch renders the
+empty branch); `findAnchor` should `CSS.escape` its interpolation;
+tokens.md's reduced-motion canon says "cross-fades PLUS highlight" while
+the flight layer renders highlights only (defensible, note the reading);
+the 300ms no-flash constant now exists in three screens with no shared
+home; `isOccupiedSlot` and `handArc` are production-dead (test-only)
+exports; `PEEK_DURATION_MS`/`SCORE_REVEAL_MS` sync with their CSS tokens
+by hand-maintained convention. Process note: ADR-0033/0034 stay
+**proposed** — correct per the adr skill (accepted at the
+release→development merge), despite being fully implemented.
+
+### Verification record
+
+Fresh forced gate `pnpm turbo build typecheck lint test --force` →
+25/25 tasks, 0 cached (contracts 11, config 16, ui 25, domain 194,
+application 86, web 185, api 118 = 635), api suite against live
+containers. F1 probe: throwaway Playwright script (deleted) against the
+gallery flight demo — reduced-motion flight nodes persist at 1.5s
+(2 vs 0 normal). Both reviewers read-only; every reported finding was
+re-verified against source before inclusion; reviewer claims that did
+not hold were dropped.

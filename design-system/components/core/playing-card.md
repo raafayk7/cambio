@@ -1,6 +1,6 @@
 name: playing-card
 status: draft
-version: 1
+version: 2
 extends: none
 
 The atom of the game. Class: **Game object**.
@@ -23,8 +23,8 @@ none may be an animation accident):
 
 1. `face-down` — rest state; back showing.
 2. `face-up` — discard top, public reveals, endgame.
-3. `peeking` — flips up at `duration.snap`, holds for the game-configured
-   peek duration, flips back. Shown only to the entitled player.
+3. `peeking` — flips up at `duration.snap`, holds for `duration.peek`, flips
+   back. Shown only to the entitled player.
 4. `selected` — lifts, `accent.focus` ring, `elevation.float`. Same visual
    language as keyboard focus.
 5. `slam-eligible` — slam window open: pulsing `accent.alarm` edge on the
@@ -59,3 +59,6 @@ none may be an animation accident):
 ## Revisions
 
 - r1: initial, from the CAM-13 specimen board.
+- r2 (CAM-18, G3): the `peeking` hold duration is `duration.peek`
+  (tokens.md), no longer "game-configured" — round-1 user decision: a
+  fixed client duration, the same for every peek.

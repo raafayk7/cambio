@@ -150,11 +150,7 @@ export function LobbyScreen() {
   }
 
   return (
-    <AppShell
-      scene="courtyard"
-      connection={connection}
-      state={connection === "reconnecting" ? "reconnecting" : "default"}
-    >
+    <AppShell scene="courtyard" connection={connection}>
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 p-5">
         {content}
       </div>

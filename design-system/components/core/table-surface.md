@@ -57,3 +57,19 @@ None.
   scrim, and seats stay programmatic overlays; the tabletop disc
   measures 54% of the asset width (spec-carried, measured from the
   alpha channel).
+- r3 (CAM-18, 2026-09-05, gate fix cycle): two changes from the game
+  screen's gate run. (1) **Seat anchoring** — `seatAnchor` prop:
+  `center` (default; the pre-game lone-pill case) centers a seat node on
+  its ring point; `edge` (the game screen) anchors the node's outboard
+  edge at the point so seat + hand grow inward toward the table — a
+  centered seat+hand group escaped the surface and occluded the chrome
+  above it. **Exception (part of `edge`'s contract):** the VIEWER's own
+  seat keeps the centered anchor even under `edge` — its dock hangs
+  below the table with the hand over the near bench (the gate-judged
+  controlled break), because a full own-size hand grown inward would
+  lie across the tabletop and occlude the deck and discard. (2) **Game-over rest** — "the table dims" now means the
+  whole surface: alongside the tabletop-disc scrim, a full-region
+  `green-deep` tint sits above the seat layer and below the score-sheet
+  overlay, so the terminal state visibly subordinates hands, seats, and
+  ground (the disc-only scrim was almost entirely hidden behind the
+  score sheet).

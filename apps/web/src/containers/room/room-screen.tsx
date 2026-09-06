@@ -269,11 +269,7 @@ export function RoomScreen({ gameId }: { gameId: string }) {
   }
 
   return (
-    <AppShell
-      scene="paving"
-      connection={connection}
-      state={connection === "reconnecting" ? "reconnecting" : "default"}
-    >
+    <AppShell scene="paving" connection={connection}>
       <div className="flex w-full flex-1 flex-col justify-center gap-5 p-5">
         {ownHeading ? null : <h1 className="sr-only">Room</h1>}
         {content}

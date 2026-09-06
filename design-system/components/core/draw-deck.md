@@ -1,6 +1,6 @@
 name: draw-deck
 status: draft
-version: 1
+version: 2
 extends: none
 
 The face-down stock. Class: **Game object**.
@@ -36,7 +36,17 @@ None.
   public animation shows a back.
 - The reshuffle retains the current top discard — visibly: it stays put
   while the rest flights.
+- The click affordance (r2) is presentation only — legality is the server's
+  and the client mirrors it in its affordance mapping (`deckCount > 0
+|| discard.length > 1` — a T1-specified rule, distinct from H1's two
+  helpers);
+  omitting `onClick` entirely renders the deck as a static, non-interactive
+  stack rather than a disabled button.
+- The stock exposes `data-flight-anchor="deck"` for the flight layer.
 
 ## Revisions
 
 - r1: initial, from the CAM-13 specimen board.
+- r2 (CAM-18, T1/T2): `onClick` (accessible-button wrap, Hand's internal
+  slot-button precedent) and the `reshuffling`/`draw` choreography states —
+  the CAM-15 carve-out this task repays.
