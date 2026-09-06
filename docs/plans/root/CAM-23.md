@@ -320,5 +320,100 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+**Verdict: fix-then-ship.** One finding, otherwise clean.
+
+**What shipped:** exactly the 13-clause contract, implemented as planned —
+arm-first give-pick with the two-tap fallback preserved, the late-slam
+`WrongPhase`→`SlamTooLate` copy remap, and the `SLAM_WINDOW_MS` 5000→10000
+dev-default bump. No scope creep: two independent reviewers (contract +
+architecture) traced every line of the diff back to a specific clause and
+found nothing implemented beyond the contract.
+
+**Independent verification this cycle:**
+
+- `pnpm turbo test --filter @cambio/web --force` and
+  `--filter @cambio/api --force` (bypassing turbo's cache, since
+  `/implement`'s own gate run would otherwise just replay as cached green):
+  204/204 and 118/118 respectively, fresh, against live Postgres/Realtime
+  containers. `pnpm turbo build typecheck lint test`: 25/25 (12/12 on a
+  scoped web+api re-run) tasks clean.
+- Two parallel read-only subagents: a **contract reviewer** (all 13 clauses,
+  verdict + file:line evidence, explicitly told not to grade coverage by
+  grepping clause numbers out of test titles) and an **architecture
+  reviewer** (import boundaries, render-time-state-vs-`useEffect`
+  discipline, design-system reuse, hidden-information, `ai-tells` voice
+  compliance, the backend config touch).
+- I independently re-verified the one finding below by reading the cited
+  test and the render guard myself before accepting the subagent's claim.
+
+**Architecture review: clean bill on all six checks** — no `domain`/
+`application` imports introduced; no new `useEffect` (the two new state
+variables and the staleness check are genuine render-time derived state,
+correctly guarded against an infinite-render loop, same pattern as the
+pre-existing `phaseKey` block); no hardcoded visual values or new
+design-system state (the "Ready a give"/"Cancel give" control is a plain
+reuse of `Button`'s existing `ghost` variant, the highlight a plain reuse
+of `Hand`'s existing `selectedSlots`); no card value ever entered a payload
+or render path it wasn't already in (`slamArmedGive` carries only a slot
+index, never a card); new copy is clean against `voice.md` (verb-first
+buttons, sentence-case functional copy, no AI-tell defaults).
+
+**Contract review: 12 of 13 clauses satisfied with real, mechanism-verified
+tests** — including a full trace of every `setSlamPendingGive`/
+`setSlamReadyMode` call site in `handleSlamClick` to confirm clause 9's
+mutual-exclusivity claim holds by construction across every branch, not
+just the one the test exercises, and confirmation that clause 12's
+`WrongPhase`→`SlamTooLate` remap is keyed on the failed command's own tag
+(TanStack Query's `onError(error, command)` argument) and structurally
+cannot fire for a non-`Slam` command.
+
+**Finding (test-coverage, not a functional defect):**
+
+- **Clause 11's cited test doesn't discriminate the reset it claims to
+  cover.** The test "(CAM-23) ready-mode and an armed give-slot reset the
+  moment the acting phase moves on from SlamWindow"
+  (`apps/web/test/game-screen.test.tsx:1346-1383`) arms a give-slot, closes
+  the window (`SlamWindowClosed`+`TurnAdvanced` → phase becomes
+  `AwaitingDraw`), and asserts the "Cancel give"/"Ready a give" buttons are
+  gone. But the control's own render guard
+  (`game-screen.tsx:596`: `slamPhase !== undefined && ...`) already hides
+  it the instant `slamPhase` is `undefined`, **regardless of whether
+  `slamReadyMode`/`slamArmedGive` were actually reset** by the `phaseKey`
+  block (`game-screen.tsx:360-366`). Deleting those two reset lines would
+  not fail this test. The underlying code is correct on inspection (I
+  traced it independently) — clause 11 genuinely holds — but the test is a
+  false positive as a regression guard, and the claim that it "covers"
+  clause 11 appears in two places: the root plan's own clause 11 text
+  (this file, "Functional contract" §11, which the test is meant to prove)
+  and the frontend plan's Contract coverage table row 11
+  (`docs/plans/frontend/CAM-23.md`, the "Test (file + name)" and "What is
+  asserted" cells for clause 11). Neither is false as _written_ — the
+  functional claim is true and the test does exist — but the row's implicit
+  claim that this test would catch a regression in the reset itself does
+  not hold up.
+  **Recommended fix:** strengthen (not replace) the existing test with a
+  genuine round-trip: after the window closes, reopen a **new**
+  `SlamWindow` (a second `GET_VIEW`/broadcast) and assert the control
+  reappears as unarmed `"Ready a give"` rather than `"Cancel give"` — that
+  version would fail if the reset lines were removed, because a real leak
+  would carry the old armed slot index into the new window.
+
+**Deferred, not a finding:** the root plan's Validation section's manual
+two-browser walkthrough still hasn't been run (flagged at `/implement`
+close-out, reconfirmed here) — the automated suite's fidelity (real
+component tree, real DOM, via testing-library) covers the interaction/copy
+logic that changed, but nothing replaces a live check. Left for whoever
+picks up the fix cycle, or a follow-up manual pass before `/ship`.
+
+**Harness issue, out of this task's scope:** `.agents/scripts/fill-coverage-row.mjs`
+expects a 4-column Contract coverage table but `.agents/templates/child-plan.md`
+currently produces 3 columns (already logged in Surprises at
+`/implement` close-out). Not re-litigated here; carries forward as a
+harness fix for a separate task.
+
+**What should carry into the next task:** when a test's assertion could
+pass for a reason OTHER than the behavior under test (here: an outer
+visibility gate masking an inner state reset), that's worth catching at
+`/implement` time, not `/review` time — the "does this test's failure mode
+actually match the clause" question is cheap to ask before checking a
+coverage-table row filled.

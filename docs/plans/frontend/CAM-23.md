@@ -257,6 +257,15 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       restructuring the table to the 4-column shape the script expects —
       see Surprises), Context & orientation / Plan of work line citations
       reconciled with as-built code.
+- [x] 2026-09-06 08:35 — `/review` verdict: fix-then-ship. 12/13 clauses
+      confirmed with real, mechanism-verified tests by an independent
+      contract reviewer; architecture review clean on all six checks. One
+      finding: row 11's cited test doesn't discriminate the reset it
+      claims to cover (an outer visibility gate masks the same result) —
+      code is correct, test needs strengthening. Full detail and the
+      recommended fix are in the root plan's Outcomes & Retrospective;
+      this row's cells stay as-is until the fix cycle lands a stronger
+      test.
 
 ## Surprises & notes for the root plan
 
