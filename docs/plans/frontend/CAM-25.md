@@ -167,7 +167,19 @@ test rows.)_
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
-- [ ] YYYY-MM-DD HH:MM — step
+- [x] 2026-09-06 14:55 — Both files edited exactly as sketched in "Plan of
+      work" above (verbatim, no drift from the quoted current state).
+      Steps 1-3 of "Concrete steps & validation" run: diffs identical
+      (7-line addition each — `configure` added to the existing `cleanup`
+      import, plus the comment + call block), the two files confirmed
+      still byte-identical to each other, `git status --porcelain` scoped
+      to test globs and `vitest.config.ts` empty.
+- [x] 2026-09-06 14:56 — Step 4: full gate green —
+      `pnpm turbo build typecheck lint test`, 25/25 tasks successful.
+      `@cambio/web:test` 20 files / 204 tests passed (pass count unchanged
+      from CAM-24's last recorded run); `@cambio/ui:test` 6 files / 25 tests
+      passed (pass count unchanged). No test added, none removed, per the
+      contract.
 
 ## Surprises & notes for the root plan
 
