@@ -199,5 +199,57 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+**Verdict: ship.** No findings against this task's diff survived review.
+
+**What shipped:** exactly the plan — `TextField` gained a `ref` prop
+(React 19 plain-prop pattern), `copyLink` guards for a missing
+`navigator.clipboard`/`writeText` before calling it and shares one
+`copyFailed()` helper with the rejection branch, and three new jsdom tests
+cover all three clipboard outcomes.
+
+**Contract review** (independent subagent, then verified by the reviewer
+myself): all 4 functional-contract clauses satisfied with file:line
+evidence; all 3 cited tests in the frontend child plan's Contract coverage
+table exist verbatim and assert what they claim; no scope creep. The one
+open acceptance criterion (manual LAN-IP smoke check) was pre-flagged as
+skipped and optional — not a violation.
+
+**Architecture review** (independent subagent): no violations — import
+boundaries untouched, `copyLink`/`copyFailed` are pure DOM plumbing (no
+logic migrated into the container), `TextField`'s new `ref` prop matches
+the sibling-component style in `packages/ui` exactly (same `cva` +
+plain-function-component pattern as `Button`), no design-system token/copy
+drift, no hidden-information surface touched, new tests follow the file's
+existing conventions.
+
+**Independent verification (this review cycle):**
+
+- Forced a fresh, uncached full gate (`pnpm turbo build typecheck lint
+test --force`) rather than trusting the `/implement` cycle's cached green.
+  Two unrelated tests (`test/score-sheet.test.tsx`,
+  `test/slam-timer.test.tsx` — neither touches this task's diff) timed out
+  under the CPU contention of rebuilding all 7 packages simultaneously.
+  Re-ran both in isolation (`npx vitest run test/score-sheet.test.tsx
+test/slam-timer.test.tsx` from `apps/web`): passed instantly (196ms/584ms
+  vs. the 5000ms timeout). Re-ran the full `@cambio/web` suite fresh once
+  more in isolation: 193/193 green, no flakes. Confirmed load-induced
+  flakiness in pre-existing tests, not a CAM-22 regression.
+- Forced the infra-dependent `@cambio/api` suite fresh against live
+  Postgres (`pnpm turbo test --filter @cambio/api --force`): 118/118 green
+  — this task didn't touch the backend, but the review's own rule ("a
+  cache hit is not a fresh run") applies regardless.
+- Final consolidated `pnpm turbo build typecheck lint test` from repo
+  root: 25/25 tasks green.
+
+**Advisory, out of scope for this task:** `test/score-sheet.test.tsx` and
+`test/slam-timer.test.tsx` have a 5000ms default timeout with no evident
+margin for CPU contention (both are timer/animation-adjacent tests) — worth
+a separate look if `--force` full-gate runs become routine (e.g. in CI),
+since they'll intermittently red the whole gate for reasons unrelated to
+whatever change triggered the run. Flagged as a spawned follow-up task, not
+fixed here — out of this task's scope and not a CAM-22 regression.
+
+**Carries into future tasks:** the `TextField` ref-forwarding pattern
+(plain `ref` prop, no `forwardRef`) is now precedent in `packages/ui` for
+any future component that needs imperative DOM access — the next one won't
+need to re-derive the React 19 pattern from scratch.
