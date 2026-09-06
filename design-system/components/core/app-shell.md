@@ -71,3 +71,12 @@ None.
   (connected) vs. hollow ring (reconnecting), sized from the ordinal
   scale (`size-3`, ~12px) — closes the color-only exposure the CAM-17
   judge flagged.
+- r4 (CAM-21, 2026-09-06): "the own-hand dock reserves the bottom" is
+  realized — the dock itself lives in the game screen
+  (`game-screen.tsx`'s `data-region="dock-actions"` plus the docked own
+  hand above it), not in this component; the shell's role stays exactly
+  what r2 already gave it, safe-area padding on the shell root, which the
+  screen's dock inherits for free by sitting inside `<main>`. The
+  compact viewport bound itself (`max-h-dvh` + the flex-shrink chain)
+  also lives on the game screen's own wrapper, not here — lobby and room
+  screens use this shell unchanged and inherit nothing from it.

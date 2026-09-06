@@ -20,14 +20,21 @@ The play surface — the top-down khoka table. Class: **Game object**.
   arranged radially around the asset.
 - The viewer's own seat is always at the bottom; the table rotates per
   viewer.
+- Compact art cap (CAM-21): the painted table asset's width is capped at a
+  token max-width (`--size-table-art-compact`, tokens.md) so the whole
+  composition fits the 360×640 fold — square asset, so the cap is also the
+  height cap. Regular is unaffected (the cap is cancelled there).
 
 ## States
 
 - `seating` — players joining/leaving during room phase; empty positions
   show no chip (benches are scenery, not slots).
 - `in-game` — 2–5 seats active with hands laid at each seat.
-- `compact` (< breakpoint `compact`) — the radial arrangement compresses:
-  own hand docks to the screen bottom, opponents arc along the top.
+- `compact` (< breakpoint `regular`) — the radial arrangement compresses:
+  own hand docks to the screen bottom (CAM-21: rendered by the SCREEN, not
+  this component — see r4), opponents wrap in a row along the top, each
+  seat+hand group uniformly oriented (name above hand) regardless of its
+  regular-mode arc side.
 - `game-over` — the score-sheet overlays; the table dims to
   `green-deep`-tinted rest.
 
@@ -73,3 +80,26 @@ None.
   overlay, so the terminal state visibly subordinates hands, seats, and
   ground (the disc-only scrim was almost entirely hidden behind the
   score sheet).
+- r4 (CAM-21, 2026-09-06, compact fold-fit): the docked composition —
+  "own hand docks to screen bottom" is realized. **`viewerSeat` prop**
+  (`"internal"` default | `"external"`): `external` (the game screen)
+  skips rendering the viewer's own seat wrapper here while still deriving
+  every position from the full `seats.length`, so the game screen can
+  render it itself inside its own bottom dock, outside this component's
+  scroll region; `internal` (the room screen's pre-game view, unchanged)
+  renders every seat as before. **Root is unconditionally `relative`**
+  (was `regular:relative`) so the game-over full-region rest (r3) scopes
+  to the surface at compact too — previously it resolved against
+  whatever positioned ancestor was next up the tree, a latent bug masked
+  by compact never having been viewport-bounded before this task.
+  **Compact opponent orientation is now uniform**, decoupled from the
+  regular-mode radial side (game-screen.tsx's `SeatWithHand`, not this
+  component) — see the root plan's Surprises: at 360px, a "row"-oriented
+  group (name beside hand, ~175px) only allows ~2 per wrapped line, while
+  a "column" one (name above hand, ~95px) allows 3; forcing every
+  opponent to the column form at compact was the fix that closed the
+  fold budget for 2–4 players. 5 players still don't fit the 360×640
+  floor by default (4 wide-enough groups need two wrapped rows
+  regardless of orientation) — the middle region's own scroll (the
+  screen's `data-region="table-scroll"`) is the sanctioned fallback,
+  chrome and dock stay pinned.
