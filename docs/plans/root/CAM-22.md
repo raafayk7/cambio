@@ -79,12 +79,16 @@ lint test` gate, since `TextField` is used elsewhere in `apps/web`).
 
 ### Acceptance criteria
 
-- [ ] All four functional-contract clauses above are covered by a passing
+- [x] All four functional-contract clauses above are covered by a passing
       test.
-- [ ] `pnpm turbo build typecheck lint test` passes.
+- [x] `pnpm turbo build typecheck lint test` passes.
 - [ ] Manual smoke check (optional but recommended given this bug was only
       caught by a real-device playtest): serve the app on a LAN IP and
-      confirm the fallback fires in a real insecure-context browser.
+      confirm the fallback fires in a real insecure-context browser. Skipped
+      this round — see Surprises: another session's dev server already held
+      the local ports on this shared working directory, and jsdom coverage
+      of all three branches gives solid confidence without it. Worth doing
+      before the next real playtest.
 
 ## Plan of work
 
@@ -126,7 +130,23 @@ fix):
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-06 — plan drafted and signed off
+- [x] 2026-09-06 — plan drafted and signed off
+- [x] 2026-09-06 07:00 — `TextField` gained a `ref` prop
+      ([packages/ui/src/components/text-field.tsx](../../../packages/ui/src/components/text-field.tsx)); `pnpm turbo build typecheck lint test --filter @cambio/ui` green (25 tests, no regression)
+- [x] 2026-09-06 07:02 — `copyLink` rewritten with the missing-API guard and
+      the shared `copyFailed` helper, `linkRef` wired to the room-link
+      `TextField`
+      ([apps/web/src/containers/room/room-screen.tsx](../../../apps/web/src/containers/room/room-screen.tsx));
+      `pnpm turbo build typecheck lint --filter @cambio/web` green
+- [x] 2026-09-06 07:05 — three new tests added to
+      [apps/web/test/room-screen.test.tsx](../../../apps/web/test/room-screen.test.tsx)
+      (missing API, rejecting promise, resolving promise);
+      `pnpm turbo test --filter @cambio/web` green — 20 test files, 193 tests
+      total, no regression
+- [x] 2026-09-06 07:07 — full gate `pnpm turbo build typecheck lint test`
+      green across all 25 tasks (7 packages)
+- [x] 2026-09-06 07:10 — Contract coverage table in the frontend child plan
+      filled with real test names and assertion phrases
 
 ## Decision log
 
@@ -169,8 +189,67 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
   never been exercised, incidentally or otherwise. Fixed by adding a third
   test case (Plan of work step 3, Validation) instead of treating clause 3
   as pre-covered.
+- 2026-09-06 — The optional manual LAN-IP smoke check (acceptance criteria)
+  was skipped: this repo's working directory already had another session's
+  `api`/`web` dev servers bound to ports 3001/3000, and contending for them
+  risked cross-session interference for no real gain given the jsdom suite
+  already exercises all three `copyLink` branches directly. Left as a
+  follow-up before the next live playtest rather than blocking this task on
+  it — the acceptance criterion was explicitly optional.
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+**Verdict: ship.** No findings against this task's diff survived review.
+
+**What shipped:** exactly the plan — `TextField` gained a `ref` prop
+(React 19 plain-prop pattern), `copyLink` guards for a missing
+`navigator.clipboard`/`writeText` before calling it and shares one
+`copyFailed()` helper with the rejection branch, and three new jsdom tests
+cover all three clipboard outcomes.
+
+**Contract review** (independent subagent, then verified by the reviewer
+myself): all 4 functional-contract clauses satisfied with file:line
+evidence; all 3 cited tests in the frontend child plan's Contract coverage
+table exist verbatim and assert what they claim; no scope creep. The one
+open acceptance criterion (manual LAN-IP smoke check) was pre-flagged as
+skipped and optional — not a violation.
+
+**Architecture review** (independent subagent): no violations — import
+boundaries untouched, `copyLink`/`copyFailed` are pure DOM plumbing (no
+logic migrated into the container), `TextField`'s new `ref` prop matches
+the sibling-component style in `packages/ui` exactly (same `cva` +
+plain-function-component pattern as `Button`), no design-system token/copy
+drift, no hidden-information surface touched, new tests follow the file's
+existing conventions.
+
+**Independent verification (this review cycle):**
+
+- Forced a fresh, uncached full gate (`pnpm turbo build typecheck lint
+test --force`) rather than trusting the `/implement` cycle's cached green.
+  Two unrelated tests (`test/score-sheet.test.tsx`,
+  `test/slam-timer.test.tsx` — neither touches this task's diff) timed out
+  under the CPU contention of rebuilding all 7 packages simultaneously.
+  Re-ran both in isolation (`npx vitest run test/score-sheet.test.tsx
+test/slam-timer.test.tsx` from `apps/web`): passed instantly (196ms/584ms
+  vs. the 5000ms timeout). Re-ran the full `@cambio/web` suite fresh once
+  more in isolation: 193/193 green, no flakes. Confirmed load-induced
+  flakiness in pre-existing tests, not a CAM-22 regression.
+- Forced the infra-dependent `@cambio/api` suite fresh against live
+  Postgres (`pnpm turbo test --filter @cambio/api --force`): 118/118 green
+  — this task didn't touch the backend, but the review's own rule ("a
+  cache hit is not a fresh run") applies regardless.
+- Final consolidated `pnpm turbo build typecheck lint test` from repo
+  root: 25/25 tasks green.
+
+**Advisory, out of scope for this task:** `test/score-sheet.test.tsx` and
+`test/slam-timer.test.tsx` have a 5000ms default timeout with no evident
+margin for CPU contention (both are timer/animation-adjacent tests) — worth
+a separate look if `--force` full-gate runs become routine (e.g. in CI),
+since they'll intermittently red the whole gate for reasons unrelated to
+whatever change triggered the run. Flagged as a spawned follow-up task, not
+fixed here — out of this task's scope and not a CAM-22 regression.
+
+**Carries into future tasks:** the `TextField` ref-forwarding pattern
+(plain `ref` prop, no `forwardRef`) is now precedent in `packages/ui` for
+any future component that needs imperative DOM access — the next one won't
+need to re-derive the React 19 pattern from scratch.

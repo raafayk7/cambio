@@ -108,6 +108,7 @@ function SeatedRoom({
 }) {
   const [toasts, setToasts] = React.useState<ReadonlyArray<ToastItem>>([])
   const toastSeq = React.useRef(0)
+  const linkRef = React.useRef<HTMLInputElement>(null)
   const roomUrl =
     typeof window === "undefined" ? `/room/${gameId}` : `${window.location.origin}/room/${gameId}`
 
@@ -116,17 +117,27 @@ function SeatedRoom({
     setToasts((previous) => [...previous, { ...toast, id: `copy-${toastSeq.current}` }])
   }
 
+  // Clipboard can be denied (permissions) or entirely absent (insecure
+  // context, e.g. a LAN-IP http origin — `navigator.clipboard` doesn't
+  // exist there at all) — sharing is this screen's one job, so the failure
+  // must not be silent. Falling back focuses the already-rendered room-link
+  // field, which auto-selects on focus, so the player can copy it herself.
+  const copyFailed = () => {
+    linkRef.current?.focus()
+    pushToast({
+      variant: "alarm",
+      message: "Couldn't copy. Select the link and copy it yourself.",
+    })
+  }
+
   const copyLink = () => {
-    navigator.clipboard.writeText(roomUrl).then(
-      () => pushToast({ variant: "success", message: "Link copied" }),
-      // Clipboard can be denied (permissions, insecure context) — sharing
-      // is this screen's one job, so the failure must not be silent.
-      () =>
-        pushToast({
-          variant: "alarm",
-          message: "Couldn't copy. Select the link and copy it yourself.",
-        }),
-    )
+    if (!navigator.clipboard?.writeText) {
+      copyFailed()
+      return
+    }
+    navigator.clipboard
+      .writeText(roomUrl)
+      .then(() => pushToast({ variant: "success", message: "Link copied" }), copyFailed)
   }
 
   const viewerIndex = lobby.members.findIndex((member) => member.id === viewerId)
@@ -153,6 +164,7 @@ function SeatedRoom({
         <div className="flex flex-col gap-4">
           <FieldScaffold label="Room link" helper="Share it. Friends who open it join this room.">
             <TextField
+              ref={linkRef}
               readOnly
               // Long UUIDs overflow the field; visible ellipsis beats a
               // silent mid-glyph clip (gate finding, CAM-17).

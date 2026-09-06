@@ -33,8 +33,10 @@ const textFieldVariants = cva(
 )
 
 export interface TextFieldProps
-  extends React.InputHTMLAttributes<HTMLInputElement>, VariantProps<typeof textFieldVariants> {}
+  extends React.InputHTMLAttributes<HTMLInputElement>, VariantProps<typeof textFieldVariants> {
+  ref?: React.Ref<HTMLInputElement>
+}
 
-export function TextField({ className, variant, ...props }: TextFieldProps) {
-  return <input className={cn(textFieldVariants({ variant }), className)} {...props} />
+export function TextField({ className, variant, ref, ...props }: TextFieldProps) {
+  return <input ref={ref} className={cn(textFieldVariants({ variant }), className)} {...props} />
 }
