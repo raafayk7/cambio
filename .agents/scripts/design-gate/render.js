@@ -3,6 +3,8 @@
 //
 //   node scripts/render.js --file path/to/design.html [--out tests/output/name] [--width 1280]
 //   node scripts/render.js --url http://localhost:3000 --out tests/output/name
+//   node scripts/render.js --url http://localhost:3100/game/<id> --cookie "cambio_session=<v>" \
+//     [--api-origin http://localhost:3001] --out tests/output/name   (authenticated screens)
 //   node scripts/render.js --html '<div>...</div>' --out tests/output/name
 //
 // Emits  <out>.png  (screenshot)  and  <out>.facts.json  (structured facts).
@@ -186,7 +188,28 @@ async function main() {
   mkdirSync(dirname(out), { recursive: true })
 
   const browser = await chromium.launch()
-  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 2 })
+  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 })
+
+  // --cookie "name=value": render an authenticated screen (CAM-18 lesson —
+  // most real screens sit behind a session). The cookie is set for the page
+  // URL's origin AND for --api-origin (default http://localhost:3001), so
+  // in-page fetches with credentials carry it too. URL mode only.
+  if (args.cookie && args.url) {
+    const eq = String(args.cookie).indexOf("=")
+    if (eq < 1) {
+      console.error('--cookie must be "name=value"')
+      process.exit(2)
+    }
+    const name = String(args.cookie).slice(0, eq)
+    const value = String(args.cookie).slice(eq + 1)
+    const apiOrigin = String(args["api-origin"] || "http://localhost:3001")
+    await context.addCookies([
+      { name, value, url: new URL(String(args.url)).origin },
+      { name, value, url: apiOrigin },
+    ])
+  }
+
+  const page = await context.newPage()
 
   try {
     if (args.url) {

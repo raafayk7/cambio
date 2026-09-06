@@ -205,6 +205,20 @@ line above and retry. Data persists across restarts in the `cambio-pgdata`
 volume, so starting it is always safe. Migrations are idempotent; re-run
 `pnpm --filter @cambio/api migrate` after starting if in doubt.
 
+**Distrust long-running dev servers.** A Vite dev server started in an
+earlier session serves STALE TRANSFORMS of files that have since changed
+(module-graph caching survives branch switches), and a long-lived api
+process can wedge outright. Both happened in CAM-18: an old api returned
+500s a fresh instance didn't, and a stale web transform of `button.tsx`
+produced a phantom 43px touch-target finding that reached the design
+gate's Map stage before a source-vs-served diff exposed it. Before ANY
+rendered verification, live walkthrough, or measurement against a dev
+server: verify freshness by fetching a recently-changed module through
+the server (e.g.
+`curl http://localhost:<port>/@fs/<abs-path-to-changed-file> | grep <new-symbol>`)
+and restart the server if the grep comes back empty. When in doubt,
+restart — a fresh server is cheap; a phantom finding is not.
+
 ## Frontend
 
 The design system landed in CAM-13 and the frontend harness in CAM-14; the
