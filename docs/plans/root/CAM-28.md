@@ -278,3 +278,91 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 _(filled at the end, typically by `/review`: what shipped, what was cut,
 what should carry into the next task.)_
+
+**Verdict: fix-then-ship.** All seven functional-contract clauses hold
+(re-verified independently below, not taken on the plan's word) and the
+gate is green, but two findings need a fix cycle before shipping — both
+small, bounded, no re-plan needed.
+
+**Independent verification performed during review** (a fresh, forced
+`--force` gate run, a fresh `node .agents/scripts/fill-coverage-row.test.mjs`
+run, and manual CLI probes for every clause, including ones the shipped
+test file doesn't cover):
+
+- Gate: `pnpm turbo build typecheck lint test --force` → 19/19 tasks green,
+  0 cached (confirms the earlier `/implement` gate run wasn't a stale cache
+  hit).
+- Test suite: `node .agents/scripts/fill-coverage-row.test.mjs` →
+  `✓ ALL PASS — 9 passed, 0 failed`, matching the plan's claim.
+- Clause 6 (missing args / clause not found / nothing-to-fill): **not**
+  covered by the test file at all — verified this independently by running
+  all three cases by hand (exit 2/"usage: …", exit 1/"no coverage row
+  starts with…", exit 2/"nothing to fill…") and diffing against the
+  pre-fix script (`git diff 9dc922d..HEAD`), which shows these three checks
+  are verbatim-relocated into `main()`, no logic change. Clause holds; see
+  F2 below for the process gap this exposes.
+- Symlink invocation (F1 below): reproduced independently — `node` through
+  a symlink to the script exits 0, prints nothing, and leaves the target
+  file byte-for-byte unchanged.
+- Both documented callers re-checked by direct read (not trusted from the
+  plan): `.agents/commands/implement.md:57-60` invokes with `--test`/
+  `--asserted` only, compatible with the new signature; `.agents/templates/child-plan.md:54-55`'s
+  current header is genuinely 3-column, confirming the fix targets the
+  shape actually in use.
+
+**Findings:**
+
+- **F1 (fix) — the new CLI-invocation guard silently no-ops through a
+  symlink.** `fill-coverage-row.mjs`'s `import.meta.url ===
+pathToFileURL(process.argv[1]).href` guard (added by this diff so the
+  test file can import the pure `fillRow` without triggering a CLI run)
+  resolves `import.meta.url` through the real path but leaves
+  `process.argv[1]` as whatever path was typed — invoking the script
+  through a symlink makes the comparison false, so `main()` silently never
+  runs: exit 0, no stderr, target file completely untouched. Every other
+  failure path this file has (usage error, nothing-to-fill, clause not
+  found, header not found, unsupported column count, `--planned` misuse)
+  fails loudly with a clear message; this is the one path that instead
+  looks like silent success — exactly the failure mode this task's own
+  Decision Log calls out as unacceptable for `--planned`-on-3-column
+  ("an explicit error is safer... no thrown exceptions the caller can't
+  act on"). Not a contract violation (no clause addresses invocation
+  path) and not currently reachable by either documented caller — but it's
+  a real regression the refactor introduced (the pre-fix script had no
+  such guard and always ran unconditionally), so it should be closed now
+  rather than carried forward. Fix: resolve real paths on both sides
+  before comparing (e.g. `fs.realpathSync(process.argv[1])`), so a
+  resolution failure degrades to a loud error instead of a silent no-op.
+- **F2 (fix) — Acceptance Criteria overclaims test coverage for clause 6.** `docs/plans/root/CAM-28.md`'s Acceptance Criteria states "All seven
+  contract clauses above hold, demonstrated by
+  `fill-coverage-row.test.mjs`" — false for clause 6, which has zero
+  coverage in that file (checked via `grep` — no reference to the usage
+  error, "nothing to fill", or "no coverage row starts with" messages
+  anywhere in the test file) and was not verified by any means during
+  `/implement`'s own close-out (the Progress log only re-runs clauses 1,
+  2, and 4 by hand). The underlying behavior does hold — verified above —
+  so this is a process/documentation gap, not a functional defect. Swept
+  the rest of the plan doc for the same claim in other phrasings (Plan of
+  Work, Validation, Progress sections): no other instance overclaims
+  clause-6 coverage — Plan of Work §2 correctly scopes the test file to
+  "clauses 1-5," and Progress correctly lists only 1/2/4 as manually
+  re-verified. Fix: either add clause-6 cases to the test file (preferred
+  — closes the gap permanently) or correct the Acceptance Criteria wording
+  to state clause 6 was verified by manual CLI run, not by the automated
+  suite. Same fix cycle should also add coverage for the header-not-found
+  error path (`fill-coverage-row.mjs:77-83`, the new backward-walk that
+  locates a table's header) — a behavior this diff introduced as a
+  necessary consequence of shape detection, with no functional-contract
+  clause naming it and no test at any level exercising it.
+
+**Not findings (checked and cleared):** header-location logic correctness
+across multi-table files and missing-header files (architecture reviewer
+constructed both scratch cases; independently spot-checked the multi-table
+claim's logic by tracing the backward-walk regex by hand — no off-by-one
+found); scope creep (diff touches exactly the two script files plus this
+plan doc, confirmed via `git diff 9dc922d..HEAD --stat`); error-exit-code
+consistency (2 for usage errors, 1 for data/runtime errors, preserved from
+the pre-fix file); ADR-0028 routing and guard-rail reasoning.
+
+**Carries into the fix cycle:** F1 and F2 above. No ADR or architecture-skill
+implications — this stays entirely within `.agents/scripts/`.
