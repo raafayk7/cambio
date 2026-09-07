@@ -225,7 +225,7 @@ describe("slam expiry nudge (C2, C5)", () => {
     expect(screen.queryByRole("progressbar", { name: "Slam window" })).not.toBeInTheDocument()
   })
 
-  it("unmounting mid-loop leaks no timers: no unhandled errors, and the GET count freezes", async () => {
+  it("unmounting between attempts leaks no timers: no unhandled errors, and the GET count freezes", async () => {
     const fake = setupFake()
     const { calls } = stubApi({
       "GET /me": json(200, ME),
@@ -248,6 +248,56 @@ describe("slam expiry nudge (C2, C5)", () => {
         vi.advanceTimersByTime(2000 * 10)
       })
     }).not.toThrow()
+    expect(getViewCount(calls)).toBe(getsAtUnmount)
+  })
+
+  it("unmounting with a nudge fetch IN FLIGHT cancels the loop — the settling fetch must not re-arm it (review finding 1)", async () => {
+    const fake = setupFake()
+
+    // The next attempt's fetch is held open across the unmount: the
+    // deferred handler resolves only after cleanup(), exercising the
+    // settling `.then`'s cancellation guard against a torn-down hook.
+    let releaseInFlight: ((r: Response) => void) | null = null
+    const staleResponse = () =>
+      new Response(JSON.stringify(expiredSlamView()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    const { handlers, calls } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, expiredSlamView()),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const getsBefore = getViewCount(calls)
+    await waitFor(() => {
+      expect(getViewCount(calls)).toBeGreaterThan(getsBefore)
+    })
+
+    handlers[GET_VIEW] = (() =>
+      new Promise<Response>((resolve) => {
+        releaseInFlight = resolve
+      })) as unknown as () => Response
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100)
+    })
+    expect(releaseInFlight).not.toBeNull()
+
+    cleanup()
+    const getsAtUnmount = getViewCount(calls)
+
+    // Resolve the in-flight fetch only now, after unmount; keep answering
+    // stale so a still-alive loop would visibly keep nudging.
+    handlers[GET_VIEW] = staleResponse
+    releaseInFlight!(staleResponse())
+    for (let i = 0; i < 6; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2100)
+      })
+    }
+
     expect(getViewCount(calls)).toBe(getsAtUnmount)
   })
 })

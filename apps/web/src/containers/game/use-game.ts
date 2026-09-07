@@ -148,15 +148,18 @@ function isNewerVersion(lastVersion: number, incomingVersion: number): boolean {
 }
 
 /**
- * CAM-26 C5: the nudge loop's "no progress yet" test. Inspects the FETCHED
- * result of a refetch (never the applied cache — the version guard drops an
- * equal-version response before it ever reaches the cache, which is
- * expected and correct, not a bug to work around). A missing result (a
- * failed fetch) counts as no progress, so the loop keeps trying rather than
- * stopping on a transient network error. Anything other than "still the
- * exact same open window, at a version no newer than when it expired" —
- * a different phase, a different `closesAt`, or a newer version — is
- * progress.
+ * CAM-26 C5: the nudge loop's "no progress yet" test. The real discipline
+ * is that the loop never REQUIRES its own response to be applied: on the
+ * guard-dropped path the query fn resolves with the existing cache (see
+ * `queryFn` above), so `data` here may well BE the cached snapshot — and
+ * that is fine, because a stale nudge response and the stale cache describe
+ * the identical window, while a cache that moved ahead (a
+ * broadcast-triggered refetch applied a newer version) correctly reads as
+ * progress and ends the loop. A missing result counts as no progress, so
+ * the loop keeps trying rather than stopping on a transient failure.
+ * Anything other than "still the exact same open window, at a version no
+ * newer than when it expired" — a different phase, a different `closesAt`,
+ * or a newer version — is progress.
  */
 function isSameStaleWindow(
   data: ViewResponse | undefined,
@@ -290,9 +293,13 @@ export function useGame(gameId: string) {
   React.useEffect(() => {
     return () => {
       if (refetchTimeoutRef.current !== null) window.clearTimeout(refetchTimeoutRef.current)
-      if (nudgeTimeoutRef.current !== null) window.clearTimeout(nudgeTimeoutRef.current)
+      // clearNudge (not just its timeout): a nudge fetch in flight at
+      // unmount re-checks `nudgeStateRef` when it settles — only nulling
+      // the state here makes `runNudge`'s cancellation guard actually
+      // catch unmount (CAM-26 review finding 1).
+      clearNudge()
     }
-  }, [])
+  }, [clearNudge])
 
   // ---- ephemeral display state (hazard 3, C5, T3-T5): React state that
   // never touches the query cache — a peek/beat/error lives here for its

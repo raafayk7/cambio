@@ -217,6 +217,11 @@ timestamp each entry)_
       mid-window walkthrough performed against a real (non-test) dev api
       process — see Surprises for the full transcript. All acceptance
       criteria met.
+- [x] 2026-09-07 — review fix cycle: all nine findings RESOLVED (see
+      Outcomes & retrospective for the branch taken per finding — code +
+      strengthened tests for 1 and 3; claim amendments for 2, 4–8;
+      gallery specimen for 9). Sweeps re-run; suites re-run fresh + full
+      gate; re-review below flipped the verdict to ship.
 
 ## Decision log
 
@@ -246,6 +251,12 @@ timestamp each entry)_
   `SlamTooLate`; UX-safe because CAM-23 already remaps `WrongPhase` →
   slam-too-late copy for `Slam` commands. The two restart tests are
   updated deliberately (accept either ordering or pin the new one).
+  _Resolved at review (2026-09-07): the race cannot happen — queue
+  serialization means a bootstrap-armed timer only enqueues `TimerClose`
+  behind the in-flight envelope, so the late slam is always judged first;
+  `SlamTooLate` is deterministic, both tests kept their assertions, only
+  comments changed (review finding 5; ADR-0037 Consequences amended to
+  match)._
 - 2026-09-07 — **No boot-time sweep of in-progress games** — rejected in
   ADR-0037 (demand-driven poke covers it; a sleeping host can't sweep).
 
@@ -359,7 +370,13 @@ test` exit 0; then, because 24/25 tasks were cache hits, a forced fresh
    microtasks. **Fix:** call `clearNudge()` in the cleanup; strengthen
    the unmount test to hold a fetch in flight across `cleanup()` (deferred
    handler + `advanceTimersByTimeAsync`), which fails against today's
-   code. RESOLUTION: _(fix cycle)_
+   code. RESOLUTION: **RESOLVED 2026-09-07 — code fixed AND test
+   strengthened.** The cleanup now calls `clearNudge()` (nulling
+   `nudgeStateRef` so the settling fetch's cancellation guard catches
+   unmount), and a new test in `slam-expiry-nudge.test.tsx` holds a
+   deferred fetch in flight across `cleanup()` then advances async timers
+   — the review probe's exact failing scenario, now green; the old
+   unmount test was renamed to "between attempts" to say what it covers.
 2. **[coverage overclaim] S1's Execute-bootstrap arming has no pinning
    test.** The backend coverage table's S1 row cites the `SlamTiming`
    restart test as asserting "bootstrap arms a timer", but that test's own
@@ -371,14 +388,24 @@ test` exit 0; then, because 24/25 tasks were cache hits, a forced fresh
    amend the S1 row to state the pin covers the Poke-path load only, with
    the Execute-half documented as unpinned-by-redundancy. Sweep: backend
    coverage S1 row; backend Progress step 2 ("7 new tests" — actually 6
-   new + 1 deliberately rewritten). RESOLUTION: _(fix cycle)_
+   new + 1 deliberately rewritten). RESOLUTION: **RESOLVED 2026-09-07 —
+   claim amended** (the arming is externally indistinguishable from the
+   envelope-end `manageTimer`, so no isolating test is possible without a
+   contrived short-circuit): the S1 row now cites only the poke test and
+   documents the `Execute`-bootstrap site as unpinned-by-redundancy; the
+   Progress count reads "6 new + 1 deliberately rewritten".
 3. **[coverage phrase mismatch] Frontend C3 row overstates its test.**
    "a decoded event right after is still handled normally" — the test
    bodies (`game-screen.test.tsx` C3 pair) only assert another `+1` GET,
    which passes even if the decode guard were inverted and the handler
    never ran. **Fix:** strengthen the follow-up assertion to observe a
    handled effect (choreography/state), or amend the phrase to what is
-   asserted. RESOLUTION: _(fix cycle)_
+   asserted. RESOLUTION: **RESOLVED 2026-09-07 — test strengthened** (the
+   preferred branch): both decoded follow-ups now land observable handled
+   effects — the room case emits `CardPeeked` and asserts the selected
+   slot beat; the player case emits `PrivateCardPeeked` and asserts the
+   revealed rank — in addition to their refetch counts; the coverage
+   phrase was updated to name those assertions.
 4. **[load-bearing comment false] `isSameStaleWindow`'s docblock**
    (`use-game.ts:150-159`) claims it inspects "the FETCHED result … never
    the applied cache"; on exactly the guard-dropped path it describes, the
@@ -386,7 +413,11 @@ test` exit 0; then, because 24/25 tasks were cache hits, a forced fresh
    (Corollary: the `data === undefined` branch is unreachable from this
    call path.) Behavior is correct; the C5 rationale comment is not.
    **Fix:** rewrite to the true discipline — "the loop never requires its
-   own response to be _applied_". RESOLUTION: _(fix cycle)_
+   own response to be _applied_". RESOLUTION: **RESOLVED 2026-09-07 —
+   claim amended**: the docblock now states the real discipline (the loop
+   never requires its own response applied; `data` may be the cache on
+   the guard-dropped path, and a cache that moved ahead reads as
+   progress).
 5. **[ADR accuracy] ADR-0037's Consequences describes an outcome that
    didn't happen.** It predicts restart tests may flip `SlamTooLate` →
    `WrongPhase` "when the close wins the race" and says the tests were
@@ -400,12 +431,21 @@ test` exit 0; then, because 24/25 tasks were cache hits, a forced fresh
    Decision stands) and correct both test comments. Sweep the root
    Decision Log's arm-only entry for the same "accept either ordering"
    phrasing and annotate it resolved-deterministic. RESOLUTION:
-   _(fix cycle)_
+   **RESOLVED 2026-09-07 — claim amended everywhere**: ADR-0037's
+   Consequences carries a dated amendment (queue serialization forecloses
+   the race; assertions unchanged, comments-only updates); both test
+   comments now credit queue serialization; the root Decision Log entry
+   carries a resolved-deterministic note. Sweep re-run across all four
+   task docs: the remaining `WrongPhase`/"either ordering" hits are the
+   backend plan's accurate conditional prose (its Step 3 correctly says
+   `WrongPhase` needs a _second_ envelope) and this retrospective itself.
 6. **[misdirected citation] `config.ts` and `.env.example` cite
    "CAM-26/ADR-0037" for the 7500 default**, but ADR-0037 carries no
    duration decision — it lives in this plan's Decision Log. **Fix:**
    re-point both comments at the root plan's Decision Log (or add the
-   duration line to 0037). RESOLUTION: _(fix cycle)_
+   duration line to 0037). RESOLUTION: **RESOLVED 2026-09-07 — claim
+   amended**: both comments now point at the root plan's Decision Log
+   explicitly ("not ADR-0037").
 7. **[comment narrower than code + unlogged widening] The Poke eviction
    comment** (`RoomRegistry.ts:286-291`) attributes `evict = true` to
    "no game row", but `reload` swallows _every_ failure identically, so a
@@ -414,18 +454,24 @@ test` exit 0; then, because 24/25 tasks were cache hits, a forced fresh
    but ADR-0020's "eviction on game end only" has silently widened.
    **Fix:** correct the comment; add one sentence to ADR-0037's
    Consequences acknowledging poke-path eviction of dead/unloadable
-   rooms. RESOLUTION: _(fix cycle)_
+   rooms. RESOLUTION: **RESOLVED 2026-09-07 — claim amended**: the
+   `RoomRegistry` comment now names the transient-`StorageError` path and
+   the sticky `evict` flag; ADR-0037's Consequences gained the
+   eviction-widening sentence with a dated amendment note.
 8. **[stale plan note] Frontend plan's closing Surprise** still reports
    the repo-wide gate red at `//#format:check` on
    `EndToEndGame.test.ts` — resolved by the backend lane before M3; the
    gate is green. **Fix:** annotate the Surprise as resolved.
-   RESOLUTION: _(fix cycle)_
+   RESOLUTION: **RESOLVED 2026-09-07 — claim amended** (annotation added
+   to the frontend plan's Surprise).
 9. **[convention gap] No gallery specimen for the new canonical
    `slam-window` deck state.** Every other canonical `DrawDeck` state has
    a `StateCard` in `apps/web/src/components/gallery/game.tsx`, including
    both r2 additions and the two precedents this change cites
    (`slamTarget`, `slamEligible`). **Fix:** add the StateCard.
-   RESOLUTION: _(fix cycle)_
+   RESOLUTION: **RESOLVED 2026-09-07** — `StateCard` "deck slam-window
+   (CAM-26 C4)" added to the gallery's deck section, using the canonical
+   prop only.
 
 ### Advisory (no action required; recorded for future tasks)
 

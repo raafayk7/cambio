@@ -36,7 +36,8 @@ export const AppConfig = Config.all({
   )("SESSION_COOKIE_SAMESITE").pipe(Config.withDefault("lax" as const)),
   /**
    * Slam window duration fed into `GameConfig` at start (ADR-0011: config,
-   * never a literal). 7500 (CAM-26/ADR-0037) is a middle ground: CAM-23
+   * never a literal). 7500 (CAM-26 — the duration call lives in the root
+   * plan's Decision Log, not ADR-0037) is a middle ground: CAM-23
    * raised the original 5000 to 10000 because the give-pick flow was
    * burning the window before a player could complete it, but CAM-23 also
    * shipped a pre-armed "Ready a give" flow that removes most of that

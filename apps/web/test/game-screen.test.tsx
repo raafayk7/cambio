@@ -292,11 +292,21 @@ describe("version guard + refetch authority (C2, ADR-0033)", () => {
     })
 
     // The handler skip is surgical — only the early return moved. A decoded
-    // event right after still goes through the normal path.
+    // event right after still goes through the normal path, proven by its
+    // choreography landing (the peek beat's selected treatment), not just
+    // by another refetch — an inverted decode guard would still refetch
+    // but could never produce this DOM effect (review finding 3).
     const getsAfterGarbage = calls.filter((call) => call === GET_VIEW).length
     act(() => {
-      room.emit("CardDrawn", { _tag: "CardDrawn", playerId: ME.userId })
+      room.emit("CardPeeked", {
+        _tag: "CardPeeked",
+        viewerId: FRIEND.id,
+        target: { playerId: ME.userId, slotIndex: 2 },
+      })
     })
+    expect(
+      document.querySelector(`[data-flight-anchor="slot:${ME.userId}:2"] [data-selected="true"]`),
+    ).not.toBeNull()
     await waitFor(() => {
       expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsAfterGarbage + 1)
     })
@@ -317,10 +327,18 @@ describe("version guard + refetch authority (C2, ADR-0033)", () => {
       expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsBefore + 1)
     })
 
+    // Same discipline as the room case: the decoded follow-up must land its
+    // handled effect (the private peek's revealed rank), not merely another
+    // refetch (review finding 3).
     const getsAfterGarbage = calls.filter((call) => call === GET_VIEW).length
     act(() => {
-      player.emit("PrivateCardDrawn", { _tag: "PrivateCardDrawn", card: "AS" })
+      player.emit("PrivateCardPeeked", {
+        _tag: "PrivateCardPeeked",
+        target: { playerId: ME.userId, slotIndex: 0 },
+        card: "7H",
+      })
     })
+    expect(screen.getByText("7")).toBeInTheDocument()
     await waitFor(() => {
       expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsAfterGarbage + 1)
     })

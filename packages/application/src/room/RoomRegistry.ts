@@ -283,11 +283,17 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
               // (or the actor already gone) and does nothing further.
               if (cache === null) yield* reload
               if (cache === null || cache.state.phase._tag === "Ended") {
-                // A dead/unknown room must not linger just because it was
-                // poked (ADR-0037): a failed load (no game row — unknown id
-                // or a lobby-only room the route never pokes in practice)
-                // and an already-Ended game both drain via the existing
-                // empty-queue eviction path below, never a special case.
+                // A dead-or-unloadable room must not linger just because it
+                // was poked (ADR-0037): ANY failed load lands here —
+                // usually no game row (unknown id, or a lobby-only room the
+                // route never pokes in practice), but also a transient
+                // StorageError, since `reload` swallows every failure
+                // identically — as does an already-Ended game. All drain
+                // via the existing empty-queue eviction path below, never a
+                // special case; eviction is free because rooms are
+                // reconstructible from rows, and `evict`, once set, stays
+                // set for this actor's life (a fresh actor rebuilds on the
+                // next envelope).
                 evict = true
               }
               yield* closeIfDue

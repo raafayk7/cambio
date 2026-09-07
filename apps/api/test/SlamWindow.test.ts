@@ -653,12 +653,13 @@ describe("SlamWindow e2e (CAM-7)", () => {
 
       // (a) CAM-26 (S1): the rebuilt actor's bootstrap now itself arms a
       // zero-duration timer for the persisted, past-due SlamWindow — it no
-      // longer arms nothing. But the late slam IS the bootstrapping
-      // envelope (a fresh POST is the first thing this process's actor
-      // ever sees for this room), so it is judged against the still-open
-      // cached phase before that freshly-forked timer fiber can be
-      // scheduled and enqueue its own TimerClose — verified below by the
-      // refusal still reading SlamTooLate, never WrongPhase. Once that
+      // longer arms nothing. The late slam still reads SlamTooLate (never
+      // WrongPhase) by QUEUE SERIALIZATION, not scheduling luck: the late
+      // slam IS the bootstrapping envelope (a fresh POST is the first
+      // thing this process's actor ever sees for this room), and the timer
+      // fiber can only enqueue a TimerClose ENVELOPE behind it — the slam
+      // is judged inside its own in-flight envelope, deterministically,
+      // however fast the fiber fires (CAM-26 review finding 5). Once that
       // envelope finishes, its own trailing re-arm (again zero-duration,
       // since the window is still past due) means the close below may
       // arrive via that timer or via (b)'s lazy path — ADR-0020 pins their
