@@ -542,6 +542,92 @@ describe("SlamWindow e2e (CAM-7)", () => {
     }
   }, 30_000)
 
+  it("GET view pokes the room actor: an expired window closes via the read, unprompted by any command (S3+S5, CAM-26)", async () => {
+    const world = await makeWorld(BIG)
+    try {
+      const phase = await world.driveToWindow()
+      world.setNow(phase.closesAt + 1)
+      clearPublisherJournal()
+
+      const viewRes = await world.app.inject({
+        method: "GET",
+        url: `/games/${world.gameId}/view`,
+        cookies: { cambio_session: world.players[0]!.cookie },
+      })
+      expect(viewRes.statusCode).toBe(200)
+      const viewBody = viewRes.json() as { view: PlayerGameView; version: number }
+      // The response shape and status are byte-identical to today: the
+      // direct row read remains the source, so this reply may still show
+      // the (now expired) window at the unchanged version — the poke is a
+      // liveness nudge to the actor, never a rewrite of this response.
+      expect(viewBody.view).toEqual(
+        viewFor(toUserId(world.players[0]!.userId), world.state, world.nameById),
+      )
+      expect(viewBody.version).toBe(world.lastVersion)
+
+      // Deadline-poll — never a bare sleep-and-assert (same idiom as "the
+      // timer-fired close arrives ... unprompted (C1.6)" above): the
+      // poke-triggered close runs asynchronously on the actor, with no
+      // command ever posted by this test.
+      const deadline = Date.now() + 10_000
+      let closeEntries = world.gameEntries()
+      while (closeEntries.length === 0 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 25))
+        closeEntries = world.gameEntries()
+      }
+      expect(closeEntries.length, "poke-triggered close published within the deadline").toBe(1)
+      expect(closeEntries[0]!.events.map((e) => e._tag)).toEqual([
+        "SlamWindowClosed",
+        "TurnAdvanced",
+      ])
+
+      // The game moves: the next player's command over HTTP succeeds
+      // against the now-closed window — the same S5 publish path a timer
+      // close would have used, proven by a second command landing cleanly.
+      world.state = apply(world.state, { _tag: "CloseSlamWindow" }, world.now)
+      await world.step(choose(world.state, world.now))
+      expect(world.gameEntries().length).toBe(2) // close batch + command batch
+    } finally {
+      await world.close()
+    }
+  }, 30_000)
+
+  it("GET view while the window is still open: the poke is inert, a subsequent slam still succeeds (S4, CAM-26)", async () => {
+    const world = await makeWorld(BIG)
+    try {
+      await world.driveToWindow()
+      clearPublisherJournal()
+
+      const viewRes = await world.app.inject({
+        method: "GET",
+        url: `/games/${world.gameId}/view`,
+        cookies: { cambio_session: world.players[0]!.cookie },
+      })
+      expect(viewRes.statusCode).toBe(200)
+
+      // A fixed grace window is the right shape for a negative claim
+      // ("nothing happened") — there is no positive event to deadline-poll
+      // for (mirrors the stale-timer check in the application-layer suite).
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      expect(world.gameEntries()).toEqual([])
+
+      // The window still functions exactly as before: a slam attempted
+      // afterward succeeds — the read changed nothing about the game.
+      if (world.state.phase._tag !== "SlamWindow") throw new Error("unreachable")
+      const owner = world.players[1]!.userId
+      const { matching } = classify(world.state, world.state.phase.rank, owner)
+      expect(matching.length).toBeGreaterThan(0)
+      const slam = slamCandidate(world, owner, {
+        playerId: owner,
+        slotIndex: matching[0]!.slotIndex,
+      })
+      await world.step(slam)
+      expect(world.gameEntries().length).toBe(1)
+    } finally {
+      await world.close()
+    }
+  }, 30_000)
+
   it("restart mid-window over the same rows: late slam 422, window closed exactly once before the next command (C4.2)", async () => {
     const worldOne = await makeWorld(BIG)
     let phase: Extract<GameState["phase"], { _tag: "SlamWindow" }>
@@ -565,12 +651,18 @@ describe("SlamWindow e2e (CAM-7)", () => {
       )
       expect(lateSlam).toBeDefined()
 
-      // (a) The rebuilt actor loads the persisted SlamWindow (its bootstrap
-      // arms nothing) and judges the slam against the stored closesAt: too
-      // late. The refused envelope then re-arms a zero-duration timer, so
-      // the close below may arrive via that timer or via (b)'s lazy path —
-      // ADR-0020 pins their equivalence and the journal reads the same
-      // either way.
+      // (a) CAM-26 (S1): the rebuilt actor's bootstrap now itself arms a
+      // zero-duration timer for the persisted, past-due SlamWindow — it no
+      // longer arms nothing. But the late slam IS the bootstrapping
+      // envelope (a fresh POST is the first thing this process's actor
+      // ever sees for this room), so it is judged against the still-open
+      // cached phase before that freshly-forked timer fiber can be
+      // scheduled and enqueue its own TimerClose — verified below by the
+      // refusal still reading SlamTooLate, never WrongPhase. Once that
+      // envelope finishes, its own trailing re-arm (again zero-duration,
+      // since the window is still past due) means the close below may
+      // arrive via that timer or via (b)'s lazy path — ADR-0020 pins their
+      // equivalence and the journal reads the same either way.
       clearPublisherJournal()
       const lateRes = await app.inject({
         method: "POST",

@@ -273,6 +273,58 @@ describe("version guard + refetch authority (C2, ADR-0033)", () => {
       expect(screen.getByLabelText("10 cards in the draw deck")).toBeInTheDocument()
     })
   })
+
+  it("a room broadcast that fails to decode still schedules a refetch, and a decoded follow-up still works (C3)", async () => {
+    const fake = setupFake()
+    const { calls } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+    const getsBefore = calls.filter((call) => call === GET_VIEW).length
+
+    // No choreography, no crash — but ADR-0033 still holds: the refetch is
+    // the authority, so an undecodable trigger must still trigger it.
+    act(() => {
+      room.emit("GameEvent", { not: "a game event" })
+    })
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsBefore + 1)
+    })
+
+    // The handler skip is surgical — only the early return moved. A decoded
+    // event right after still goes through the normal path.
+    const getsAfterGarbage = calls.filter((call) => call === GET_VIEW).length
+    act(() => {
+      room.emit("CardDrawn", { _tag: "CardDrawn", playerId: ME.userId })
+    })
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsAfterGarbage + 1)
+    })
+  })
+
+  it("a player broadcast that fails to decode still schedules a refetch, and a decoded follow-up still works (C3)", async () => {
+    const fake = setupFake()
+    const { calls } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { player } = await channelsReady(fake)
+    const getsBefore = calls.filter((call) => call === GET_VIEW).length
+
+    act(() => {
+      player.emit("PlayerEvent", { not: "a game event" })
+    })
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsBefore + 1)
+    })
+
+    const getsAfterGarbage = calls.filter((call) => call === GET_VIEW).length
+    act(() => {
+      player.emit("PrivateCardDrawn", { _tag: "PrivateCardDrawn", card: "AS" })
+    })
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsAfterGarbage + 1)
+    })
+  })
 })
 
 describe("denials and errors (C3)", () => {
@@ -844,6 +896,23 @@ describe("slam window rendering + targeting (SL1)", () => {
 
     const bar = screen.getByRole("progressbar", { name: "Slam window" })
     expect(bar).toHaveAttribute("aria-valuemax", "8000")
+  })
+
+  it("(CAM-26 C4) the draw deck carries the slam-window state while the window is open, driven off slamPhase like DiscardPile's slamTarget", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    expect(document.querySelector('[data-flight-anchor="deck"]')).toHaveAttribute(
+      "data-state",
+      "slam-window",
+    )
   })
 
   it("renders no slam timer outside the SlamWindow phase (ADR-0012, empty discard pile)", async () => {

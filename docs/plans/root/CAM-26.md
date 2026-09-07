@@ -146,15 +146,15 @@ whose `closesAt` has passed per the authoritative `ClockPort`.
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes.
-- [ ] Every S/C clause above has a row in a child plan's contract coverage
+- [x] `pnpm turbo build typecheck lint test` passes.
+- [x] Every S/C clause above has a row in a child plan's contract coverage
       table with a landed test (or a documented reason none can).
-- [ ] The two restart tests that pinned "bootstrap arms nothing"
+- [x] The two restart tests that pinned "bootstrap arms nothing"
       (`apps/api/test/SlamWindow.test.ts` restart case,
       `packages/application/test/SlamTiming.test.ts` restart case) are
       deliberately updated for the new arming behavior, not deleted.
-- [ ] F1's finding is posted to CAM-26.
-- [ ] Manual liveness check: with the api running and a game mid-window,
+- [x] F1's finding is posted to CAM-26.
+- [x] Manual liveness check: with the api running and a game mid-window,
       kill and restart the api; after the window's `closesAt` passes, a
       page refresh (or the client's own nudge) unsticks the game.
 
@@ -203,7 +203,20 @@ that's the new fixture). S7/S8 close the brief's named test gaps.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-07 — planning complete; implementation not started
+- [x] 2026-09-07 — planning complete; implementation not started
+- [x] 2026-09-07 — M0 forensics done: no persisted stall found in any
+      2026-09-06 game; finding posted to CAM-26 (see Surprises).
+- [x] 2026-09-07 — M1 (backend, S1–S8, F1) and M2 (frontend, C1–C5)
+      implemented in parallel on the task branch — both lanes' full
+      per-package gates green independently; see
+      [backend](../backend/CAM-26.md) and [frontend](../frontend/CAM-26.md)
+      child plans' Progress sections for step-by-step detail.
+- [x] 2026-09-07 — M3 integration pass: repo-wide
+      `pnpm turbo build typecheck lint test` green (25/25 tasks, run bare,
+      exit 0) once both lanes landed on the same tree. Manual restart-
+      mid-window walkthrough performed against a real (non-test) dev api
+      process — see Surprises for the full transcript. All acceptance
+      criteria met.
 
 ## Decision log
 
@@ -250,6 +263,54 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 - 2026-09-07 (planning) — `VersionConflict` doesn't merely fail to arm; it
   actively interrupts the live timer (`manageTimer` leads with
   `clearTimer`). The window is more stranded after a conflict than before.
+- 2026-09-07 (M0 forensics) — **F1 finding: no persisted evidence of a
+  stall.** Queried `game_events` for every 2026-09-06 game with exactly 2
+  players (13 games, all Raafay vs. Moony). Of those, 3 contain a
+  `SlamFailed` whose `target.playerId` differs from the slammer (the
+  "false slam on the opponent's card" shape the report describes):
+  `22ffe19d-ec92-41c8-a730-52f51d32e648`,
+  `e11e92cd-2f14-4f0e-8347-8692cb159ff8`,
+  `f89ce987-e181-484b-a249-692f5d0f281f`. In all three, the ordered log
+  (by `seq`) shows `SlamFailed` → `PenaltyDrawn` → `SlamWindowClosed` →
+  `TurnAdvanced` landing correctly on the opponent, with no gap and no
+  stall. No 2026-09-06 game is currently persisted in a `SlamWindow`
+  phase, and no game's log shows a false slam with no following
+  close/turn-advance. **Classification: the reported incident left no
+  trace of an actual liveness failure in the durable event log** — this
+  supports the ticket's own "mundane alternative" hypothesis (the
+  give-slot prompt appearing before the outcome, plus the ~1200ms public
+  reveal, being misread as a stall) over a reproduction of the structural
+  defect. The structural defect itself (no recovery path for a genuinely
+  stale `SlamWindow`) is real and independently confirmed by code
+  inspection (see Context & orientation above) — this task fixes it
+  regardless of whether this specific incident was its cause. Posted to
+  CAM-26 as a comment.
+- 2026-09-07 (M3, manual liveness check) — **live walkthrough against a
+  real dev api process (not a test harness), confirming all four recovery
+  layers end to end.** Started `apps/api`'s dev server, created two real
+  users (Alice, Bob) via `POST /users`, formed a lobby, joined, and
+  started a 2-player game over plain HTTP/curl. Alice drew and discarded
+  a 4♦, opening a `SlamWindow` (`closesAt` ~5.5s out, version 5). Then:
+  killed the api process outright (simulating a crash — the in-memory
+  `RoomRegistry` actor and its timer fiber are gone, nothing but the
+  persisted Postgres row survives); slept past `closesAt` with the api
+  still down; restarted the api fresh (a brand-new process, cold
+  `RoomRegistry`, no in-memory state at all); then, as Bob, did a plain
+  `GET /games/:id/view` — the same request a page refresh makes. The
+  first response still showed the stale `SlamWindow` at version 5
+  (expected — S3's read stays a direct, unserialized row read; the
+  poke's effect is fire-and-forget and lands slightly after the
+  response). A **second** `GET /view` one second later (the "client's
+  own nudge" round-trip C2 models) showed `AwaitingDraw` for Bob at
+  version 6 — the window had closed and the turn had advanced, with no
+  command ever sent and no server code running continuously in between.
+  Confirmed for real, not just observed: Bob's `DrawFromDeck` immediately
+  succeeded (200, version 7), proving the game was genuinely live again,
+  not just showing a different phase tag. This is the acceptance
+  criterion's exact scenario (kill+restart mid-window, refresh unsticks
+  the game), performed against real process boundaries and real
+  wall-clock time rather than the application/API test harnesses'
+  simulated restarts and settable clocks.
 
 ## Outcomes & retrospective
 

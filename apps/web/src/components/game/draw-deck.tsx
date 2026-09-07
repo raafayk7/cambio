@@ -1,7 +1,7 @@
 import { Badge, cn } from "@cambio/ui"
 
 /**
- * DrawDeck — design-system/components/core/draw-deck.md (r2, CAM-18).
+ * DrawDeck — design-system/components/core/draw-deck.md (r3, CAM-26).
  * Class: Game object.
  *
  * The face-down stock: a 2–3 offset stack of card backs + a count badge.
@@ -15,6 +15,14 @@ import { Badge, cn } from "@cambio/ui"
  * `draw` choreography states (occupancy-independent — they render for the
  * duration of their flight regardless of `count`'s populated/low/empty
  * split), and `data-flight-anchor="deck"` so a flight can find it.
+ *
+ * r3 (CAM-26 C4): `slamWindow` — a phase overlay (not a `state` member;
+ * mirrors `DiscardPile.slamTarget`) so it composes with an in-flight
+ * choreography state instead of forcing a false either/or. Presentational
+ * only: no button, no copy — the deck was the one silent participant while
+ * a slam window was open (root plan), so this only makes that state
+ * visible, using the same alarm-frame idiom as `PlayingCard`'s
+ * `slamEligible` and the discard's `slamTarget` echo of it.
  */
 export interface DrawDeckProps {
   count: number
@@ -27,10 +35,16 @@ export interface DrawDeckProps {
    * are choreography states, independent of the populated/low/empty count
    * split above. */
   state?: "reshuffling" | "draw"
+  /** The slam window is open (CAM-26 C4): a quiet alarm frame + soft pulse
+   * on the stack, independent of the populated/low/empty split and of
+   * `count` (a window can be open over an empty deck). A choreography
+   * `state`, if present, still wins on `data-state` — mirrors
+   * `DiscardPile`'s `receiving`-over-`slamTarget` precedence. */
+  slamWindow?: boolean
   className?: string
 }
 
-export function DrawDeck({ count, onClick, state, className }: DrawDeckProps) {
+export function DrawDeck({ count, onClick, state, slamWindow = false, className }: DrawDeckProps) {
   const low = count <= 5
   const layers = Math.min(3, Math.max(1, count))
 
@@ -64,9 +78,23 @@ export function DrawDeck({ count, onClick, state, className }: DrawDeckProps) {
   return (
     <div
       data-flight-anchor="deck"
-      data-state={state ?? (count === 0 ? "empty" : low ? "low" : "populated")}
+      data-state={
+        state ?? (slamWindow ? "slam-window" : count === 0 ? "empty" : low ? "low" : "populated")
+      }
       className={cn("relative w-fit", className)}
     >
+      {slamWindow ? (
+        // Same alarm-frame idiom as `PlayingCard`'s `slamEligible` overlay
+        // (`playing-card.tsx`) and the discard's `slamTarget` echo of it —
+        // deck and discard pulse as one system while the window is open.
+        // A sibling of `stack`, not nested inside it: `inset-0` on this
+        // `relative w-fit` parent lands on the stack's own footprint
+        // (card-md) regardless of the populated/empty branch above.
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-10 card-frame card-md border-2 border-accent-alarm animate-pulse-soft"
+        />
+      ) : null}
       {onClick !== undefined ? (
         <button
           type="button"

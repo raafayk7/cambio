@@ -42,6 +42,17 @@ export type GameDenial = "no-access"
 const REFETCH_DEBOUNCE_MS = 100
 
 /**
+ * CAM-26 C2 (ADR-0037 layer 4): the bounded client expiry nudge. Liveness
+ * mechanics, not design values — plain hook constants rather than tokens
+ * (frontend child plan Decisions), named so tests read intent. Roughly 2s
+ * between nudges, capped at 5 attempts before falling back to the existing
+ * `onResubscribe` recovery — none of ADR-0037's four layers is individually
+ * load-bearing.
+ */
+const NUDGE_INTERVAL_MS = 2000
+const NUDGE_MAX_ATTEMPTS = 5
+
+/**
  * Mirrors `--duration-peek` (`packages/ui/src/styles.css`, tokens.md
  * `duration.peek` = 2800ms, playing-card.md r2): kept as a plain constant
  * rather than read from CSS at runtime, because this drives a JS
@@ -136,6 +147,28 @@ function isNewerVersion(lastVersion: number, incomingVersion: number): boolean {
   return incomingVersion > lastVersion
 }
 
+/**
+ * CAM-26 C5: the nudge loop's "no progress yet" test. Inspects the FETCHED
+ * result of a refetch (never the applied cache — the version guard drops an
+ * equal-version response before it ever reaches the cache, which is
+ * expected and correct, not a bug to work around). A missing result (a
+ * failed fetch) counts as no progress, so the loop keeps trying rather than
+ * stopping on a transient network error. Anything other than "still the
+ * exact same open window, at a version no newer than when it expired" —
+ * a different phase, a different `closesAt`, or a newer version — is
+ * progress.
+ */
+function isSameStaleWindow(
+  data: ViewResponse | undefined,
+  closesAt: number,
+  version: number,
+): boolean {
+  if (data === undefined) return true
+  if (data.view.phase._tag !== "SlamWindow") return false
+  if (data.view.phase.closesAt !== closesAt) return false
+  return !isNewerVersion(version, data.version)
+}
+
 export function useGame(gameId: string) {
   const queryClient = useQueryClient()
   const { session, createUser } = useSession()
@@ -191,9 +224,73 @@ export function useGame(gameId: string) {
     }, REFETCH_DEBOUNCE_MS)
   }, [])
 
+  // CAM-26 C2/C5: the bounded expiry-nudge loop, wired to `SlamTimer.onExpire`
+  // below. A dedicated timeout slot — NOT `scheduleRefetch`'s debounce slot,
+  // which coalesces broadcast bursts; this is a paced retry with its own
+  // lifecycle. Latest view kept in a ref so the stable `onSlamExpire`
+  // callback (identity never changes — refs and `useCallback` only, no
+  // effect watching the cache) can read the just-expired window's identity
+  // without closing over a stale render.
+  const viewDataRef = React.useRef(view.data)
+  viewDataRef.current = view.data
+  const nudgeTimeoutRef = React.useRef<number | null>(null)
+  const nudgeStateRef = React.useRef<{
+    readonly closesAt: number
+    readonly version: number
+    attempts: number
+  } | null>(null)
+
+  const clearNudge = React.useCallback(() => {
+    if (nudgeTimeoutRef.current !== null) window.clearTimeout(nudgeTimeoutRef.current)
+    nudgeTimeoutRef.current = null
+    nudgeStateRef.current = null
+  }, [])
+
+  const runNudge = React.useCallback(() => {
+    const state = nudgeStateRef.current
+    if (state === null) return
+    void refetchRef.current().then((result) => {
+      // The loop may have been cancelled (unmount, or a fresher attempt
+      // already superseded this one) while this fetch was in flight.
+      if (nudgeStateRef.current !== state) return
+      if (!isSameStaleWindow(result.data, state.closesAt, state.version)) {
+        // Progress: a newer version or a moved-on phase. The nudge loop's
+        // only job was to keep GETs flowing while stale — it never needs
+        // its own response applied (C5); whatever broadcast-triggered
+        // refetch carries the close is what the cache actually shows.
+        clearNudge()
+        return
+      }
+      state.attempts += 1
+      if (state.attempts >= NUDGE_MAX_ATTEMPTS) {
+        // Cap reached: stop for good. `onResubscribe` remains the standing
+        // backstop (ADR-0037: no layer is individually load-bearing).
+        clearNudge()
+        return
+      }
+      nudgeTimeoutRef.current = window.setTimeout(runNudge, NUDGE_INTERVAL_MS)
+    })
+  }, [clearNudge])
+
+  /** `SlamTimer.onExpire`: fired once per window, past `closesAt` plus its
+   * own skew grace. Records the expired window's identity — its `closesAt`
+   * and the last-applied version — then starts the bounded nudge loop. */
+  const onSlamExpire = React.useCallback(() => {
+    const phase = viewDataRef.current?.view.phase
+    if (phase === undefined || phase._tag !== "SlamWindow") return
+    clearNudge()
+    nudgeStateRef.current = {
+      closesAt: phase.closesAt,
+      version: lastVersionRef.current,
+      attempts: 0,
+    }
+    runNudge()
+  }, [clearNudge, runNudge])
+
   React.useEffect(() => {
     return () => {
       if (refetchTimeoutRef.current !== null) window.clearTimeout(refetchTimeoutRef.current)
+      if (nudgeTimeoutRef.current !== null) window.clearTimeout(nudgeTimeoutRef.current)
     }
   }, [])
 
@@ -602,10 +699,14 @@ export function useGame(gameId: string) {
   React.useEffect(() => {
     if (roomTopic === undefined || playerTopic === undefined) return
     const unsubscribeRoom = subscribeTopic(roomTopic, {
+      // CAM-26 C3: the decode check guards only the choreography handler —
+      // `scheduleRefetch` runs unconditionally. ADR-0033's "the refetched
+      // view is authoritative, broadcasts are only triggers" holds even for
+      // an undecodable trigger: something happened, so resync regardless of
+      // whether this client understood the payload.
       onEvent: (_event, payload) => {
         const decoded = decodeRoomGameEventEither(payload)
-        if (decoded._tag !== "Right") return
-        handleRoomEventRef.current(decoded.right)
+        if (decoded._tag === "Right") handleRoomEventRef.current(decoded.right)
         scheduleRefetch()
       },
       onResubscribe: () => {
@@ -615,8 +716,7 @@ export function useGame(gameId: string) {
     const unsubscribePlayer = subscribeTopic(playerTopic, {
       onEvent: (_event, payload) => {
         const decoded = decodePlayerGameEventEither(payload)
-        if (decoded._tag !== "Right") return
-        handlePlayerEventRef.current(decoded.right)
+        if (decoded._tag === "Right") handlePlayerEventRef.current(decoded.right)
         scheduleRefetch()
       },
       onResubscribe: () => {
@@ -694,5 +794,6 @@ export function useGame(gameId: string) {
     awaitingGive,
     slamBeatMessage,
     calledBy,
+    onSlamExpire,
   }
 }

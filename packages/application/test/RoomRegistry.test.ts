@@ -118,8 +118,13 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
   )
 
   it.effect(
-    "VersionConflict: surfaced unchanged, cache dropped, next command reloads (clause 6)",
+    "VersionConflict: surfaced unchanged, cache reloaded eagerly in the same envelope (clause 6, CAM-26 S2)",
     () => {
+      // CAM-26 changes what happens AFTER the conflict: the actor no longer
+      // waits for a next command to happen to reload — it reloads eagerly,
+      // in the SAME envelope, so a live window's timer is never left
+      // stranded on a command that might never arrive (S2). The conflict
+      // itself still surfaces unchanged and is never retried.
       const h = makeHarness()
       return Effect.gen(function* () {
         const registry = yield* RoomRegistry
@@ -139,14 +144,55 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
             expect(conflicted.left.actual).toBe(9)
           }
         }
-        expect(opsOf(h.journal)).not.toContain("publishGame")
+        // Nothing is persisted or published by the conflict itself — but the
+        // eager re-arm reload (S2) DOES appear in this same envelope's ops.
+        expect(opsOf(h.journal)).toEqual(["load"])
 
-        // Self-heal: the cache was invalidated, so the retry bootstraps from
-        // the repository (a load appears) and succeeds against version 9.
+        // Self-heal: the reload already primed the cache at version 9, so
+        // the retry succeeds directly off the warm cache — no second load.
         h.journal.splice(0)
         const healed = yield* registry.execute(gid(1), cmd)
         expect(healed.version).toBe(10)
-        expect(opsOf(h.journal)).toEqual(["load", "save", "publishGame"])
+        expect(opsOf(h.journal)).toEqual(["save", "publishGame"])
+      }).pipe(Effect.provide(h.layer))
+    },
+  )
+
+  it.effect(
+    "VersionConflict during an open window: eager reload keeps the timer armed, closing with no further command (S2, CAM-26)",
+    () => {
+      const h = makeHarness()
+      return Effect.gen(function* () {
+        const registry = yield* RoomRegistry
+        const state = yield* driveToSlamWindow(gid(1))
+        if (state.phase._tag !== "SlamWindow") throw new Error("unreachable")
+        const closesAt = state.phase.closesAt
+        // The only command legal during an open window is Slam itself
+        // (checkCommand/legalCommandKinds — nothing else is on offer).
+        const slam = legalCandidates(state, NOW).find((c) => c._tag === "Slam")
+        expect(slam).toBeDefined()
+
+        // Something else bumps the row's version behind the actor's back.
+        h.repo.poke(gid(1), 999)
+        h.journal.splice(0)
+
+        const conflicted = yield* registry.execute(gid(1), slam!).pipe(Effect.either)
+        expect(conflicted._tag).toBe("Left")
+        if (conflicted._tag === "Left") expect(conflicted.left._tag).toBe("VersionConflict")
+        // The conflicted envelope's own eager reload (S2) is what re-arms
+        // the trailing manageTimer — proven below by NO further command.
+        expect(opsOf(h.journal)).toEqual(["load"])
+
+        h.journal.splice(0)
+        yield* Effect.sync(() => h.clock.set(Timestamp.make(closesAt + 1)))
+        yield* TestClock.adjust(config.slamWindowMs + 1000)
+        for (let i = 0; i < 100 && h.journal.length < 2; i++) {
+          yield* Effect.yieldNow()
+        }
+        expect(opsOf(h.journal)).toEqual(["save", "publishGame"])
+        const closeBatch = h.journal[0]!
+        if (closeBatch.op !== "save") throw new Error("unreachable")
+        expect(closeBatch.events.map((e) => e._tag)).toEqual(["SlamWindowClosed", "TurnAdvanced"])
       }).pipe(Effect.provide(h.layer))
     },
   )
@@ -368,6 +414,159 @@ describe("RoomRegistry (clauses 8–11, ADR-0020)", () => {
         expect(timedResult.reply.events).toEqual(lazyResult.reply.events)
         expect(timed.repo.rows.get(gid(1))!.events).toEqual(lazy.repo.rows.get(gid(1))!.events)
       })
+    },
+  )
+})
+
+describe("Poke (S1, S3, S4, S5 — CAM-26, ADR-0037)", () => {
+  it.effect(
+    "poke closes a cold, past-due window — bootstrap, judge the clock, close (S1+S3+S5)",
+    () => {
+      const h = makeHarness()
+      // Lifetime one: drive into the window, then the provide-scope closes —
+      // the actor and its armed timer die with the process (§6 restart
+      // idiom, shared with the SlamTiming restart test).
+      const lifetimeOne = driveToSlamWindow(gid(1)).pipe(Effect.provide(h.layer))
+      return Effect.gen(function* () {
+        const state = yield* lifetimeOne
+        if (state.phase._tag !== "SlamWindow") throw new Error("unreachable")
+        const past = Timestamp.make(state.phase.closesAt + 1)
+        yield* Effect.sync(() => h.clock.set(past))
+
+        h.journal.splice(0)
+        // Lifetime two: a fresh registry over the same persisted rows. No
+        // command is ever sent to it — only the reply-less poke.
+        yield* Effect.gen(function* () {
+          const registry = yield* RoomRegistry
+          yield* registry.poke(gid(1))
+          // Poke has no reply — poll the journal race-free until the close
+          // batch lands (bootstrap load, then the close's own save+publish).
+          for (let i = 0; i < 100 && h.journal.length < 3; i++) {
+            yield* Effect.yieldNow()
+          }
+        }).pipe(Effect.provide(h.layer))
+
+        expect(opsOf(h.journal)).toEqual(["load", "save", "publishGame"])
+        const closeBatch = h.journal[1]!
+        if (closeBatch.op !== "save") throw new Error("unreachable")
+        expect(closeBatch.events.map((e) => e._tag)).toEqual(["SlamWindowClosed", "TurnAdvanced"])
+      }).pipe(Effect.provide(h.deps))
+    },
+  )
+
+  it.effect("poke on a still-open window: bootstraps and arms, closes nothing yet (S4)", () => {
+    const h = makeHarness()
+    const lifetimeOne = driveToSlamWindow(gid(1)).pipe(Effect.provide(h.layer))
+    return Effect.gen(function* () {
+      const state = yield* lifetimeOne
+      if (state.phase._tag !== "SlamWindow") throw new Error("unreachable")
+      const closesAt = state.phase.closesAt
+      // Clock is left at NOW — the window is still open.
+
+      h.journal.splice(0)
+      yield* Effect.gen(function* () {
+        const registry = yield* RoomRegistry
+        yield* registry.poke(gid(1))
+        for (let i = 0; i < 100 && h.journal.length < 1; i++) {
+          yield* Effect.yieldNow()
+        }
+        expect(opsOf(h.journal)).toEqual(["load"])
+
+        // The poke armed a timer off the bootstrapped cache: advancing past
+        // the remaining duration closes the window with no further envelope
+        // sent by the test — proof the poke itself re-armed, not just read.
+        yield* Effect.sync(() => h.clock.set(Timestamp.make(closesAt + 1)))
+        h.journal.splice(0)
+        yield* TestClock.adjust(config.slamWindowMs + 1000)
+        for (let i = 0; i < 100 && h.journal.length < 2; i++) {
+          yield* Effect.yieldNow()
+        }
+        expect(opsOf(h.journal)).toEqual(["save", "publishGame"])
+      }).pipe(Effect.provide(h.layer))
+    }).pipe(Effect.provide(h.deps))
+  })
+
+  it.effect(
+    "poke on an ended game: bootstraps, evicts, persists and publishes nothing (S4)",
+    () => {
+      const h = makeHarness()
+      return Effect.gen(function* () {
+        const registry = yield* RoomRegistry
+        yield* seedLobby({ id: gid(1), members: [user(0), user(1)], status: "open" })
+        const started = yield* registry.start(gid(1), { starterId: uid(0), config })
+        const cambio = legalCandidates(started.state, NOW).find((c) => c._tag === "CallCambio")
+        expect(cambio).toBeDefined()
+        const ended = yield* registry.execute(gid(1), cambio!)
+        expect(ended.state.phase._tag).toBe("Ended")
+        expect(yield* registry.roomCount).toBe(0) // the actor already evicted itself
+
+        // A poke against the (now gone) actor creates a fresh cold one,
+        // whose bootstrap sees the Ended phase and evicts straight away.
+        h.journal.splice(0)
+        yield* registry.poke(gid(1))
+        for (let i = 0; i < 100 && h.journal.length < 1; i++) {
+          yield* Effect.yieldNow()
+        }
+        expect(opsOf(h.journal)).toEqual(["load"])
+
+        let count = yield* registry.roomCount
+        for (let i = 0; i < 100 && count !== 0; i++) {
+          yield* Effect.yieldNow()
+          count = yield* registry.roomCount
+        }
+        expect(count).toBe(0)
+      }).pipe(Effect.provide(h.layer))
+    },
+  )
+
+  it.effect(
+    "poke on an unknown/lobby-only game id: tolerated, nothing persisted, no lingering actor (S4)",
+    () => {
+      const h = makeHarness()
+      return Effect.gen(function* () {
+        const registry = yield* RoomRegistry
+        // No lobby or game row exists for gid(1) at all — `games.load` fails
+        // exactly as it does for a lobby-only room (the route never pokes
+        // one in practice; the handler tolerates it defensively regardless).
+        h.journal.splice(0)
+        yield* registry.poke(gid(1))
+        for (let i = 0; i < 100 && h.journal.length < 1; i++) {
+          yield* Effect.yieldNow()
+        }
+        expect(opsOf(h.journal)).toEqual(["load"])
+
+        let count = yield* registry.roomCount
+        for (let i = 0; i < 100 && count !== 0; i++) {
+          yield* Effect.yieldNow()
+          count = yield* registry.roomCount
+        }
+        expect(count).toBe(0)
+      }).pipe(Effect.provide(h.layer))
+    },
+  )
+
+  it.effect(
+    "a second poke on an already-armed window is a no-op — idempotent by construction",
+    () => {
+      const h = makeHarness()
+      return Effect.gen(function* () {
+        const registry = yield* RoomRegistry
+        const state = yield* driveToSlamWindow(gid(1))
+        if (state.phase._tag !== "SlamWindow") throw new Error("unreachable")
+
+        // First poke bootstraps nothing new (the actor is already resident
+        // and armed from driveToSlamWindow's own Start/Execute calls).
+        h.journal.splice(0)
+        yield* registry.poke(gid(1))
+        yield* Effect.yieldNow()
+        yield* Effect.yieldNow()
+        expect(opsOf(h.journal)).toEqual([]) // already warm, still not due — nothing to do
+
+        yield* registry.poke(gid(1))
+        yield* Effect.yieldNow()
+        yield* Effect.yieldNow()
+        expect(opsOf(h.journal)).toEqual([]) // still idempotent
+      }).pipe(Effect.provide(h.layer))
     },
   )
 })
