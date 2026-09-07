@@ -21,7 +21,7 @@
 // --planned only makes sense against a 4-column table, since the 3-column
 // shape has no cell for it to write into.
 import { execFileSync } from "node:child_process"
-import { readFileSync, writeFileSync } from "node:fs"
+import { readFileSync, realpathSync, writeFileSync } from "node:fs"
 import { pathToFileURL } from "node:url"
 
 // headerCells / rowCells: the raw `line.split("|")` arrays, so each has a
@@ -95,4 +95,10 @@ function main() {
   console.log(`filled ${clause} in ${file}`)
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main()
+// realpathSync matters here: import.meta.url is already the resolved real
+// path, but process.argv[1] is whatever the caller typed — invoking the
+// script through a symlink used to make this comparison false, so main()
+// silently never ran (exit 0, no output, nothing written). Resolving both
+// sides makes symlink invocation work like direct invocation, and a
+// genuinely missing/broken argv[1] now throws loudly instead (CAM-28 F1).
+if (import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) main()

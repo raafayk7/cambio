@@ -120,7 +120,9 @@ After this task, `node .agents/scripts/fill-coverage-row.mjs <plan.md> <CLAUSE> 
 
 - [x] All seven contract clauses above hold, demonstrated by
       `.agents/scripts/fill-coverage-row.test.mjs`
-      (`✓ ALL PASS — 9 passed, 0 failed`).
+      (`✓ ALL PASS — 14 passed, 0 failed` after the review fix cycle added
+      clause-6 and header-not-found coverage — see Progress and Outcomes &
+      Retrospective).
 - [x] The scratch repro from planning (3-column table +
       `--test`/`--asserted`) re-run post-fix produces a correctly-shaped
       3-cell row, not the 4-cell corruption documented above.
@@ -220,6 +222,29 @@ timestamp each entry)_
       confirmed); `--planned` against the 3-column table exits 1 with the
       documented error message and leaves the file byte-for-byte unchanged
       (clause 4).
+- [x] 2026-09-07 06:35 — **Fix cycle (F1):** `fill-coverage-row.mjs`'s
+      main-module guard now resolves `process.argv[1]` with
+      `realpathSync` before comparing to `import.meta.url` (which Node
+      already resolves through symlinks), so invoking the script via a
+      symlink runs `main()` correctly instead of silently exiting 0 with
+      the file untouched. Verified by hand: filled a row through a symlink
+      before and after the fix — before, exit 0 and file unchanged; after,
+      exit 0 and file correctly filled.
+- [x] 2026-09-07 06:37 — **Fix cycle (F2):** added five CLI-level cases to
+      `fill-coverage-row.test.mjs` (test strengthened, not the claim
+      weakened, per the fix-cycle's stated preference): missing args (exit
+      2), clause not found (exit 1, file untouched), nothing-to-fill (exit
+      2, file untouched), a coverage row with no header above it (exit 1 —
+      the path this diff introduced, previously untested at any level), and
+      symlink invocation (F1's regression test — fills correctly instead of
+      silently no-opping). `node fill-coverage-row.test.mjs` →
+      `✓ ALL PASS — 14 passed, 0 failed`. Confirmed the new symlink case is
+      a real mutant-killer, not a placebo: reverted the F1 fix, re-ran the
+      suite (`13 passed, 1 failed` — only the symlink case failed), then
+      restored the fix and re-ran (`14 passed, 0 failed`).
+- [x] 2026-09-07 06:39 — Re-ran the full gate fresh:
+      `pnpm turbo build typecheck lint test --force` → 19/19 tasks green, 0
+      cached.
 
 ## Decision log
 
@@ -279,10 +304,12 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 _(filled at the end, typically by `/review`: what shipped, what was cut,
 what should carry into the next task.)_
 
-**Verdict: fix-then-ship.** All seven functional-contract clauses hold
-(re-verified independently below, not taken on the plan's word) and the
-gate is green, but two findings need a fix cycle before shipping — both
-small, bounded, no re-plan needed.
+**Initial verdict: fix-then-ship** (superseded below — **final verdict:
+ship** after the fix cycle). All seven functional-contract clauses held at
+first review (re-verified independently below, not taken on the plan's
+word) and the gate was green, but two findings needed a fix cycle before
+shipping — both small, bounded, no re-plan needed. See "Fix cycle" below
+for resolution.
 
 **Independent verification performed during review** (a fresh, forced
 `--force` gate run, a fresh `node .agents/scripts/fill-coverage-row.test.mjs`
@@ -366,3 +393,45 @@ the pre-fix file); ADR-0028 routing and guard-rail reasoning.
 
 **Carries into the fix cycle:** F1 and F2 above. No ADR or architecture-skill
 implications — this stays entirely within `.agents/scripts/`.
+
+**Fix cycle (2026-09-07):**
+
+- **F1 — RESOLVED (code fixed).** `fill-coverage-row.mjs`'s main-module
+  guard now compares `import.meta.url` against
+  `pathToFileURL(realpathSync(process.argv[1])).href` instead of the
+  unresolved path, so symlink invocation runs `main()` correctly. Verified
+  by hand (fills correctly through a symlink now) and by a new automated
+  regression case (`fill-coverage-row.test.mjs`, "CLI via symlink: fills
+  the row instead of silently no-opping") — confirmed this case is a real
+  mutant-killer by reverting the fix, re-running the suite
+  (`13 passed, 1 failed` — only the symlink case failed), then restoring
+  the fix (`14 passed, 0 failed`).
+- **F2 — RESOLVED (test strengthened, not the claim weakened).** Added
+  four more CLI-level cases to `fill-coverage-row.test.mjs`: missing args,
+  clause not found, nothing-to-fill (closing clause 6's coverage gap), and
+  a coverage row with no header above it (closing the header-not-found
+  path's coverage gap). The Acceptance Criteria claim ("all seven clauses
+  demonstrated by the test file") is now true rather than corrected —
+  strengthening the test was preferred per the fix-cycle's own rule, and
+  was the branch actually available here since the claim's _intent_ was
+  always right, only its evidence was missing. Re-ran the F2 multi-instance
+  sweep (`grep -in "seven contract clauses\|demonstrated by\|9 passed"`)
+  across the whole doc before closing: found three stale `9 passed`
+  citations (Acceptance Criteria, the original Progress entry, and this
+  Outcomes section's own verification log) — the Acceptance Criteria one
+  is updated to `14 passed` above; the other two are historical
+  point-in-time log entries (what was true on first read at `/implement`
+  and at review) and are deliberately left as-is rather than rewritten,
+  consistent with this repo's append-only living-document convention.
+
+**Re-verification before flipping the verdict:** `node
+.agents/scripts/fill-coverage-row.test.mjs` → `✓ ALL PASS — 14 passed, 0
+failed` (fresh run, post-fix). `pnpm turbo build typecheck lint test
+--force` → 19/19 tasks green, 0 cached (fresh run, post-fix). Both
+findings' fixes verified directly, not by re-reading the diff alone.
+
+**Verdict: ship.** Both findings resolved and re-verified; nothing else
+outstanding. The one remaining item from `/implement`'s acceptance criteria
+— the ADR-0028 merge-down (`main` → `development` → `release-v0`) + fresh
+session smoke test — is unchanged from before this fix cycle and is
+`/ship`'s or a follow-up's responsibility, not a review finding.
