@@ -451,6 +451,13 @@ timestamp each entry)_
       (25/25, confirmed independently by the orchestrator after the pass,
       not just accepted from the subagent's own report); web suite
       230/230 (227 + 3 new), UI suite 25/25.
+- [x] 2026-09-07 — `/review` pass: four reviewers (contract +
+      architecture × both lanes), independent gate + forced zero-cache
+      test run (680/680 green). Verdict **fix-then-ship**; findings
+      F1–F12 recorded in Outcomes & retrospective. All 12 contract
+      clauses satisfied; the blockers are doc-integrity items plus two
+      behavior questions (F1 five-seat render throw, F2 flight-anchor
+      displacement) awaiting user calls.
 
 ## Decision log
 
@@ -506,4 +513,158 @@ timestamp each entry)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+_(filled by `/review`, 2026-09-07)_
+
+**Verdict: fix-then-ship.** All 12 contract clauses verdict **satisfied**
+(rendered-only halves of 7 and 9 verified via the documented rendered
+evidence, per ADR-0030). Zero hidden-information exposure (zero contracts
+and zero api changes in the diff, confirmed twice). Import boundaries,
+domain purity, typed errors, ADR-0027/0030/0034/0035 conformance all
+clean. Independent verification: full gate exit 0, then a **forced
+zero-cache test run** — 680 tests green across 10 packages (domain 194,
+application 86, api 118 against live Postgres, web 230, ui 25,
+contracts 11, config 16). The findings below block shipping only because
+this repo does not ship false doc claims; none is a contract violation.
+
+### Findings (rank-ordered; fix cycle loads from here)
+
+- **F1 (behavior, user call needed).** `benchAssignment` **throws during
+  render** for any seat count ≥ 5 (`table-geometry.ts:84–91`, called from
+  `table-surface.tsx:115` and `game-screen.tsx:339`; no error boundary in
+  `apps/web`). The domain cap gates creation/joins only — a game
+  persisted under release-v0's 2–5 rule stays engine-valid and `viewFor`
+  projects all five seats, so opening it now takes down the screen: a
+  projection renderer refusing data the server considers valid
+  (frontend-architecture rule). The throw was planned ("degrade
+  honestly") and is test-pinned, so this is a decision, not a bug:
+  either (a) record the accepted consequence explicitly in ADR-0036
+  (+ optionally verify no live 5-player rows exist), or (b) add a
+  layout-only degradation (5th seat falls back to the compact flat row
+  or `bottom`). RESOLUTION: pending user call.
+- **F2 (behavior consequence undocumented).** The side-bench arc fix
+  (`SIDE_BENCH_MARGIN_CLASS`, `hand.tsx:170–224`) moves the painted card
+  visual up to **~57px off its own flight anchor** (doubled margin,
+  halved by the flex-centered anchor). The flight layer measures and
+  highlights the **anchor** (`flight-layer.tsx:196–205`, `:245`), so a
+  penalty/give card flying into a middle slot of a left/right bench
+  lands ~57px from where the resting card draws. Canon (`hand.md` r4)
+  documents only the **orientation** artifact (upright clone → rotated
+  card), not this displacement; ADR-0036 §5's "anchors stay where the
+  card is" rationale is silently weakened. Fix: document the
+  displacement as an accepted artifact in `hand.md` + an ADR-0036
+  amendment note, or bound/redesign the offset mechanism. RESOLUTION:
+  pending.
+- **F3 (false claim + missing re-measure).** The acceptance box above
+  claims clause 7's rendered numbers were re-verified
+  "post-creation-gate **and post-fix-pass**"; the coverage row's latest
+  12-card measurement is **pre-fix-pass** (creation-gate follow-up), and
+  the fix pass changed exactly that geometry (arc margins) then
+  re-measured only a 4-card hand. Compounding: a 12-card rotated hand
+  uses the **6-row margin table, which is extrapolated from a two-point
+  fit and never rendered-verified** (disclosed in `hand.tsx:150–154` and
+  `hand.md` r4). Fix: re-measure the 12-card side-bench case rendered
+  (validating the extrapolation), update the coverage row, then the
+  claim becomes true; or amend the claim. Sweep both phrasings
+  ("post-fix-pass", "re-verified") across root + frontend plans.
+  RESOLUTION: pending.
+- **F4 (false enforcement claim, two instances + sweep).** The
+  `BENCH_INSET_PCT` "drift guard" is a tautology:
+  `table-geometry.test.ts:20` asserts the constant equals its own
+  definition, so changing the art proportions leaves the suite green
+  while the hardcoded `8.5%`/`91.5%` literals in
+  `table-surface.tsx:81–84` go stale. Both the source docstring
+  (`table-surface.tsx:76–79`) and the frontend plan (`frontend/CAM-20.md`
+  "pins `BENCH_INSET_PCT` (41.5)…") advertise a protection that does not
+  exist. Fix: make the guard real — assert the class strings contain
+  `${50 - BENCH_INSET_PCT}%` and `${50 + BENCH_INSET_PCT}%` — and sweep
+  every statement of the claim. RESOLUTION: pending.
+- **F5 (process deviation + stale claims).** The `cambio-rules` skill
+  amendment was committed on `main` (9dc922d) although **ADR-0028's
+  guard rail names that exact file as release-side-diverged and
+  must-not-edit-on-main**. Outcome verified fine — the merge-down
+  resolved cleanly and release-v0's copy carries both the amendment and
+  the release-side content, so the PR target is correct — but the
+  mis-routing originated in this plan's own docs (clause 12's "lands on
+  `main` per ADR-0028", backend step 6) and must be corrected so no
+  future task inherits it. Also stale: backend coverage row 12 still
+  says the amendment is "not yet done" (it is, on `main` +
+  `development` + `release-v0`; absent from this branch only by
+  branch-point ordering). Fix: amend clause 12 + backend step 6 with an
+  inline correction note, update the coverage row, log the deviation in
+  the Decision Log. RESOLUTION: pending.
+- **F6 (contract text contradicted).** Clause 10 says compact is
+  "unchanged except for the hand's internal row-major layout", but the
+  (user-authorized, Decision-Logged) fix pass changed compact beyond
+  hand internals: opponents-row gaps (`table-surface.tsx:198`), the
+  deck badge inset (`draw-deck.tsx:96`), and
+  `--size-table-art-compact` 128→158px. Same "revised, not
+  contradicted" discipline the clause imposes on canon: add an inline
+  amendment note at clause 10. RESOLUTION: pending.
+- **F7 (coverage-table staleness, frontend).** Row 12 names
+  table-surface.md **v5** / hand.md **v3** (actual: v6 / v4); the three
+  fix-pass tests (`game-screen.test.tsx:2068`, `:2090`, `:2114`) have no
+  rows; row 10 omits the fix-pass compact changes. RESOLUTION: pending.
+- **F8 (coverage gaps, backend).** (a) Clause 4's START_HELPER
+  ("2–4 players", `use-room.ts:47`) is asserted by no test — the clause
+  names three copy surfaces, two are pinned. (b) The new 5-player
+  invariant probe asserts only `not.toStrictEqual([])` — any violation
+  passes; asserting the message contains "outside 2–4" pins the actual
+  bound. (c) Nothing pins that `playerCountFor` reaches 4 (a narrowing
+  to 2–3 keeps every suite green). Fix: strengthen all three
+  (prefer strengthening tests over weakening claims). RESOLUTION:
+  pending.
+- **F9 (token discipline, user call on depth).** 15 new off-scale pixel
+  literals ship as arbitrary-value utilities backed by no token and
+  named in no design-system file: the `SIDE_BENCH_MARGIN_CLASS` table
+  (46–130px, `hand.tsx:185–221`), the Call Cambio
+  `left-[calc(50%+324px)]` (`game-screen.tsx:913`), the dock's −4px
+  nudge, and the `8.5%`/`91.5%` bench insets. Contrast: the same diff
+  minted `card-frame-rotated` and the 158px art cap correctly (styles.css
+  - tokens.md + gate interview). The 324px is additionally a
+    hand-evaluated derivation of three live constants (`ROW_WIDTH`,
+    card-lg width, gap) with nothing pinning the arithmetic. Fix options:
+    document the value families in tokens.md/canon (measured-against-art
+    values arguably can't be @theme tokens, but canon must name them), and
+    pin 324's derivation in a test. RESOLUTION: pending.
+- **F10 (stale prose/comment sweep).** (a) `packages/ui/src/styles.css:274`
+  "five opponent hands" (file touched by this diff); (b) HANDOFF §4.1
+  "acceptable at a 5-player maximum" and the out-of-scope "more than 5
+  players" (self-flagged in backend Surprises, left by scope);
+  (c) `game-screen.tsx:696–701` justifies gap-1 against the superseded
+  128px art cap; (d) "table-surface.md v5" citations in
+  `table-geometry.ts:2` and `table-geometry.test.ts:11`; (e) gallery
+  label "populated (own, 2×2)" now renders one row of four
+  (`gallery/game.tsx:138`); (f) `table-surface.tsx:66–71` claims the
+  dock "reuses the exact same bottom entry instead of hand-copying a
+  translate" — true for position, false for the (deliberately) diverged
+  translate; (g) frontend plan's "CAM-21 restorations were **pinned**
+  THERE" — they were documented invariants, no such test existed
+  (verified against release-v0); (h) the vacuous `24 > 4`
+  literal assertion (`game-screen.test.tsx:2147–2149`) overstated in the
+  plan as "the two underlying constants". RESOLUTION: pending.
+- **F11 (ADR drift).** ADR-0036 §5 says "upright anchor boxes **sized to
+  the rotated footprint**"; as-built (post creation-gate) the anchor
+  keeps upright `card-frame` and only the visual takes
+  `card-frame-rotated`. Recorded in `hand.md` r3 but the ADR was never
+  amended. Fix: amendment note in ADR-0036. RESOLUTION: pending.
+- **F12 (advisory, no fix required to ship).** (a) `max-w-4xl` rides
+  Tailwind's undocumented-in-tokens.md container namespace (precedent:
+  `max-w-2xl`); (b) no jsdom pin that **opponent** seat wrappers carry
+  `BENCH_POSITION_CLASS` (only the own-seat wrapper is pinned);
+  (c) no gallery showcase for the `rotate` hand variant (logged scope
+  note); (d) `.agents/scripts/fill-coverage-row.mjs` corrupts 3-column
+  coverage tables (backend Surprises) — harness issue to file.
+
+### What was run
+
+- `pnpm turbo build typecheck lint test` — exit 0 (25/25; 18 cached).
+- `pnpm turbo test --force` — exit 0, **zero cache**, 680/680 tests.
+- Four read-only reviewers (contract + architecture × backend/frontend);
+  every load-bearing finding re-verified by the adjudicator against
+  source before being recorded here (three reviewer claims were
+  corrected during adjudication: the skill amendment IS on the merge
+  target; `BENCH_ANCHOR_CLASS` HAS a production consumer at
+  `table-surface.tsx:139`; the dock translate divergence is deliberate
+  and pinned).
+- No timing/concurrency claims arose (layout + constants only), so no
+  timing probe was required this cycle.
