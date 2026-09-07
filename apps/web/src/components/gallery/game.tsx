@@ -131,8 +131,11 @@ export function PlayingCardSection() {
 
 export function HandSection() {
   return (
-    <Section title="hand" note="Slot grids in rows of 2 — holes stay holes; indices never reflow.">
-      <StateCard label="populated (own, 2×2)">
+    <Section
+      title="hand"
+      note="Row-major slot grids, rows of up to 6 — holes stay holes; indices never reflow."
+    >
+      <StateCard label="populated (own, one row of 4)">
         <TableGround>
           <Hand variant="own" playerId={PLAYER_C} slots={[0, 1, 2, 3]} />
         </TableGround>
@@ -341,12 +344,12 @@ export function TableSurfaceSection() {
   return (
     <Section
       title="table-surface"
-      note="Seat-arc redistribution: benches are scenery; 2–5 seats space radially, viewer bottom-center. Below `regular` the arc compresses."
+      note="Bench doctrine (ADR-0036): the viewer always anchors bottom, opponents take left/top/right by seat-arc sweep, 2–4 players. Below `regular` the arrangement compresses to a flat row."
     >
-      <StateCard label="in-game · 5 players (the resolved fifth seat)" wide>
+      <StateCard label="in-game · 4 players (every bench occupied)" wide>
         <div className="scene-paving rounded-md p-4">
           <TableSurface
-            seats={seatsFor(5)}
+            seats={seatsFor(4)}
             viewerSeatIndex={0}
             center={
               <div className="flex items-center gap-3">

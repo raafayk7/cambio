@@ -8,10 +8,10 @@ import { SlotIndex, type Timestamp, type UserId } from "./Ids.js"
 import { prngStateFromSeed, shuffle } from "./Prng.js"
 
 /**
- * Game creation (§1.1): shuffle the 52-card deck from the seed, deal 4
- * face-down cards to each of 2–5 players (slots 0–3, never looked at — there
- * is no opening peek), turn one card face up to start the discard pile, and
- * await seat 0's first draw. Pure: same inputs, same game.
+ * Game creation (§1.1 as amended by ADR-0036): shuffle the 52-card deck from
+ * the seed, deal 4 face-down cards to each of 2–4 players (slots 0–3, never
+ * looked at — there is no opening peek), turn one card face up to start the
+ * discard pile, and await seat 0's first draw. Pure: same inputs, same game.
  */
 export const dealGame = (
   players: ReadonlyArray<UserId>, // seat order
@@ -19,7 +19,7 @@ export const dealGame = (
   config: GameConfig,
   now: Timestamp,
 ): Either.Either<readonly [GameState, ReadonlyArray<GameEvent>], GameError> => {
-  if (players.length < 2 || players.length > 5) {
+  if (players.length < 2 || players.length > 4) {
     return Either.left(new BadPlayerCount({ count: players.length }))
   }
 

@@ -1,25 +1,24 @@
 /**
- * Table geometry — the ONE radius source (table-surface.md r2, root plan
- * G1). Every placement on the table (seats, hands, and — via the
- * `flight/anchors.ts` registry built on top of this module — future flight
+ * Table geometry — the bench doctrine (ADR-0036; table-surface.md v5).
+ * Every placement on the table (seats, hands, and — via the
+ * `flight/anchors.ts` registry built on top of this module — flight
  * endpoints) derives from the same painted-art anatomy instead of each
  * guessing its own container percent.
  *
- * The prior module (`seat-arc.ts`, now folded in here) carried a
- * self-contradicting comment: "radius of the seat ring, in percent of the
- * container's half-size" next to `RING_RADIUS_PCT = 42`. 42 was never a
- * percent of the half-size — it was 42% of the container's full WIDTH
- * (equivalently 84% of the half-width), a plain reading error that nobody
- * caught because nothing else in the file cross-checked it against the
- * painted asset. `table-surface.tsx` renders that asset at `w-3/4` of the
- * square container, so the painted table's own half-width is a known,
- * derivable quantity — 37.5% of the container's width — and every ring
- * below is stated relative to THAT edge, not to a bare container percent
- * invented in isolation.
+ * This module used to be a count-agnostic polar engine (`ringPositions`,
+ * `seatArc`, `handArc`, `inwardSide`) that spaced seats evenly around the
+ * table for any count 2–5. ADR-0036 replaced that doctrine: the game caps
+ * at 2–4 players and seats anchor to the table's four painted benches —
+ * viewer always bottom, opponents assigned to top/left/right in seat-arc
+ * sweep order. Benches are a fixed assignment (this module), placed on
+ * screen by a small static class map (`table-surface.tsx`, decision 2) —
+ * no angle math, no per-seat-count radius. `handArc`/`HAND_RING_RADIUS_PCT`
+ * had no production consumer even before this task and retire with the
+ * rest of the polar engine.
  *
  * Pure geometry so it stays unit-testable (jsdom measures no layout —
- * ADR-0030): percentages position points inside a square container;
- * rendering just applies them.
+ * ADR-0030): this module states relationships and assignments; rendering
+ * (table-surface.tsx) applies them.
  */
 
 /** The painted table art's width, as a fraction of the square container
@@ -33,88 +32,68 @@ export const TABLE_ART_WIDTH_FRACTION = 3 / 4
 export const TABLE_DISC_FRACTION = 0.54
 
 /** Half the art's width, as a percent of the (square) container's width —
- * the one honest number the old comment got wrong. Every ring below is
- * stated as an offset from this edge. */
+ * the anchor for every bench offset below. */
 export const ART_HALF_PCT = TABLE_ART_WIDTH_FRACTION * 50
 
-/** Seats sit just outside the painted table's edge — a small named gap,
- * not flush against it, so the bench art still reads underneath them. */
+/** Bench anchors sit just outside the painted table's edge — a small named
+ * gap, not flush against it, so the bench art still reads underneath them. */
 export const SEAT_RING_GAP_PCT = 4
 
-/** The seat ring's radius: the art's edge plus the gap above. Seats
- * previously sat at a flat 42% invented independently of the art; now they
- * are pinned to it by construction. */
-export const SEAT_RING_RADIUS_PCT = ART_HALF_PCT + SEAT_RING_GAP_PCT
+/** How far a bench anchor sits outside the painted table's edge, as a
+ * percent of the (square) container's width/height — the art's half-width
+ * plus the named gap above. Spec-carried from the pre-ADR-0036 seat ring's
+ * radius: benches are now fixed compass points instead of seat-count-
+ * dependent angles, so this single number places all four (top/bottom at
+ * `50 ∓ BENCH_INSET_PCT`, left/right the same on the other axis). */
+export const BENCH_INSET_PCT = ART_HALF_PCT + SEAT_RING_GAP_PCT
 
-/** Hands sit inside the art's edge, overlapping the tabletop rim toward
- * the center — a named inset, so a hand never reads as sitting on the
- * bench rather than at the table. */
-export const HAND_RING_INSET_PCT = 12
-
-/** The hand ring's radius: strictly inside the art's edge, strictly inside
- * the seat ring — hands live between the seat and the table's center. */
-export const HAND_RING_RADIUS_PCT = ART_HALF_PCT - HAND_RING_INSET_PCT
-
-/** A point on one of the table's radial rings. */
-export interface RadialPosition {
-  seatIndex: number
-  /** Screen-space degrees, normalized [0, 360): 90 = bottom-center. */
-  angleDeg: number
-  xPct: number
-  yPct: number
-}
-
-/** Kept as the seat-arc-era name — every prior call site (table-surface.tsx,
- * its tests) reads `SeatPosition`. */
-export type SeatPosition = RadialPosition
-export type HandPosition = RadialPosition
+/** The four painted benches a seat can anchor to. Doubles as the
+ * hand-growth direction vocabulary (a hand grows INWARD from its own
+ * bench, toward the table center — table-surface.tsx / game-screen.tsx). */
+export type Bench = "bottom" | "top" | "left" | "right"
 
 /**
- * Radial positions derive from seat order (array index = seat order on the
- * wire), rotated so the viewer sits bottom-center. The four benches are
- * scenery — seats space evenly for any count 2–5; the visual metaphor
- * never constrains the player count (table-surface.md, root plan F4.1).
+ * Opponent benches, in seat-arc sweep order (left → top → right), keyed by
+ * seat count. Index 0 is the seat immediately after the viewer; the
+ * viewer's own seat is always "bottom" and isn't listed here. Root plan
+ * clause 5 / decision 1. 0 and 1 have no opponents (an empty lobby of one,
+ * or a solo pre-game view) — an entry exists so `benchAssignment` never
+ * needs to special-case them.
  */
-function ringPositions(
-  seatCount: number,
-  viewerSeatIndex: number,
-  radiusPct: number,
-): ReadonlyArray<RadialPosition> {
-  const step = 360 / seatCount
-  return Array.from({ length: seatCount }, (_, seatIndex) => {
-    const offset = (seatIndex - viewerSeatIndex + seatCount) % seatCount
-    const angleDeg = (90 + offset * step) % 360
-    const radians = (angleDeg * Math.PI) / 180
-    return {
-      seatIndex,
-      angleDeg,
-      xPct: 50 + radiusPct * Math.cos(radians),
-      yPct: 50 + radiusPct * Math.sin(radians),
-    }
-  })
+const OPPONENT_BENCH_ORDER: Readonly<Record<number, ReadonlyArray<Bench>>> = {
+  0: [],
+  1: [],
+  2: ["top"],
+  3: ["left", "right"],
+  4: ["left", "top", "right"],
 }
 
-/** The side of a ring point that faces the table center — the direction a
- * seat's content (its hand, its growth) should extend. Derived from the
- * dominant axis of the vector toward (50, 50), so it is exact for the
- * compass seats and stable for the diagonal ones. */
-export type InwardSide = "top" | "bottom" | "left" | "right"
-
-export function inwardSide(position: RadialPosition): InwardSide {
-  const dx = 50 - position.xPct
-  const dy = 50 - position.yPct
-  if (Math.abs(dy) >= Math.abs(dx)) return dy < 0 ? "top" : "bottom"
-  return dx < 0 ? "left" : "right"
-}
-
-/** Seat centers, on the seat ring (just outside the painted table). */
-export function seatArc(seatCount: number, viewerSeatIndex: number): ReadonlyArray<SeatPosition> {
-  return ringPositions(seatCount, viewerSeatIndex, SEAT_RING_RADIUS_PCT)
-}
-
-/** Hand centers, on the hand ring (between each seat and the table
- * center) — same angles as `seatArc` for the same inputs, one shared
- * source, so a hand always lines up with its own seat. */
-export function handArc(seatCount: number, viewerSeatIndex: number): ReadonlyArray<HandPosition> {
-  return ringPositions(seatCount, viewerSeatIndex, HAND_RING_RADIUS_PCT)
+/**
+ * Assigns every seat a bench: the viewer's own seat is always "bottom";
+ * opponents take the next bench in `OPPONENT_BENCH_ORDER` starting from the
+ * seat immediately after the viewer (seat-arc order), wrapping around the
+ * table. Replaces the polar `ringPositions` engine (ADR-0036) — benches are
+ * a fixed assignment, not an angle computed from seat count.
+ *
+ * Seat counts outside the documented doctrine (anything but 0–4) throw
+ * rather than guess: the domain caps games at 2–4 (ADR-0036), so this is
+ * unreachable in production once that cap lands, and a real need to seat
+ * more players is a rules question (stop-and-ask, HANDOFF directive 1),
+ * never a silent 5th placement.
+ */
+export function benchAssignment(seatCount: number, viewerSeatIndex: number): ReadonlyArray<Bench> {
+  const order = OPPONENT_BENCH_ORDER[seatCount]
+  if (order === undefined) {
+    throw new Error(
+      `benchAssignment: no bench doctrine for ${seatCount} players — the domain caps games ` +
+        "at 2–4 (ADR-0036); seating more is a rules question, not a layout guess.",
+    )
+  }
+  const benches = new Array<Bench>(seatCount)
+  if (seatCount > 0) benches[viewerSeatIndex] = "bottom"
+  for (let step = 0; step < order.length; step++) {
+    const seatIndex = (viewerSeatIndex + step + 1) % seatCount
+    benches[seatIndex] = order[step]!
+  }
+  return benches
 }

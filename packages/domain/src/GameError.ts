@@ -9,7 +9,7 @@ import { type SlotIndex, type Timestamp, type UserId } from "./Ids.js"
  * returns them in `Either.left`.
  */
 
-/** Game creation requires 2–5 players (§1.1). */
+/** Game creation requires 2–4 players (§1.1, ADR-0036). */
 export class BadPlayerCount extends Data.TaggedError("BadPlayerCount")<{
   readonly count: number
 }> {}

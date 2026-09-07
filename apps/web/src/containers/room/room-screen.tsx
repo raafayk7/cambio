@@ -33,7 +33,7 @@ import { type RoomDenial, START_HELPER, startErrorCopy, useRoom } from "./use-ro
 const DENIAL_COPY: Record<RoomDenial, { title: string; body: string }> = {
   full: {
     title: "Room full",
-    body: "Five players are already seated — the table takes no more. Create a room of your own.",
+    body: "Four players are already seated — the table takes no more. Create a room of your own.",
   },
   unknown: {
     title: "No room here",

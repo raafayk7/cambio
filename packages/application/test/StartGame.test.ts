@@ -86,7 +86,7 @@ describe("startGame (clause 4)", () => {
       )
     })
 
-  // Passed through from dealGame — the single source of the 2–5 rule.
+  // Passed through from dealGame — the single source of the 2–4 rule.
   refusal(
     "a 1-member lobby",
     { id: gid(1), members: [user(0)], status: "open" },

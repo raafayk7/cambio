@@ -12,8 +12,8 @@ import { HeldCard } from "../../components/game/held-card.js"
 import { ScoreSheet } from "../../components/game/score-sheet.js"
 import { Seat } from "../../components/game/seat.js"
 import { SlamTimer } from "../../components/game/slam-timer.js"
-import { inwardSide, seatArc, type InwardSide } from "../../components/game/table-geometry.js"
-import { TableSurface } from "../../components/game/table-surface.js"
+import { benchAssignment, type Bench } from "../../components/game/table-geometry.js"
+import { BENCH_POSITION_CLASS, TableSurface } from "../../components/game/table-surface.js"
 import { TurnIndicator } from "../../components/game/turn-indicator.js"
 import {
   affordancesFor,
@@ -243,44 +243,42 @@ function handSlotWiring(params: {
   return { interactive: false, selectedSlots }
 }
 
-// ---- hand placement (radial axis toward the table, root plan step 8) ----
+// ---- hand placement (bench doctrine, ADR-0036, root plan clause 5) ------
 
-/** The hand sits on the seat's inward side (`inwardSide`, table-geometry) —
- * the shared radial-direction source, paired with TableSurface's
- * `seatAnchor="edge"` so the whole seat+hand group grows from the ring
- * point toward the table center (CAM-18 gate fix: a centered group escaped
- * the container and occluded the chrome above it). Exact pixel placement
- * is tuned against the rendered table (step 15, ADR-0030).
+/** The hand grows INWARD from its seat's bench (`Bench`, table-geometry) —
+ * paired with TableSurface's `seatAnchor="edge"` so the whole seat+hand
+ * group grows from the bench anchor toward the table center (CAM-18 gate
+ * fix: a centered group escaped the container and occluded the chrome
+ * above it). Exact pixel placement is tuned against the rendered table
+ * (ADR-0030).
  *
- * CAM-21: at compact this radial direction is `regular:`-scoped, not
- * unprefixed — compact doesn't render the arc at all (opponents are a
- * flat wrapping row, table-surface.tsx), so letting a "left"/"right" side
- * leak into a horizontal (`flex-row`) group there was never a deliberate
+ * CAM-21: at compact this direction is `regular:`-scoped, not unprefixed —
+ * compact doesn't render bench placement at all (opponents are a flat
+ * wrapping row, table-surface.tsx), so letting a "left"/"right" bench leak
+ * into a horizontal (`flex-row`) group there was never a deliberate
  * choice, just unexamined reuse. A horizontal group is ~175px wide vs a
  * vertical one's ~95px (width = pill + gap + hand vs max(pill, hand)) —
  * with 360px to share, that's the difference between 2 opponents fitting
- * on one wrapped line and needing two (measured at the M5 rendered pass:
- * forcing every opponent to the vertical form closes the fold budget for
- * 2–4 players outright, root plan Surprises). The viewer's own seat is
- * unaffected — it already rendered vertically (its `side` always resolves
- * "top", the only side whose compact and regular forms coincide) and
- * keeps that via the `own` flag rather than `side`. */
-type RadialSide = InwardSide
-
-const REGULAR_SIDE_FLEX_CLASS: Record<RadialSide, string> = {
-  top: "regular:flex-col-reverse",
-  bottom: "regular:flex-col",
-  left: "regular:flex-row-reverse",
-  right: "regular:flex-row",
+ * on one wrapped line and needing two (measured at the CAM-21 M5 rendered
+ * pass: forcing every opponent to the vertical form closes the fold
+ * budget for 2–4 players outright). The viewer's own seat is unaffected —
+ * it always sits on the bottom bench (the only one whose compact and
+ * regular forms coincide) and keeps its vertical form via the `own` flag
+ * rather than `bench`. */
+const REGULAR_SIDE_FLEX_CLASS: Record<Bench, string> = {
+  bottom: "regular:flex-col-reverse",
+  top: "regular:flex-col",
+  right: "regular:flex-row-reverse",
+  left: "regular:flex-row",
 }
 
 function SeatWithHand({
-  side,
+  bench,
   own,
   seat,
   hand,
 }: {
-  side: RadialSide
+  bench: Bench
   own: boolean
   seat: React.ReactNode
   hand: React.ReactNode
@@ -290,7 +288,7 @@ function SeatWithHand({
       className={cn(
         "flex items-center gap-2",
         own ? "flex-col-reverse" : "flex-col",
-        REGULAR_SIDE_FLEX_CLASS[side],
+        REGULAR_SIDE_FLEX_CLASS[bench],
       )}
     >
       {seat}
@@ -338,7 +336,7 @@ function GameTable({
   // resolved for an authenticated participant — the Math.max is a
   // type-level fallback, not a live branch (room-screen precedent).
   const viewerSeatIndex = Math.max(0, viewerIndex)
-  const seatPositions = seatArc(view.players.length, viewerSeatIndex)
+  const benches = benchAssignment(view.players.length, viewerSeatIndex)
 
   const playerName = (id: string): string =>
     view.players.find((player) => player.id === id)?.name ?? ""
@@ -512,8 +510,13 @@ function GameTable({
 
   const seatNodes = view.players.map((player, index) => {
     const own = index === viewerSeatIndex
-    const seatPos = seatPositions[index]
-    const side = seatPos !== undefined ? inwardSide(seatPos) : "bottom"
+    const bench = benches[index] ?? "bottom"
+    // ADR-0036 §5 / decision 5: a side-bench opponent's hand reads rotated
+    // along its bench. The viewer's own hand is never on a side bench
+    // (decision 2's hang-below exception keeps it on `bottom`), so this
+    // never needs to special-case `own`.
+    const rotate =
+      bench === "left" ? ("left" as const) : bench === "right" ? ("right" as const) : undefined
     const wiring = handSlotWiring({
       affordances,
       playerId: player.id,
@@ -549,7 +552,7 @@ function GameTable({
     return (
       <SeatWithHand
         key={player.id}
-        side={side}
+        bench={bench}
         own={own}
         seat={
           <Seat
@@ -566,6 +569,7 @@ function GameTable({
             playerId={player.id}
             slots={handSlots}
             faces={facesFor(player.id)}
+            {...(rotate !== undefined ? { rotate } : {})}
             inert={!wiring.interactive && slamOnSlotClick === undefined}
             // CAM-23: the armed give-slot renders with the same
             // `selectedSlots` treatment `Hand` already uses for an
@@ -595,10 +599,15 @@ function GameTable({
 
   return (
     // Unconditionally relative (CAM-21, was `regular:relative`): the
-    // positioned ancestor for both the compact bounded stage below and the
+    // positioned ancestor for both the bounded stage below and the
     // regular docked Call Cambio affordance (bottom-right of the whole
-    // stage column).
-    <div className="relative flex w-full flex-1 min-h-0 flex-col items-center gap-4 regular:flex-initial regular:min-h-auto">
+    // stage column). `flex-1 min-h-0` now stay LIVE at regular too
+    // (CAM-20/ADR-0036 clause 9: `regular:flex-initial`/
+    // `regular:min-h-auto` used to cancel them here, restoring the OLD
+    // regular layout CAM-21 deliberately pinned as "regular untouched" —
+    // this task revises that on purpose so the stage actually claims the
+    // screen wrapper's bounded height instead of growing to fit content).
+    <div className="relative flex w-full flex-1 min-h-0 flex-col items-center gap-4">
       {/* Top band (root plan clause 2, CAM-21): turn indicator, slam timer,
           and every inline message pin here — none of them can leave the
           viewport while the game screen is mounted. `regular:contents`
@@ -642,35 +651,36 @@ function GameTable({
       {/* Middle region (root plan clause 4, CAM-21): stays the flight root
           and the ScoreSheet overlay's positioning box (ADR-0034/0035 —
           zero flight-layer churn, no transform anywhere in this chain).
-          Compact: a bounded column of (a) the ONLY element that ever
+          A bounded flex column of (a) the ONLY element that ever
           scrolls — the opponents/table/art, and (b) the extracted own
           seat, docked directly beneath it (the dock's hand half).
-          `regular:block` restores plain document flow; align-items and
-          gap die with the flex display, but flex-ITEM properties
-          (`flex-1`, `min-h-0`) would stay live against the stage — so
-          both are explicitly restored at regular below (review F3:
-          an earlier comment here claimed they'd be inert; they aren't).
-          Design-gate note (2026-09-06, wording per review F5): the
-          scroll region below is `flex-1`, so at 2–4 players (where its
-          content is shorter than its allocation) it grows past its
-          content and leaves ~37px of empty paving between the table and
-          the own-hand dock. That slack is ACCEPTED FLEX RESIDUE, kept
-          knowingly: it reads acceptably as separation between the
-          shared table and the viewer's zone, it's identical across
-          every player count that fits the fold, and 16px of it was
-          reclaimed as real padding on the pinned bands (the screen
-          wrapper's `py-2`). Fully eliminating it would mean moving
-          flex-grow off this element entirely, relocating the same slack
-          elsewhere in the column for no clear gain — not worth the risk
-          against the fold budget. */}
+          CAM-20/ADR-0036 clause 9: `regular:block`/`regular:flex-initial`/
+          `regular:min-h-auto` used to cancel flex here, restoring the OLD
+          regular layout (CAM-21 pinned "regular untouched" for exactly
+          these three utilities) — this task deliberately revises that.
+          Table-root now stays a REAL flex column at regular too, so
+          TableSurface (the scroll wrapper's only child, hoisted by its
+          own `regular:contents` below) can be given `flex-1` and grow to
+          fill whatever height this element has. The extracted own-seat
+          wrapper right below is `shrink-0` AND `regular:absolute` at
+          regular (out of flow there), so TableSurface is the only
+          in-flow flex child at regular — its resolved box exactly
+          coincides with table-root's own (same top edge, same height),
+          which is what keeps the own-seat wrapper's bench percentages
+          (measured against table-root) aligned with TableSurface's
+          benches (see the wrapper's own comment below). */}
       <div
         ref={setTableRoot}
         data-region="table-root"
-        // `gap-2` (not the stage's `gap-4`): compact-only in effect — the
-        // fold budget was short at the M5 rendered pass (root plan
-        // Surprises), and this gap is inert at regular anyway once
-        // `regular:block` cancels flex.
-        className="relative flex w-full flex-1 min-h-0 flex-col items-center gap-2 regular:order-9 regular:block regular:flex-initial regular:min-h-auto"
+        // `gap-2` (not the stage's `gap-4`, CAM-21): compact has TWO
+        // in-flow children (the scroll wrapper + the own-seat wrapper
+        // below, both still in-flow there) — the gap separates them for
+        // the fold budget. At regular the scroll wrapper dissolves
+        // (`regular:contents`) and the own-seat wrapper goes
+        // `regular:absolute`, leaving TableSurface the only in-flow flex
+        // child (see the comment above) — `gap` has nothing to apply
+        // between there, inert but harmless.
+        className="relative flex w-full flex-1 min-h-0 flex-col items-center gap-2 regular:order-9"
       >
         <div
           data-region="table-scroll"
@@ -683,12 +693,13 @@ function GameTable({
             seatAnchor="edge"
             viewerSeat="external"
             center={
-              // CAM-21 design-gate fix: compact-only gap-1 (was the shared
-              // gap-4) — at the 128px compact art cap the painted disc is
-              // only 69px (TABLE_DISC_FRACTION 0.54), and the deck+discard
-              // pair at gap-4 (80px total) hung ~5.5px off each edge onto
-              // the bench art. gap-1 brings the pair to 68px, inside the
-              // disc; regular keeps gap-4 (its disc has plenty of room).
+              // CAM-21 design-gate fix, numbers re-derived after CAM-20's
+              // fix pass raised the compact art cap to 158px (review F10c):
+              // the painted disc is now ~85px (TABLE_DISC_FRACTION 0.54).
+              // gap-4 would put the deck+discard pair at 80px — a ~2.6px
+              // margin per side, still cramped against the disc's painted
+              // edge — so compact keeps gap-1 (pair at 68px, clear air);
+              // regular keeps gap-4 (its disc has plenty of room).
               <div className="flex items-center gap-1 regular:gap-4">
                 <DrawDeck
                   count={view.deckCount}
@@ -731,21 +742,26 @@ function GameTable({
           />
         </div>
         {/* The viewer's own seat, extracted from TableSurface (root plan
-            clause 3): reuses the exact geometry TableSurface would have
-            applied (`seatArc`'s ring point, the "top"-inward centered
-            translate the viewer's bottom-center position always resolves
-            to — table-surface.tsx's own EDGE_ANCHOR_CLASS comment records
-            why). Landing INSIDE this middle div, after the scroll wrapper,
-            keeps every flight anchor a descendant of `tableRoot` with zero
-            flight-layer churn — clause 5 by containment, not by moving the
-            ref. Compact: `shrink-0` so the scroll region above absorbs any
-            squeeze, never the dock. This OUTER div must stay `position:
-            static` at compact — its inline `left`/`top` are ring-point
-            PERCENTAGES meant only for `regular:absolute`; making it
-            `relative` here too (an earlier version of this fix did)
-            resurrects them as a relative offset and shoves the whole hand
-            off-screen (confirmed at the M5 rendered pass). The INNER div
-            is the positioning context for the game-over rest instead.
+            clause 3): reuses the exact `bottom`-bench POSITION
+            (`BENCH_POSITION_CLASS`) TableSurface imports from the same
+            module and would have applied itself — one shared source, no
+            hand-copied position, no reproduced geometry call (decision 3).
+            The vertical TRANSLATE diverges from `BENCH_ANCHOR_CLASS.bottom`
+            by one 4px spacing step (CAM-20 gate fix, finding 1 — see the
+            wrapper's own comment below); the shared constant itself is
+            untouched and TableSurface's internal seatWrapper still uses it
+            unmodified for the room screen's own-seat pill. Landing INSIDE
+            this middle div,
+            after the scroll wrapper, keeps every flight anchor a
+            descendant of `tableRoot` with zero flight-layer churn —
+            clause 5 by containment, not by moving the ref. Compact:
+            `shrink-0` so the scroll region above absorbs any squeeze,
+            never the dock. Bench placement is entirely `regular:`-scoped
+            Tailwind classes now (no inline ring-point percentages) — the
+            old hazard of `position: relative` reviving stray inline
+            offsets at compact no longer applies by construction, but this
+            OUTER div still carries no unprefixed position of its own; the
+            INNER div is the positioning context for the game-over rest.
             The rest is COMPACT-ONLY (`regular:hidden`, review F2): at
             regular this wrapper is `regular:z-10`, a stacking context
             that TableSurface's own full-region z-20 rest paints OVER
@@ -761,11 +777,21 @@ function GameTable({
             z-20/`green-deep`/35% treatment, scoped to this wrapper. */}
         <div
           data-seat-index={viewerSeatIndex}
-          className="shrink-0 regular:absolute regular:z-10 regular:-translate-x-1/2 regular:-translate-y-1/2"
-          style={{
-            left: `${seatPositions[viewerSeatIndex]?.xPct ?? 50}%`,
-            top: `${seatPositions[viewerSeatIndex]?.yPct ?? 50}%`,
-          }}
+          className={cn(
+            "shrink-0 regular:absolute regular:z-10",
+            BENCH_POSITION_CLASS.bottom,
+            // CAM-20 gate fix (regular, finding 1): `BENCH_ANCHOR_CLASS.bottom`
+            // centers the group with a plain `-translate-y-1/2`, which measured
+            // 3px past the 900px regular reference viewport (the pill's bottom
+            // border + its 3x3 hard shadow), clipped by the screen wrapper's
+            // `overflow-hidden` ancestor — undetected because nothing pinned
+            // the actual bottom coordinate. Nudged up by one 4px spacing step
+            // beyond that translate, scoped to THIS wrapper only (not the
+            // shared constant — table-surface.tsx's own internal seatWrapper
+            // reuses `BENCH_ANCHOR_CLASS.bottom` unmodified for the room
+            // screen's own-seat pill, which this task's finding never flagged).
+            "regular:-translate-x-1/2 regular:translate-y-[calc(-50%-4px)]",
+          )}
         >
           <div className="relative">
             {seatNodes[viewerSeatIndex]}
@@ -851,13 +877,41 @@ function GameTable({
           </div>
         ) : null}
         {affordances.phase === "AwaitingDraw" && affordances.holder ? (
-          // The call affordance docks at the stage's bottom corner at
-          // regular — it is the VIEWER's action, so it lives by their hand
-          // (gate fix: the tall top stack pushed the viewer's own seat
-          // below the fold). Compact: part of the bottom dock, alongside
-          // the hand it belongs to (root plan Decision Log — this reverses
-          // CAM-18's "compact keeps it in flow" call).
-          <div className="regular:absolute regular:right-5 regular:bottom-5 regular:z-20 regular:order-5 regular:self-end">
+          // The call affordance docks by the viewer's own hand at regular —
+          // it is the VIEWER's action (gate fix: the tall top stack pushed
+          // the viewer's own seat below the fold). Compact: part of the
+          // bottom dock, alongside the hand it belongs to (root plan
+          // Decision Log — this reverses CAM-18's "compact keeps it in
+          // flow" call).
+          //
+          // CAM-20 gate fix (regular, finding 2): this element's DOM
+          // location (inside dock-actions, `regular:contents`-dissolved)
+          // must stay put — `dockActions().contains(callCambio)` is an
+          // existing structural pin (game-screen.test.tsx) and the exact
+          // reason "part of the bottom dock" holds at compact — so it still
+          // resolves `position:absolute` against the STAGE (this component's
+          // outer `relative` div), not against `table-root`. The own-seat
+          // group is centered at the stage's horizontal midline (same
+          // centerline table-root and the stage share, both `w-full`), so
+          // `left: calc(50% + …)` reaches it without needing table-root as
+          // an ancestor. The own hand's row width caps at 6 columns
+          // (hand.tsx `ROW_WIDTH`) regardless of card count — extra cards
+          // ADD ROWS, never extra width — so 6 × card-lg's regular width
+          // (2×`--spacing-7` = 96px) + 5 × the grid's own gap (`gap-2` =
+          // 8px) = 616px is the true CEILING on the hand's rendered width,
+          // not an approximation: half of that (308px) plus one `gap-4`
+          // step (16px) places the button just outside the widest hand this
+          // component ever renders. Shorter hands (4 or 5 cards, 408px/
+          // 512px) leave a bigger but still small gap (~100-150px) instead
+          // of a fixed corner 260-415px away — measured live at a 4-card
+          // hand: gap dropped from 260.5px to well under 150px. A true
+          // pixel-exact dock would need JS measurement of the rendered hand
+          // (no existing breakpoint-aware measurement hook exists in this
+          // codebase, and `window.matchMedia` isn't polyfilled in the
+          // jsdom test environment) — out of proportion for a reposition-
+          // only fix; this CSS-only approximation is bounded and correct
+          // for the common (5+ card) case.
+          <div className="regular:absolute regular:bottom-5 regular:left-[calc(50%+324px)] regular:z-20 regular:order-5">
             <Button variant="danger" onClick={() => setConfirmCambioOpen(true)}>
               Call Cambio
             </Button>
@@ -1000,29 +1054,33 @@ export function GameScreen({ gameId }: { gameId: string }) {
 
   return (
     <AppShell scene="paving" state="game" connection={connection}>
-      {/* CAM-21: the compact viewport bound lives HERE, not on AppShell —
+      {/* CAM-21: the viewport bound lives HERE, not on AppShell —
           lobby/room screens don't use this wrapper and inherit nothing
           (root plan decision 1). `max-h-dvh` + the `min-h-0` flex chain
-          give GameTable's stage a real height to bound itself against;
-          the compact vertical padding is restored at regular, where the
-          bound itself is cancelled — this screen keeps scrolling normally
-          there (clause 10). Known residual: `max-h-dvh` ignores the
-          shell's safe-area inset padding, so on notched devices the bound
-          is generous by that amount; exact at the 360×640 floor.
-          `py-2` (design-gate fix, was `py-0`): the scroll region
-          (table-root's `table-scroll`) is flex-grown past its own
-          content at 2–4 players by ~53px — unclaimed slack, not a
-          decision — which left the pinned top/bottom bands flush with
-          the viewport edges and clipped the dock's button shadow. This
-          claims 16px of that same slack as real padding instead
-          (verified: still exactly fits at 2–4 players; 5 players was
-          already relying on its scroll fallback and is unaffected in
-          practice). */}
+          give GameTable's stage a real height to bound itself against.
+          CAM-20/ADR-0036 clause 9 EXTENDS the bound to `regular` (was
+          compact-only; `regular:max-h-none`/`regular:overflow-visible`
+          used to cancel it and let this screen scroll the page normally
+          there) — the fluid table needs a real, bounded height to grow
+          into at every breakpoint, not just compact's fold. Only the
+          padding restores at regular now (`regular:py-4`), a visual
+          choice independent of the bound itself. Known residual:
+          `max-h-dvh` ignores the shell's safe-area inset padding, so on
+          notched devices the bound is generous by that amount; exact at
+          the 360×640 floor. `py-2` (design-gate fix, was `py-0`, CAM-21):
+          the scroll region (table-root's `table-scroll`) is flex-grown
+          past its own content at 2–4 players by ~53px — unclaimed slack,
+          not a decision — which left the pinned top/bottom bands flush
+          with the viewport edges and clipped the dock's button shadow.
+          This claims 16px of that same slack as real padding instead
+          (verified at CAM-21 for the then-supported 2–5; CAM-20 re-
+          verifies the fold at M6 with the row-major hand, bench layout,
+          and the regular bound extended here). */}
       {/* `justify-center` is inert for the game state (GameTable's stage is
           `flex-1`) but still centers every non-stage state — skeleton,
           no-access, error — so it stays (review F5.6 called it dead; it is
           only conditionally so). */}
-      <div className="flex max-h-dvh w-full flex-1 min-h-0 flex-col justify-center gap-4 overflow-hidden px-4 py-2 regular:max-h-none regular:min-h-auto regular:overflow-visible regular:py-4">
+      <div className="flex max-h-dvh w-full flex-1 min-h-0 flex-col justify-center gap-4 overflow-hidden px-4 py-2 regular:py-4">
         {ownHeading ? null : <h1 className="sr-only">Game</h1>}
         {content}
       </div>

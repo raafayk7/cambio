@@ -120,13 +120,55 @@ as digital, not print.
   tuned down from an initial `64px`/`32px` at the M5 rendered pass once
   the measured budget came up short — root plan Surprises). `card-sm`
   (`32px`) is unchanged at both breakpoints. `--size-table-art-compact`
-  (`128px`, tuned down from an initial `160px` the same pass): the
-  compact-only max-width cap on the table art — square asset, so it's
+  (`158px` — CAM-21 tuned it down from an initial `160px` to `128px` at
+  the M5 rendered pass for fold budget, then CAM-20's design-gate pass
+  raised it back to `158px`, a newly re-measured value rather than a
+  revert, once `128px` was found to leave the deck+discard pair
+  effectively flush against the tabletop disc — see table-surface.md r6):
+  the compact-only max-width cap on the table art — square asset, so it's
   also the height cap. The cap (like the surface's tightened root gap)
   belongs to the game screen's DOCKED composition only
   (`viewerSeat="external"`, table-surface.md r4 as amended at review) —
   the room screen's default path keeps the uncapped `w-3/4` art and
   `gap-4`.
+- `card-frame` (the shared card/slot footprint utility — `playing-card.md`,
+  `hand.md`): `width: --card-width`, `aspect-ratio: 5 / 7` — the playing-card
+  proportion — plus `radius.card`. `card-frame-rotated` (CAM-20,
+  gate-approved 2026-09-06) is its canonical sibling for a side-bench
+  opponent's rotated hand (`hand.md` r3, ADR-0036 §5): identical
+  conventions, `aspect-ratio: 7 / 5` — the width/height-reversed
+  footprint a rotated card's painted shape needs at the same
+  `--card-width`. The user chose minting this new utility over the two
+  alternatives raised (a shared `--card-aspect` variable on `card-frame`
+  itself, or tuning bench spacing without a new footprint token).
+- **Art-registration constants** (CAM-20 review fix cycle, F9): a small
+  family of pixel values measured against the painted table asset rather
+  than drawn from the spacing scale — they register CSS boxes onto raster
+  art, so they cannot be `@theme` tokens, but they are canon and live
+  here so no one mistakes them for magic numbers. All are
+  regular-breakpoint, arbitrary-value utilities, each with a derivation
+  pin or source-comment derivation:
+  - **Bench inset literals** `8.5%`/`91.5%`
+    (`table-surface.tsx` `BENCH_POSITION_CLASS`) = `50 ∓ BENCH_INSET_PCT`
+    (41.5, `table-geometry.ts`); pinned in lockstep by
+    `table-geometry.test.ts`.
+  - **Side-bench arc offsets** 23–65px (`hand.tsx`
+    `SIDE_BENCH_ARC_CLASS`): per-row `relative` offsets on the slot
+    anchors fitting the bench crescent's sagitta — 4-row `40/57/57/40`,
+    5-row `32/48/65/48/32` (formula-generated), 6-row
+    `23/40/57/57/40/23` (rendered-verified 2026-09-07). Derivation and
+    measurement provenance in the `hand.tsx` block comment; canon in
+    `hand.md` r5.
+  - **Call Cambio dock offset** `calc(50% + 324px)`
+    (`game-screen.tsx`): half the own hand's full-row width
+    (`ROW_WIDTH`·96px card-lg + 5·8px gaps)/2 + one 16px clearance step;
+    derivation pinned in `game-screen.test.tsx`.
+  - **Own-seat dock nudge** `-4px`
+    (`game-screen.tsx` `translate-y-[calc(-50%-4px)]`): one 4px spacing
+    step raising the docked group inside the 900px reference viewport
+    (design-gate fix, regular finding 1); deliberately NOT folded into
+    the shared `BENCH_ANCHOR_CLASS.bottom` (pinned in
+    `game-screen.test.tsx`).
 
 ## Elevation
 

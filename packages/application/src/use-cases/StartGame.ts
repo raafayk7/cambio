@@ -26,7 +26,7 @@ import { SeedPort } from "../ports/Seed.js"
  * `SeedPort` and `now` from `ClockPort`; the full `GameStarted` batch is
  * persisted in ONE save guarded by the lobby's current version (the
  * lobby→game transition, ADR-0019 — after it, seq 0 is `GameStarted`).
- * `dealGame` owns the 2–5 player rule (`BadPlayerCount`); the lobby model
+ * `dealGame` owns the 2–4 player rule (`BadPlayerCount`); the lobby model
  * deliberately doesn't duplicate it.
  *
  * `GameConfig` is a plain input — presentation assembles it from AppConfig

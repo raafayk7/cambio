@@ -33,9 +33,52 @@ describe("Hand", () => {
     ])
   })
 
-  it("keeps the 2×2 footprint minimum: a single card still shows four slots", () => {
+  it("keeps the minimum footprint: a single card still shows four slots in one row (hand.md r3)", () => {
     const { container } = render(<Hand variant="own" playerId="p1" slots={[0]} />)
     expect(cellsOf(container)).toHaveLength(4)
+    const grid = container.querySelector('[data-variant="own"]')
+    expect(grid?.children).toHaveLength(4)
+    expect(grid?.className).toContain("grid-cols-4")
+  })
+
+  it("renders a 4-card deal as one straight row of four, never padded to a second row", () => {
+    const { container } = render(<Hand variant="own" playerId="p1" slots={[0, 1, 2, 3]} />)
+    const grid = container.querySelector('[data-variant="own"]')
+    expect(grid?.children).toHaveLength(4)
+    expect(grid?.className).toContain("grid-cols-4")
+  })
+
+  it("keeps a single row up to six cards, without padding to a second row", () => {
+    const { container } = render(<Hand variant="own" playerId="p1" slots={[0, 1, 2, 3, 4, 5]} />)
+    const cells = cellsOf(container)
+    expect(cells).toHaveLength(6)
+    const grid = container.querySelector('[data-variant="own"]')
+    expect(grid?.children).toHaveLength(6)
+    expect(grid?.className).toContain("grid-cols-6")
+  })
+
+  it("pads a hand exceeding one row up to a full 6-wide grid, with invisible fillers beyond the highest signal", () => {
+    const { container } = render(<Hand variant="own" playerId="p1" slots={[0, 1, 2, 3, 4, 5, 6]} />)
+    const cells = cellsOf(container)
+    expect(cells).toHaveLength(7)
+    const grid = container.querySelector('[data-variant="own"]')
+    expect(grid?.children).toHaveLength(12)
+    expect(grid?.className).toContain("grid-cols-6")
+  })
+
+  it("tolerates a third row: 13 cards pad to 18 slots (6×3)", () => {
+    const slots = Array.from({ length: 13 }, (_, index) => index as never)
+    const { container } = render(<Hand variant="own" playerId="p1" slots={slots} />)
+    const cells = cellsOf(container)
+    expect(cells).toHaveLength(13)
+    const grid = container.querySelector('[data-variant="own"]')
+    expect(grid?.children).toHaveLength(18)
+  })
+
+  it("never caps or truncates hand data: a 19-card hand still renders every real slot (root plan clause 7)", () => {
+    const slots = Array.from({ length: 19 }, (_, index) => index as never)
+    const { container } = render(<Hand variant="own" playerId="p1" slots={slots} />)
+    expect(cellsOf(container)).toHaveLength(19)
   })
 
   it("removal keeps the slot: dropping index 1 leaves its outline in place", () => {
@@ -131,5 +174,78 @@ describe("Hand", () => {
     expect(emptySlotButton).not.toBeNull()
     emptySlotButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }))
     expect(onSlotClick).toHaveBeenCalledWith(1)
+  })
+
+  describe("rotate (r3, ADR-0036 §5 — side-bench opponents, regular breakpoint only)", () => {
+    it("flows column-major instead of row-major once rotated, at regular only", () => {
+      const { container } = render(
+        <Hand variant="opponent" playerId="p1" slots={[0, 1, 2, 3]} rotate="left" />,
+      )
+      const grid = container.querySelector('[data-variant="opponent"]')
+      // The base (compact) layout is the plain row-major grid-cols-4 —
+      // rotation only overrides it at `regular:` (M6 rendered-pass fix: an
+      // earlier unprefixed version leaked a 3-column rotated grid into
+      // compact and broke the fold at 3–4 players).
+      expect(grid?.className).toContain("grid-cols-4")
+      expect(grid?.className).toContain("regular:grid-cols-none")
+      expect(grid?.className).toContain("regular:grid-flow-col")
+      expect(grid?.className).toContain("regular:grid-rows-4")
+    })
+
+    it("rotates the card visual, never the slot anchor (ADR-0035/0036 no-transform-above-anchor rule)", () => {
+      const { container } = render(
+        <Hand variant="opponent" playerId="p1" slots={[0]} rotate="left" />,
+      )
+      const anchor = container.querySelector('[data-slot-index="0"]')
+      expect(anchor?.className ?? "").not.toMatch(/rotate-/)
+      const visual = anchor?.querySelector("[data-face]")
+      expect(visual).toHaveClass("regular:-rotate-90")
+    })
+
+    it("rotates the opposite way for a right-bench opponent", () => {
+      const { container } = render(
+        <Hand variant="opponent" playerId="p1" slots={[0]} rotate="right" />,
+      )
+      const visual = container.querySelector('[data-slot-index="0"] [data-face]')
+      expect(visual).toHaveClass("regular:rotate-90")
+    })
+
+    it("applies the side-bench arc offset to the ANCHOR div, not the card visual, so flights land on the resting card (review F2)", () => {
+      const { container } = render(
+        <Hand variant="opponent" playerId="p1" slots={[0, 1, 2, 3]} rotate="left" />,
+      )
+      const anchor = container.querySelector('[data-slot-index="1"]')
+      expect(anchor?.className ?? "").toContain("regular:relative")
+      expect(anchor?.className ?? "").toContain("regular:-left-[57px]")
+      // The visual carries rotation only — no margin/offset that would
+      // displace the painted card from the anchor the FLIP layer measures.
+      const visual = anchor?.querySelector("[data-face]")
+      expect(visual?.className ?? "").not.toMatch(/ml-\[|-left-\[|left-\[/)
+    })
+
+    it("mirrors the arc offset for a right-bench opponent", () => {
+      const { container } = render(
+        <Hand variant="opponent" playerId="p1" slots={[0, 1, 2, 3]} rotate="right" />,
+      )
+      const anchor = container.querySelector('[data-slot-index="1"]')
+      expect(anchor?.className ?? "").toContain("regular:left-[57px]")
+      expect(anchor?.className ?? "").not.toContain("regular:-left-[57px]")
+    })
+
+    it("rotates an empty (vacancy) slot's dashed outline the same way as an occupied one", () => {
+      const { container } = render(
+        <Hand variant="opponent" playerId="p1" slots={[]} rotate="left" />,
+      )
+      const vacancy = container.querySelector('[data-slot-index="0"] span')
+      expect(vacancy).toHaveClass("regular:-rotate-90")
+    })
+
+    it("omits rotation entirely for top/bottom benches (no rotate prop)", () => {
+      const { container } = render(<Hand variant="own" playerId="p1" slots={[0]} />)
+      const grid = container.querySelector('[data-variant="own"]')
+      expect(grid?.className).not.toContain("grid-flow-col")
+      const visual = container.querySelector('[data-slot-index="0"] [data-face]')
+      expect(visual?.className ?? "").not.toMatch(/rotate-/)
+    })
   })
 })

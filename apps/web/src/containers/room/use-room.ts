@@ -33,7 +33,7 @@ import { subscribeTopic } from "../../services/realtime.js"
  * `GameStarted` navigates. On re-subscribe after a drop the query is
  * refetched so missed broadcasts are absorbed. Everything rendered comes
  * from contracts-decoded payloads — the client reflects, never re-implements
- * (projection renderer; the 2–5 start rule is the server's call).
+ * (projection renderer; the 2–4 start rule is the server's call).
  */
 
 export type RoomDenial = "full" | "unknown" | "started" | "closed"
@@ -44,13 +44,13 @@ type JoinOutcome =
   | { readonly kind: "already-member" }
   | { readonly kind: "player-of-started-game" }
 
-export const START_HELPER = "2–5 players"
+export const START_HELPER = "2–4 players"
 
 /** Voice.md copy for a refused start: what went wrong, then the fix. */
 export function startErrorCopy(error: unknown): string | undefined {
   if (error === null || error === undefined) return undefined
   if (error instanceof ApiError && error.tag === "BadPlayerCount") {
-    return "The game needs 2 to 5 players at the table. Share the link and wait for a friend."
+    return "The game needs 2 to 4 players at the table. Share the link and wait for a friend."
   }
   return "Couldn't start the game. Try again."
 }

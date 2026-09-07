@@ -36,10 +36,10 @@ export type Lobby = typeof Lobby.Type
 export const decodeLobby = Schema.decodeUnknownSync(Lobby)
 export const encodeLobby = Schema.encodeSync(Lobby)
 
-/** The §1.1 player ceiling — a sixth member could never be seated. */
-export const MAX_LOBBY_MEMBERS = 5
+/** The §1.1 player ceiling (ADR-0036) — a fifth member could never be seated. */
+export const MAX_LOBBY_MEMBERS = 4
 
-/** The lobby already holds five members (§1.1). */
+/** The lobby already holds four members (§1.1, ADR-0036). */
 export class LobbyFull extends Data.TaggedError("LobbyFull") {}
 
 /** Joining a lobby you are already in. */
@@ -109,7 +109,7 @@ export const leaveLobby = (
  * plan Decision Log). Returns the seat order (= join order) as member IDS —
  * `dealGame` and every engine consumer stay id-typed (CAM-17 C1).
  * Deliberately no member-count check: `dealGame`'s `BadPlayerCount` is the
- * single source of the 2–5 rule.
+ * single source of the 2–4 rule (§1.1, ADR-0036).
  */
 export const startSeats = (
   lobby: Lobby,

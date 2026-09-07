@@ -66,11 +66,11 @@ describe("joinLobby (clause 2)", () => {
     if (err._tag === "AlreadyInLobby") expect(err.userId).toBe(p1.id)
   })
 
-  it("a fifth member fills the lobby; a sixth is LobbyFull (§1.1 ceiling)", () => {
-    const four = openWith(user(10), user(11), user(12), user(13))
-    const five = expectRight(joinLobby(four, user(14)))
-    expect(five.members).toHaveLength(MAX_LOBBY_MEMBERS)
-    const err = expectLeft(joinLobby(five, user(15)))
+  it("a fourth member fills the lobby; a fifth is LobbyFull (§1.1 ceiling)", () => {
+    const three = openWith(user(10), user(11), user(12))
+    const four = expectRight(joinLobby(three, user(13)))
+    expect(four.members).toHaveLength(MAX_LOBBY_MEMBERS)
+    const err = expectLeft(joinLobby(four, user(14)))
     expect(err._tag).toBe("LobbyFull")
   })
 

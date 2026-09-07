@@ -26,6 +26,14 @@ Cambio is a hidden-information, memory-based card game. **Lowest score wins.**
 ### 1.1 Setup
 
 - 2–5 players. Single standard 52-card deck. No jokers.
+
+> **Amended:** [ADR-0036](adr/0036-four-player-cap-bench-anchored-table-layout.md)
+> caps games at **2–4 players**, enforced in the domain (`Deal.ts`'s
+> player-count gate, `Lobby.ts`'s `MAX_LOBBY_MEMBERS`) — the bench-anchored
+> table layout makes the visual metaphor load-bearing, and the rule bends to
+> it. The "2–5 players" line above is superseded; a fifth player is no
+> longer accepted.
+
 - Each player is dealt **4 face-down cards**. Players do **not** look at any of them.
 - **There is no opening peek phase.** This is intentional and differs from most published Cambio variants. Do not add one.
 - One card is turned face up to start the discard pile. The remainder is the face-down draw deck.
@@ -204,6 +212,10 @@ There are exactly 52 cards. Model them as a domain constant, not a database enti
 
 This locks the game to one deck. That's acceptable at a 5-player maximum.
 
+> **Amended:** the maximum is now **4 players** (ADR-0036, see the §1.1
+> amendment) — which only strengthens this conclusion: one deck covers a
+> 4-player game with even more headroom.
+
 ### 4.2 Turn phase is a discriminated union
 
 > **Amended:** this sketch is superseded by the implemented union in
@@ -340,7 +352,8 @@ Two gotchas:
 
 - Computer/AI opponents. Designed for (the domain being pure and the belief model existing make a bot a pure function from redacted view → command) but **not built yet**.
 - Spectator mode, reconnect-mid-game UX polish, match history UI, ranked play, accounts with passwords.
-- Horizontal scaling, Redis, multiple decks, more than 5 players.
+- Horizontal scaling, Redis, multiple decks, more than 5 players (now
+  more than **4** — ADR-0036 capped games at 2–4, see the §1.1 amendment).
 
 ---
 

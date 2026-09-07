@@ -171,25 +171,35 @@ as orientation for the PRE-task shape, and prefer the symbol names.
    inline-style rule (genuinely dynamic), but prefer an enumerated
    class map (`grid-cols-4`…`grid-cols-6`) if the value space stays
    this small.
-5. **Side-bench rotation lives below the anchors.** For `left`/`right`
+5. **Side-bench rotation lives below the anchors.** ~~For `left`/`right`
    benches the hand's rows run vertically along the bench. Mechanism
    per ADR-0036 §5: the grid flows column-major (e.g. a fixed row count
    with `grid-flow-col`, so slot indices run down the bench — the
    row-major layout turned 90° as a LAYOUT, not a transform); each slot
    anchor stays an upright box sized to the rotated footprint (w/h
    swapped — 7/5 where `card-frame` is 5/7); the card VISUAL inside the
-   anchor takes the rotate (90° one way on the left bench, the other
-   way on the right, so both read as facing the table center). The
-   FLIP clone renders upright and the resting card is rotated — a
-   one-beat landing artifact, accepted under ADR-0034's
-   capture-then-cancel stance (same class as the mid-flight-scroll
-   desync ADR-0035 records); note it in the canon revision so nobody
-   "fixes" it with a transform on the anchor chain.
-   **Creation-gate STOP:** the swapped slot footprint needs a canonical
-   utility (a rotated sibling of `card-frame` in
+   anchor takes the rotate~~ **As implemented, the anchor sizing sketch
+   above is superseded** (discovered at the creation-gate follow-up,
+   full account in Surprises): the flight anchor keeps plain UPRIGHT
+   `card-frame` (5/7) — it is the grid's real reserved track space and
+   must stay sized like an upright card — while only the card VISUAL
+   inside it takes the new `card-frame-rotated` utility (7/5) plus the
+   rotate class (90° one way on the left bench, the other way on the
+   right, so both read as facing the table center), comfortably smaller
+   than its upright anchor on both axes and centered via
+   `flex items-center justify-center`. A first attempt that swapped the
+   anchor's own footprint (matching this sketch literally) fixed one
+   clearance axis while silently breaking the other — see Surprises for
+   the measurements. The FLIP clone renders upright and the resting
+   card is rotated — a one-beat landing artifact, accepted under
+   ADR-0034's capture-then-cancel stance (same class as the
+   mid-flight-scroll desync ADR-0035 records); noted in the canon
+   revision so nobody "fixes" it with a transform on the anchor chain.
+   **Creation-gate STOP (resolved):** the swapped slot footprint needed
+   a canonical utility — the user chose minting `card-frame-rotated` in
    `packages/ui/src/styles.css`, mirrored in
-   `design-system/references/tokens.md`) — name the gap and get the
-   user's call before minting it. `rotate-90` itself is an enumerated
+   `design-system/references/tokens.md`, over a shared `--card-aspect`
+   variable or a spacing-only fix. `rotate-90` itself is an enumerated
    Tailwind step, not a new value.
 6. **Fluid table at regular, scoped to the docked composition.** The
    regular table square grows to claim the vertical space between the
@@ -417,16 +427,16 @@ note**; test file, name, and assertion phrase are written by
 a test title and assertion is an overclaim waiting to become a review
 finding.)_
 
-| Clause                                | Planned approach (plan-time)                                                                                                                                                                                                                                                                                       | Test (file + name)         | What is asserted           |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------- | -------------------------- |
-| 5. Bench anchoring, no radial remnant | jsdom unit tests on the bench-assignment model (per-count maps, viewer-bottom for every viewer index, left→top→right sweep) in `table-geometry.test.ts`'s successor; a structural pin that seat wrappers carry bench-class anchors, not ring-point inline styles; rendered evidence at 2/3/4 for the visual claim. | _(filled by `/implement`)_ | _(filled by `/implement`)_ |
-| 6. Row-major hands, stable slots      | `hand.test.tsx`: footprint rule (min 4 one-row; 6-wide wrap; pads beyond highest signal), vacancy-in-place on removal, growth appends at lowest free slot — behaviors carried from the existing suite with new footprint expectations, both variants.                                                              | _(filled by `/implement`)_ | _(filled by `/implement`)_ |
-| 7. 12-card fit; no data cap           | Rendered-path only for the fit (ADR-0030): 6×2 hands at every seat at 1280×900, no overlap, archived captures; the no-cap half is jsdom-able (a >18-slot hand still renders every slot) plus review grep that no clamping entered `hand.tsx`/`game-screen.tsx`.                                                    | _(filled by `/implement`)_ | _(filled by `/implement`)_ |
-| 8. Rotation below flight anchors      | Extend the CAM-21 ADR-0035 pin in `game-screen.test.tsx`: walk every flight anchor's ancestor chain asserting no scale-or-rotate class (variant-prefixed and negative forms included); rendered look confirms the rotated reading at 3/4 players.                                                                  | _(filled by `/implement`)_ | _(filled by `/implement`)_ |
-| 9. Fluid regular table, real CSS      | By construction (no transform introduced) + the widened clause-8 pin covers the chain; `max-w-4xl` scoping to the docked composition gets a structural pin mirroring CAM-21's viewerSeat scoping tests; fill-the-fold itself is rendered evidence at 1280×900.                                                     | _(filled by `/implement`)_ | _(filled by `/implement`)_ |
-| 10. Compact untouched, CAM-21 pins    | The existing "compact docked composition (CAM-21)" pins in `game-screen.test.tsx` pass unmodified (adaptations logged if the bench rework forces any); rendered 360×640 at 2/3/4 players re-verifies fold fit with row-major hand widths (decision 7's risk).                                                      | _(filled by `/implement`)_ | _(filled by `/implement`)_ |
-| 11. 5-player retirement               | Bench model accepts 2–4 only (unit-pinned); repo grep for 5-player/2–5 prose in `apps/web`; gallery renders no 5-seat fixture; the canon revision retires the r4 fallback — verified by review reading table-surface.md v5.                                                                                        | _(filled by `/implement`)_ | _(filled by `/implement`)_ |
-| 12. Canon revised, not contradicted   | No test — verified by review: `table-surface.md` v5 and `hand.md` v3 exist with changelog entries and in-place amendments in the r3/r4 style; HANDOFF/cambio-rules untouched by this side's diff (backend-owned).                                                                                                  | _(filled by `/implement`)_ | _(filled by `/implement`)_ |
+| Clause                                | Planned approach (plan-time)                                                                                                                                                                                                                                                                                       | Test (file + name)                                                                                                                                                                                                                                                                                                                                         | What is asserted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5. Bench anchoring, no radial remnant | jsdom unit tests on the bench-assignment model (per-count maps, viewer-bottom for every viewer index, left→top→right sweep) in `table-geometry.test.ts`'s successor; a structural pin that seat wrappers carry bench-class anchors, not ring-point inline styles; rendered evidence at 2/3/4 for the visual claim. | table-geometry.test.ts > benchAssignment > per-count + viewer-bottom + sweep-order tests; table-surface.tsx seatWrapper (review grep: no inline left/top style remains)                                                                                                                                                                                    | viewer always bottom for every count 2–4 and viewer index; opponents assigned left→top→right sweep order; seat wrappers carry regular:top-[...]/left-[...] bench classes, zero inline ring-point styles                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 6. Row-major hands, stable slots      | `hand.test.tsx`: footprint rule (min 4 one-row; 6-wide wrap; pads beyond highest signal), vacancy-in-place on removal, growth appends at lowest free slot — behaviors carried from the existing suite with new footprint expectations, both variants.                                                              | hand.test.tsx > "renders a 4-card deal as one straight row of four..." / "keeps a single row up to six cards..." / "pads a hand exceeding one row up to a full 6-wide grid..." / "removal keeps the slot..." / "renders vacancies at exactly the missing indices..."                                                                                       | 4-card hand is one row (grid-cols-4); 6-card hand stays one row (grid-cols-6); 7-card hand pads to 12 slots (grid-cols-6, invisible fillers beyond the highest signal); vacancy-in-place on removal; stable slot indices                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 7. 12-card fit; no data cap           | Rendered-path only for the fit (ADR-0030): 6×2 hands at every seat at 1280×900, no overlap, archived captures; the no-cap half is jsdom-able (a >18-slot hand still renders every slot) plus review grep that no clamping entered `hand.tsx`/`game-screen.tsx`.                                                    | hand.test.tsx > "tolerates a third row..." / "never caps or truncates hand data..."; rendered pass (M6): live 4P game, Zara (top bench) grown to exactly 12 via scripted false-slams, 1280×900                                                                                                                                                             | jsdom: no client-side cap, pads correctly; RENDERED (M6, pre-creation-gate): Zara's 12-card upright hand clears deck/discard by 62px (measured); Sam's 12-card ROTATED (left-bench) hand clears by only ~2px (measured) — technically zero overlap but a tight margin flagged for the pending creation-gate anchor-footprint decision; a 16-card rotated overshoot (13–18 tolerated-compression band) visibly grazes the deck, accepted per ADR-0036. **Re-verified post-resolution (creation-gate follow-up, 2026-09-06)** with `card-frame-rotated` wired in: rendered `TableSurface` + `Hand` composition (real `seatAnchor="edge"`/`viewerSeat="external"` sizing, live measurement) — rotated (left-bench) 12-card hand clears deck/discard by ~50px, upright (top-bench) 12-card hand by ~86px; inter-row/column clearance INSIDE the rotated hand itself (a distinct axis the placeholder also risked) measured ~26–34px, comfortably positive on both axes. No overlap anywhere; the rotated/upright asymmetry shrank from ~31× to ~1.7×, no longer reading as a leftover bug. **Re-measured post-fix-cycle (2026-09-07, review F2/F3):** arc offsets moved from card visuals to the slot ANCHORS (`SIDE_BENCH_ARC_CLASS`); live 3-player game, left-bench hand grown to exactly 12 at 1280×900 — anchor/visual center delta **0.0px on all 12 slots** (flights land on the resting card), column-1 centers sweep the crescent 430/413/396/396/413/430px, 20.1px clearance to the deck/discard cluster, hand fully inside the viewport, no page scroll on either axis. The 6-row arc table is thereby rendered-verified; the 5-row table remains formula-generated (tokens.md, art-registration constants). |
+| 8. Rotation below flight anchors      | Extend the CAM-21 ADR-0035 pin in `game-screen.test.tsx`: walk every flight anchor's ancestor chain asserting no scale-or-rotate class (variant-prefixed and negative forms included); rendered look confirms the rotated reading at 3/4 players.                                                                  | game-screen.test.tsx > "carries no scale-or-rotate transform class from every flight anchor up through the root's ancestors (ADR-0035, widened to rotation by ADR-0036 §5)"; side-bench rotation (CAM-20) > "actually exercises rotation..." / "...still carries no scale-or-rotate transform above any flight anchor with a rotated hand on the table..." | every flight anchor's ancestor chain carries no scale-or-rotate class/inline transform; a left-bench opponent's card visual gets -rotate-90 and a right-bench one rotate-90, both strictly INSIDE (below) their anchor div, never on it                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 9. Fluid regular table, real CSS      | By construction (no transform introduced) + the widened clause-8 pin covers the chain; `max-w-4xl` scoping to the docked composition gets a structural pin mirroring CAM-21's viewerSeat scoping tests; fill-the-fold itself is rendered evidence at 1280×900.                                                     | game-screen.test.tsx > fluid regular table (CAM-20 M5); room-screen.test.tsx > fluid regular table scope guard; rendered pass (M6): playwright measurement of the live 4P table at 1280×900                                                                                                                                                                | structural pins hold (see above); RENDERED/MEASURED: TableSurface resolves to a 809.5×809.5px square (height-driven, table-root's exact height) vs the old fixed 672px (max-w-2xl) cap — a real, measured fill-the-fold gain; room screen unaffected (not measured further, byte-for-byte class guard suffices)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 10. Compact untouched, CAM-21 pins    | The existing "compact docked composition (CAM-21)" pins in `game-screen.test.tsx` pass unmodified (adaptations logged if the bench rework forces any); rendered 360×640 at 2/3/4 players re-verifies fold fit with row-major hand widths (decision 7's risk).                                                      | game-screen.test.tsx > "compact docked composition (CAM-21)" describe block (9 pins, green); rendered pass (M6): live 2/3/4P games at 360×640, including grown hands (12–16 cards) and an active own-turn state                                                                                                                                            | jsdom pins hold; RENDERED/MEASURED: page height stays exactly 640px (documentElement.scrollHeight) at every count and hand size tried, including Zara-12/Sam-16; dock-actions renders 0x0 with no affordance when it's not the viewer's turn (expected, not a bug) and a real 44px-tall Call Cambio button pinned at the bottom edge when it is; table-scroll absorbs the excess (scrollHeight 465 vs clientHeight ~390-430) — chrome/dock pinned, no page scroll, confirming decision 7's risk did not materialize. One REAL BUG found and fixed here: the rotate prop's classes were unprefixed and leaked a 3-column rotated grid into compact, breaking the fold at 3-4 players — fixed by making the rotated presentation regular-only-scoped (hand.tsx), with jsdom regression coverage added                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 11. 5-player retirement               | Bench model accepts 2–4 only (unit-pinned); repo grep for 5-player/2–5 prose in `apps/web`; gallery renders no 5-seat fixture; the canon revision retires the r4 fallback — verified by review reading table-surface.md v5.                                                                                        | table-geometry.test.ts > "degrades honestly for an out-of-range count instead of inventing a 5th placement"; review grep of apps/web for 2–5/5-player prose (gallery/game.tsx, seat.tsx, table-geometry.ts, table-surface.tsx, game-screen.tsx all swept)                                                                                                  | benchAssignment(5, …) throws rather than seating a 5th player; the gallery's TableSurfaceSection renders a 4-player showcase (no 5-seat fixture); zero remaining 2–5/5-player prose outside historical revision-history text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 12. Canon revised, not contradicted   | No test — verified by review: `table-surface.md` v5 and `hand.md` v3 exist with changelog entries and in-place amendments in the r3/r4 style; HANDOFF/cambio-rules untouched by this side's diff (backend-owned).                                                                                                  | No test — verified by review                                                                                                                                                                                                                                                                                                                               | table-surface.md **v6** and hand.md **v5** (r3 → r4 gate-fix → r5 review-fix; the review's F7 corrected this row's stale v5/v3 citation) carry Revisions changelog entries and in-place amendments on superseded text; this side's diff touches nothing under .agents/skills/cambio-rules/ (the HANDOFF §4.1 + out-of-scope amendments landed in the review fix cycle, F10b)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ## Progress
 
@@ -437,6 +447,254 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       anchor map), rotation mechanism, and fluid-table candidate
       mechanism decided; two creation-gate STOPs flagged (swapped slot
       footprint; possible fluid-height utility).
+- [x] 2026-09-06 — M2 (row-major hands): `hand.tsx` reworked from
+      `grid-cols-2` to row-major (`GRID_COLS_CLASS`, 4/5/6-wide,
+      `Math.max(4, highest+1)` floored at one row, padded to a full
+      6-wide multiple only once it outgrows one row); `hand.test.tsx`
+      rewritten with the new footprint expectations plus new coverage
+      for the 12/18-slot pad cases and the >18 no-cap case; `hand.md` →
+      v3. `pnpm turbo test --filter @cambio/web` green throughout.
+- [x] 2026-09-06 — M3 (bench geometry): `table-geometry.ts` rewritten —
+      `ringPositions`/`seatArc`/`handArc`/`inwardSide`/`RadialPosition`
+      family deleted, replaced by `Bench` + `benchAssignment` (2–4,
+      throws honestly outside that range); `table-surface.tsx` anchors
+      seats via two exported static class maps (`BENCH_POSITION_CLASS`,
+      `BENCH_ANCHOR_CLASS`) instead of inline ring percentages;
+      `game-screen.tsx`'s seat-node assembly and the extracted own-seat
+      wrapper both import those maps (decision 3 — no `ViewerSeatDock`
+      extraction, per the plan's explicit rejection). 5-player retirement
+      sweep done (gallery 4-player showcase, `seat.tsx` comment,
+      `table-geometry.ts`/`table-surface.tsx` doc comments,
+      `game-screen.tsx`'s `py-2` comment). `table-geometry.test.ts`
+      rewritten as bench-map tests. `table-surface.md` → v5 (r1's
+      "scenery, never a constraint" and r4's 5-player scroll fallback
+      superseded/retired via amendment blockquotes, not silently
+      dropped). Full web suite green (223/223 at this point).
+- [x] 2026-09-06 — M4 (side-bench rotation): **creation-gate STOP hit**
+      (swapped slot footprint) — implemented the rotation MECHANISM
+      (column-major flow via `grid-flow-col` + `GRID_ROWS_CLASS`,
+      `rotate` prop on `Hand`, rotate class on the card visual only,
+      never the anchor) using `card-frame`'s existing upright dimensions
+      as the placeholder anchor size, per the task's explicit
+      instruction to keep moving. The ADR-0035 transform pin in
+      `game-screen.test.tsx` widened to walk from every flight anchor
+      (not just table-root) and to catch rotate as well as scale; a new
+      "side-bench rotation (CAM-20)" describe block added with a
+      3-player fixture that actually exercises both rotation directions
+      (proving the mechanism fires, not just that it's absent when
+      unused). `hand.md` v3 already carried the one-beat-landing-artifact
+      note from the M2 pass. Full web suite green (225/225).
+- [x] 2026-09-06 — M5 (the big table): implemented the fluid regular
+      sizing using EXISTING tokens only — no creation-gate STOP hit
+      here (the `aspect-square` + height-driven-flex-item + `max-w-4xl`
+      approach expressed entirely in enumerated Tailwind utilities, no
+      new computed-height utility needed). `TableSurface`'s root gets
+      `regular:flex-1 regular:min-h-0 regular:w-auto regular:max-w-4xl`
+      under `viewerSeat="external"` only; the room screen's default path
+      keeps `regular:block regular:max-w-2xl` byte-for-byte (new
+      structural pins in both `game-screen.test.tsx` and
+      `room-screen.test.tsx` guard the scope split, mirroring CAM-21
+      review F1). `game-screen.tsx`'s three-link flex chain
+      (screen wrapper → stage → table-root) has its CAM-21
+      `regular:max-h-none`/`regular:overflow-visible`/
+      `regular:flex-initial`/`regular:min-h-auto` restorations removed
+      so the bound and the `flex-1 min-h-0` chain stay live at regular
+      too — deliberately revising, not regressing, the CAM-21 pins those
+      restorations satisfied (per the plan's Surprises note below).
+      Fill-the-fold itself and the 12-card no-overlap claim are rendered-
+      path evidence (ADR-0030), deferred to M6. Full web suite green
+      (227/227); typecheck and prettier clean throughout M2–M5.
+- [x] 2026-09-06 — M6 (verification & canon close-out): rendered pass run
+      against live authenticated games (users/lobbies/games created
+      directly via the API, cookies captured, both breakpoints via
+      `render.js` + targeted Playwright measurements for exact pixel
+      claims — see Surprises for the numbers). Freshness check done
+      before trusting anything rendered (curled a changed module,
+      grepped for `bench`, restarted the stale `pnpm dev` processes
+      that predated this session's edits). **One real bug found and
+      fixed**: the M4 `rotate` presentation was unprefixed and leaked
+      into compact, breaking the fold outright at 3–4 players (a
+      3-column rotated grid where a flat uniform row belongs) — fixed
+      by making the whole rotated presentation (`grid-flow-col`,
+      `grid-rows-N`, the card rotate class) `regular:`-scoped in
+      `hand.tsx`, with `hand.test.tsx` and `game-screen.test.tsx`
+      updated to assert the prefixed classes (closing the coverage gap
+      that let it through — the tests had checked the classes existed,
+      not that they were breakpoint-gated). Re-verified clean after the
+      fix. Gallery polish (M6 step 3) folded into M3's sweep — no
+      separate rendered gallery pass beyond what M3 already covered by
+      code inspection; not re-verified rendered here, logged as a minor
+      scope note. Coverage table clauses 7/9/10 updated with final
+      rendered/measured evidence (not just "pending"). Final bare gate
+      (`pnpm turbo build typecheck lint test`) green: 25/25 tasks.
+      Dev servers stopped after the pass. **HANDOFF §1.1 and the
+      cambio-rules skill were NOT touched** (backend lane's job per
+      ADR-0028). **One creation-gate item remains genuinely open** (M4's
+      swapped slot footprint) — see the final report for the candidate
+      options; M5 resolved its own maybe-STOP to "no creation-gate
+      utility needed."
+- [x] 2026-09-06 — Creation-gate follow-up (M4's swapped slot footprint,
+      resolved): the user picked minting a new canonical utility,
+      **`card-frame-rotated`** (`aspect-ratio: 7 / 5`, mirroring
+      `card-frame`'s `5 / 7` otherwise), over the two alternatives raised
+      at the STOP (a shared `--card-aspect` variable on `card-frame`
+      itself, or tuning bench spacing without a new footprint token) —
+      decided via `AskUserQuestion`. Added to
+      `packages/ui/src/styles.css` right after `card-frame`, and mirrored
+      in `design-system/references/tokens.md` §Shape (`card-frame`
+      wasn't previously documented there by name either, so both the
+      base utility and its new sibling landed together). Wired into
+      `hand.tsx`/`playing-card.tsx`: the flight anchor (`data-slot-index`)
+      keeps plain upright `card-frame` always — it's the grid track's
+      real estate and needs to stay the size an upright card of that
+      variant needs, not the swapped one — while the rotated card VISUAL
+      (`PlayingCard`'s new `rotated` prop, threaded through all three
+      `Hand` call sites, plus the empty-slot span's own class) takes
+      `card-frame-rotated` at the same `--card-width`; the anchor centers
+      the now-smaller rotated visual (`flex items-center
+justify-center`, rotated only). This split was NOT the first thing
+      tried — an initial pass put `card-frame-rotated` directly on the
+      same element being rotated (mirroring the plan sketch's literal
+      wording literally), which fixed the horizontal (column-to-column)
+      clearance but flipped a NEW ~10px vertical (row-to-row) overlap
+      into existence for card-md at regular, caught only by rendered
+      measurement, not by eyeballing the classes — see Surprises.
+      `hand.md` r3 amended again (the placeholder note superseded).
+      Re-verified clause 7's rendered-path claim (Surprises has the
+      numbers): no overlap on any axis, comfortable clearance,
+      asymmetry no longer reads as a bug. `pnpm turbo test --filter
+@cambio/ui` (25/25) and `--filter @cambio/web` (227/227) green;
+      final bare gate (`pnpm turbo build typecheck lint test`) green,
+      25/25 tasks, twice (once mid-fix, once after the corrected
+      wiring). Dev server stopped after the pass.
+- [x] 2026-09-06 — Bug-report follow-up (untested-viewport gap coverage,
+      user-reported at 723×770 and 421×770, neither a plan-time reference
+      viewport): confirmed the full bare gate green (25/25) before
+      touching anything, per instruction. Live-rendered investigation
+      (real 2P and 4P authenticated games, users/lobbies/games created
+      directly via the API — `POST /users` → `POST /lobbies` →
+      `POST /lobbies/:id/join` ×N → `POST /lobbies/:id/start` — cookie
+      captured per session, same recipe as M6) against a
+      freshness-checked dev server (curled `table-surface.tsx` through
+      Vite, grepped `bench`, confirmed live before trusting anything
+      rendered). Measured via `getBoundingClientRect`/`getComputedStyle`
+      in-page (ADR-0030: geometry claims route to the rendered path, not
+      jsdom) rather than eyeballed screenshots — the Browser pane's
+      compositor wasn't available for actual screenshots in this
+      session, so every claim below is a live DOM measurement, which is
+      the stricter form of evidence this task's own M6 pass already
+      established as canonical (its own 809.5×809.5 figure, reproduced
+      exactly below). **Two independent findings, opposite verdicts:** 1. **723×770 (regular, in-scope): NOT REPRODUCIBLE — no code
+      change made.** At 723×770, `table-root` resolves to 679.5×679.5
+      and `TableSurface` fills it exactly (0px unclaimed slack,
+      `docScrollHeight` === viewport height, no page scroll) — the M5
+      mechanism working exactly as designed. Swept the surrounding
+      regular range to rule out a narrow failure band: 720×770 (the
+      exact breakpoint floor) and 768×770 both also resolve to
+      679.5×679.5 with zero slack; 1280×900 reproduces the M6 pass's
+      own recorded 809.5×809.5 figure exactly. Re-checked at both 2P
+      and 4P (723×770) — identical 679.5×679.5, confirming the
+      mechanism is player-count-independent, as designed. Every
+      measurement across this sweep is clean; **the M5 fluid-table
+      mechanism could not be made to fail anywhere in the regular
+      range** on this branch's current code. Given AGENTS.md's own
+      documented precedent (CAM-18's stale-Vite-transform phantom
+      finding, the exact failure class this task's M6 step 2
+      mandates a freshness check for) and that this session's `pnpm
+ dev` bound to port 3100 (3000 was free, but a config/prior-
+      session artifact could easily have left an OLD server answering
+      on 3000 in a different session — not verifiable after the
+      fact), the most likely explanation for the user's screenshots
+      is a stale dev server or cached page predating this task's M5
+      landing (pre-M5 code used `regular:max-h-none` +
+      `regular:max-w-2xl` width-driven sizing with no height bound,
+      which would produce exactly the reported symptom — a smaller,
+      non-height-filling table with dead space below, on a viewport
+      taller than the fixed square). Recommend the user hard-refresh
+      against a freshly-started `pnpm dev` before treating this as an
+      open defect; no evidence of a real defect was found after
+      thorough, repeated, measured attempts. 2. **421×770 (compact, out-of-scope): REPRODUCIBLE, confirmed
+      PRE-EXISTING to CAM-21 — not fixed, flagged for a separate
+      Linear issue instead.** At 421×770, `table-scroll` resolves to
+      518.3px tall but its actual content (`TableSurface`) is only
+      317.6px tall, leaving ~200.7px of dead space between the
+      compact table art and the own-hand dock below it (confirmed at
+      719×770 too: same shape, 222.8px content in a 635.5px
+      `table-root`). Root-caused to `table-scroll`'s `flex-1`
+      class in `game-screen.tsx` — confirmed **byte-identical** to
+      `release-v0` via `git diff release-v0 --
+ apps/web/src/containers/game/game-screen.tsx` (the exact
+      className string `"w-full flex-1 min-h-0 overflow-y-auto
+ regular:contents"` is untouched by this task). The removed-but-
+      quoted CAM-21 comment this task's diff carried forward
+      (Progress, M6 entry above) already named this exact mechanism
+      and accepted it as "~37-53px of ACCEPTED FLEX RESIDUE" at the
+      one height CAM-21 ever validated, 640px. The residue scales
+      ~1:1 with any excess viewport height beyond that: measured
+      70.7px slack at 360×640 (this task's own validated reference,
+      consistent with CAM-21's figure) vs. 200.7px at 360×770 and
+      421×770 (both 130px taller than 640) — 70.7 + 130 ≈ 200.7,
+      confirming the mechanism is exactly linear and untouched by
+      CAM-20. This is a gap in CAM-21's validation coverage (it was
+      only ever measured at one height, 640px) that CAM-20 did not
+      cause or worsen — per the task's explicit instruction, NOT
+      fixed here. Flagging for the user's call on a new Linear issue,
+      the same way planning spun out CAM-26 for an unrelated bug.
+      No source files were touched by this follow-up (investigation
+      only); `docs/plans/frontend/CAM-20.md` (this file) is the only
+      diff. Final bare gate re-confirmed green (`pnpm turbo build
+typecheck lint test`, 25/25) after this doc update. Dev server and
+      the temporary users/lobbies created for this investigation's live
+      games were left in the dev Postgres instance (soft-delete/TTL
+      territory, same as any other manual dev-server testing); the dev
+      server itself was stopped after the pass.
+
+- [x] 2026-09-07 — Design-gate fix cycle (the `/gate` pass against a live
+      4-player game at 1280×900 and 360×640 came back "flagged" —
+      advisory findings, zero constraint-tier failures — user asked to
+      fix the accidental ones before close-out; findings marked
+      "controlled" were left untouched). Confirmed the full bare gate
+      green (25/25) before touching anything, per instruction. All
+      7 fixes verified live against real authenticated games (same
+      API-driven recipe as every prior rendered pass this task has
+      used: `POST /users` → `POST /lobbies` → `POST /lobbies/:id/join`
+      ×N → `POST /lobbies/:id/start`, cookies captured, freshness
+      checked via `curl .../@fs/... | grep <new-symbol>` before
+      trusting anything rendered). One capability gap this pass hit:
+      the Browser pane's compositor was unavailable for actual
+      screenshots this session (`computer`/`zoom` both timed out with
+      "pane is not displayed") — every geometry claim below is a live
+      `getBoundingClientRect()`/`getComputedStyle()` measurement instead
+      (the stricter form of evidence this task's own M6 pass already
+      established as canonical), and the one visual judgment call this
+      cycle needed (the side-bench arc, finding 3) was made by cropping
+      and annotating the actual `table-top.webp` asset with PIL and
+      reading the crop via the Read tool — not a page screenshot, but
+      still a direct look at the real painted art, not a guess.
+
+      Regular breakpoint (1280x900), three fixes. Finding 1 (own-seat overshoot): the extracted own-seat wrapper's vertical translate in `game-screen.tsx` changed from the shared `BENCH_ANCHOR_CLASS.bottom` constant (a plain `-translate-y-1/2`) to an inline translate that layers a 4px nudge on top of it, scoped to this one wrapper (the shared constant, and TableSurface's own internal seatWrapper, are untouched). Measured: bottom edge moved from 903.38px to 899.38px at the 900px regular reference viewport. New structural pin (jsdom cannot measure real geometry, ADR-0030): a test in `game-screen.test.tsx` asserts the new translate-y class is present, the old bare `-translate-y-1/2` is gone from that wrapper, and the shared constant itself is untouched. Finding 2 (Call Cambio 260-415px from the hand): the fixed bottom-right corner offset was replaced with a horizontal offset computed from the stage's own center plus half of the hand's row-width ceiling (six columns of card-lg at regular, 616px, per `hand.tsx`'s `ROW_WIDTH` cap) plus one spacing step. The button's DOM location stays inside the dock-actions region unchanged (an existing test pins that containment, and moving it would also disturb compact's deliberate placement, which this finding never flagged); a true JS-measured dock was considered and rejected as disproportionate for a reposition-only fix (no existing breakpoint-detection hook in this codebase). Measured: the gap dropped from 260.5px to 120px at the live 4-card hand this session's game used — exact for hands of six or more cards (the row-width ceiling), an approximation for smaller ones. Finding 3 (2 of 4 side-bench cards over the shadow gap): the straight rotated-column mechanism from M4 never matched the painted bench's actual shape. Measured the real asset directly by cropping and annotating `table-top.webp` with PIL and reading the crop as an image, rather than guessing from color sampling alone (a first color-based attempt was misleading, since the bench and tabletop paint in similar greens — the useful signal was the dark shadow-gap band and the fully transparent corner gaps, not hue). The bench is a shallow crescent, widest at its vertical middle and tapering to the corner posts at both ends. Added a per-row margin-left on the card visual only, never the anchor, fit to two measured points and generalized by a row-index formula to the 5/6-row cases (not independently re-verified on the rendered path — see Surprises). Two real bugs found only by measuring the rendered rect, not by reading the classes: (a) the actual visual shift from a margin turned out to be exactly half of the class's own pixel value, because the anchor's centering flex layout centers the child's whole margin box, not its content box, so every table value had to be doubled; (b) the right bench's positive margin collapsed the card visual to zero-by-zero, because the anchor is narrower than the margin plus the visual's own width, triggering the browser's default shrinkable flex behavior, fixed with a shrink-disabling class on the visual. Measured after both fixes: all four left-bench cards land squarely on the painted bench (confirmed by annotating the actual crop); the right bench mirrors it within a fraction of a pixel of the expected symmetric distance from table center. Compact breakpoint (360x640), all four fixes. Finding 4 (opponent hands read as one continuous 8-card strip, highest priority per the Judge): the intra-hand grid gap tightened to 4px at compact (regular's 8px is unchanged); the opponent row's inter-seat gap widened to 24px horizontally (the vertical wrap-row gap was never the diagnosed problem, so it stays untouched to avoid re-opening the CAM-21 wrap-budget question). Measured: a 4-card opponent hand is now 140px wide (was 152px); two adjacent hands sit 24px apart (was 8px) — confirmed live in a 4P game. New structural pin: a test in `game-screen.test.tsx` asserts both gap classes and a numeric comparison of the two underlying constants. Finding 5 (deck-count badge escaping onto the discard pile): the badge's corner overhang (an 8px push past the deck's own edge on both axes, fine at regular's larger scale) is now flush to the deck's own corner at compact specifically; regular keeps the original overhang byte-for-byte. Measured: badge right edge now exactly flush with the deck's own right edge (was 8px past it, 4px into the discard's own space); badge bottom now flush with the deck's bottom (was 8px past it). Finding 6 (compact table art capped too small for its contents): the compact table-art size token was raised from 128px to 158px, the minimum that clears the deck-and-discard pair by at least 8px inside the 54% tabletop disc on both sides, not a revert to CAM-21's original 160px (which was tuned down for a fold-budget shortfall that does not reproduce today, now that this task's row-major hands and tightened card scale free enough of the same budget). Measured: disc clearance went from about half a pixel to 8.66px per side; re-verified the CAM-21 fold-fit invariant at 2, 3, AND 4 players (not just 4) at the compact reference viewport — the document's scroll height stayed exactly equal to the viewport height at every count. Updated the tokens reference and the table-surface component doc (new revision, changelog entry, amendment blockquote on the prior revision's mention of the old value) per this task's own revised-not-contradicted discipline. Cross-reference for CAM-27 (out of this task's scope, filed separately): raising the art size claims a little more of the same vertical budget CAM-27's flex-residue slack measures, not observed to shrink that residue measurably at the one height checked, but a taller compact viewport would need re-measuring if CAM-27 is ever picked up. Finding 7 (connection dot relies on color alone) — not a live defect, already fixed: a diff against release-v0 for the app-shell component shows zero changes — the connection dot already carries a status role and an accessible name that reads Connected or Reconnecting, and the existing ui test suite already asserts both label strings. No code or test change made. The Judge's finding likely reflects a stale render, the same failure class AGENTS.md documents from CAM-18. Validation: the web suite stayed green throughout (227 to 230 tests, 3 new); the ui suite stayed green (25/25, unaffected by the token change). One prettier formatting issue surfaced only at the final bare-gate run, on the two files with the most new inline comments and tests — fixed with a formatter pass on those two files, then the full bare gate re-ran clean: 25/25 tasks, exit 0. The dev server and the temporary users, lobbies, and games created for this pass's live verification were left in the dev Postgres instance (the same soft-delete/TTL territory as every other manual dev-server testing pass this task has done); both dev processes were stopped after the pass.
+
+- [x] 2026-09-07 — `/review` fix cycle (root plan Outcomes F2–F4,
+      F7–F12): the side-bench arc offset moved from card visuals to the
+      slot anchors (`SIDE_BENCH_ARC_CLASS`, true fitted values —
+      relative positioning is layout, not a transform, so anchor and
+      painted card move together and flights land on the resting card);
+      rendered-verified against a live 3-player game with a 12-card
+      left-bench hand (anchor/visual delta 0.0px ×12, crescent sweep
+      430→396→430px, 20.1px cluster clearance, no page scroll) — the
+      6-row arc table is now measured, not extrapolated. New jsdom pins:
+      arc-on-anchor (both benches, hand.test.tsx), the real
+      `BENCH_INSET_PCT` lockstep guard (table-geometry.test.ts), the
+      324px CTA derivation from `ROW_WIDTH` (game-screen.test.tsx), and
+      opponent-wrapper bench-position classes (game-screen.test.tsx);
+      the vacuous 24>4 literal assertion removed (F10h). Stale prose
+      fixed: v6 citations in table-geometry.ts/.test.ts, the 158px-cap
+      re-derivation of the deck-gap comment, the styles.css "five
+      opponent hands" comment, the gallery "2×2" label, and
+      table-surface.tsx's dock-reuse + drift-guard docstrings. Canon:
+      hand.md → v5 (r5, arc-on-anchor); tokens.md gains the
+      "art-registration constants" family (F9 name-and-pin). Web suite
+      233/233 after the cycle.
 
 ## Surprises & notes for the root plan
 
@@ -452,10 +710,155 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 - Planning: the fluid regular table (clause 9) implies bounding the
   regular viewport the way CAM-21 bounded compact — CAM-21's
   `regular:max-h-none` / `regular:flex-initial` / `regular:min-h-auto`
-  restorations were pinned as "regular untouched" THERE and are
-  deliberately revised HERE. The reviewer should read those diffs as
-  clause-9 intent, not as CAM-21 regressions.
+  restorations were documented invariants THERE (no CAM-21 test asserted
+  them — the review's F10g corrected this entry's original "were pinned"
+  wording) and are deliberately revised HERE. The reviewer should read
+  those diffs as clause-9 intent, not as CAM-21 regressions.
 - Planning: the flight clone lands upright on a rotated resting card
   (side benches) — a one-beat artifact accepted under ADR-0034's
   capture-then-cancel stance, recorded in ADR-0036 §5 and the canon
   revision. Do not "fix" it with a transform above an anchor.
+- M3: the bench-anchor class map (`BENCH_POSITION_CLASS`) needed literal
+  arbitrary-value percentages (`top-[8.5%]`, `top-[91.5%]`) rather than a
+  value computed from `table-geometry.ts`'s constants at runtime —
+  Tailwind's build-time scanner needs the class text to appear verbatim
+  in source, so a template-literal-interpolated percentage would never
+  generate CSS. _Corrected by the review fix cycle (F4): the original
+  claim here — that pinning `BENCH_INSET_PCT` catches art-proportion
+  drift — was false (the test asserted the constant against its own
+  definition, a tautology). `table-geometry.test.ts` now asserts the
+  `BENCH_POSITION_CLASS` literals contain `50 ∓ BENCH_INSET_PCT`
+  verbatim, which is the real lockstep guard._
+- M4: **creation-gate STOP** — decision 5's swapped slot-footprint
+  utility (7/5 anchor aspect ratio, mirroring `card-frame`'s 5/7) was NOT
+  minted. `Hand`'s rotated presentation currently sizes rotated anchors
+  with `card-frame`'s existing upright (5/7) dimensions as a placeholder,
+  per the task's explicit "keep moving" instruction. Visible consequence
+  at the M6 rendered pass: a rotated card's painted footprint will not
+  exactly match its slot box (a portrait box holding a visually-rotated
+  card reads slightly squished/overhanging until the real utility lands).
+  Candidate options for the user's call, in the final report below.
+- M5: no creation-gate STOP was needed — the fluid-height mechanism
+  expresses entirely in existing enumerated utilities (`flex-1`,
+  `min-h-0`, `w-auto`, `aspect-square`, `max-w-4xl`); no new computed-
+  height utility in `packages/ui/src/styles.css` was required. The
+  plan's decision 6 flagged this as a maybe, not a certainty, and it
+  resolved to "no."
+- M6 rendered pass, exact numbers (all measured live, not eyeballed):
+  the regular table square resolves to **809.5×809.5px** (height-driven,
+  exactly `table-root`'s own height) at 4 players/1280×900, up from the
+  old fixed 672px (`max-w-2xl`) cap — a real, substantial fill-the-fold
+  gain, and well under the 896px (`max-w-4xl`) ceiling, so the cap never
+  bound in this configuration. The DESIGNED 12-card (6×2) case is clean
+  at every bench tried: an UPRIGHT (top) bench clears the deck/discard
+  cluster by **~62px**; a ROTATED (left) bench clears by only **~2px** —
+  technically zero overlap (clause 7 holds) but riding the edge of it,
+  and the margin asymmetry traces directly to the pending creation-gate
+  placeholder (the rotated anchor's un-swapped 5/7 footprint doesn't
+  match the true rotated card shape, so its true clearance is
+  under-stated or over-stated versus what the real utility will produce
+  — this can't be resolved until that decision lands). A 16-card
+  rotated hand (13–18 "tolerated compression" band) visibly grazes the
+  deck at regular — accepted per ADR-0036, but worth the record: there
+  is no actual compression MECHANISM (no shrinking, no reflow) for that
+  band, "tolerated" just means the grid keeps padding via the same rule
+  and is allowed to look tight, not that anything adapts.
+- M6 rendered pass also caught a compact/regular scoping bug (see
+  Progress) — the fix and its regression coverage are the only
+  mid-M6 code change; everything else in M6 was verification only.
+- Creation-gate follow-up: minting `card-frame-rotated` was NOT
+  sufficient by itself — WHERE it gets applied mattered as much as the
+  utility's own CSS. A rotated element's LAYOUT box (what a CSS grid
+  reserves track space for) is always its PRE-transform box; `rotate`
+  only changes what gets PAINTED, and a non-square box rotated 90°
+  necessarily paints a box with width/height swapped from its own
+  layout box. The first attempt applied `card-frame-rotated` directly
+  to the same element carrying the `rotate-90` transform (matching the
+  plan sketch's literal wording, decision 5) — this DID fix the
+  horizontal clearance the M6 pass measured (~2px), but silently
+  introduced a NEW ~10px VERTICAL overlap between rotated rows at
+  card-md/regular, because `card-frame-rotated`'s formula
+  (`width: var(--card-width)`) leaves the anchor's WIDTH unchanged from
+  `card-frame`'s — only the height changes — so swapping the class on
+  the rotated element alone shrinks the wrong dimension. This was only
+  caught by rendering the actual page and measuring
+  `getBoundingClientRect()` on adjacent rows — reading the class names
+  alone (or jsdom) could not have surfaced it (ADR-0030's whole
+  rationale). The fix that resolved BOTH axes: keep the flight anchor
+  on plain upright `card-frame` (unrotated, sized like an upright card
+  of that variant — the grid's real reserved footprint) and apply
+  `card-frame-rotated` only to the CARD VISUAL inside it (still
+  rotated) — a rotated card-frame-rotated box, at the same
+  `--card-width`, paints width×height-reversed from `card-frame`'s own
+  box, so it's comfortably smaller in BOTH dimensions than the upright
+  anchor it sits inside, centered via `flex items-center
+justify-center`. Trade-off worth recording: a rotated card's visual
+  is now genuinely smaller in area than an upright card of the "same"
+  nominal size (`card-md`) — roughly half the footprint — because the
+  same `--card-width` scalar plays a different edge in each formula.
+  Nobody surfaced this as a concern during the interview; if the
+  smaller rotated-card size reads as visually off at a future design
+  pass, it's this trade-off, not a bug.
+- Re-verified numbers (rendered, not eyeballed; `TableSurface` +
+  `Hand` composed with the real `seatAnchor="edge"` / `viewerSeat=
+"external"` sizing so the measurement reflects production geometry,
+  not an undersized default-width stand-in — an untried first
+  reproduction using the room-screen's default `max-w-2xl` sizing
+  actually measured NEGATIVE clearance, i.e. looked broken, purely
+  because the table itself was too small; switching to the real
+  `viewerSeat="external"` fluid sizing resolved that artifact). At a
+  1280×900-equivalent regular table: a 12-card ROTATED (left-bench)
+  hand clears the deck/discard cluster by **~50px**; a 12-card UPRIGHT
+  (top-bench) hand clears by **~86px** — both comfortably positive, no
+  overlap, and the asymmetry between them shrank from the M6 pass's
+  ~31× (2px vs 62px) down to ~1.7× (50px vs 86px). Separately, the
+  INTERNAL clearance between adjacent rows/columns within the rotated
+  hand itself (not measured at M6, but the axis the first fix attempt
+  broke) came out to ~26px (column-to-column) and ~34px
+  (row-to-row) — also comfortably positive. Absolute pixel values here
+  won't match a from-scratch live-game measurement exactly (this
+  reproduction approximates the game screen's real flex/height chain
+  rather than rendering the actual route against a live authenticated
+  game), but the mechanism, the classes applied, and the sign/order of
+  magnitude of every clearance are the real production ones.
+- Bug-report follow-up (full detail in Progress above): a user-reported
+  "table renders much smaller than the fold allows" at two DevTools
+  viewport sizes outside this task's two reference viewports turned out
+  to be two unrelated things wearing one symptom. **723×770 (regular)**
+  did not reproduce after a thorough, repeated, measured sweep (720
+  through 1280px wide, 2P and 4P) — the M5 mechanism fills the fold at
+  every point tried; likely a stale dev server/cache on the reporter's
+  side (AGENTS.md's own CAM-18 precedent). **421×770 (compact)** DID
+  reproduce (~200px of dead space) but traces to `table-scroll`'s
+  `flex-1` in `game-screen.tsx`, confirmed byte-identical to
+  `release-v0` — a CAM-21-era mechanism (their own comment named it
+  "accepted flex residue" at the one height, 640px, they ever validated)
+  that scales ~1:1 with any excess viewport height beyond 640, not
+  something this task's diff touched. Left unfixed per the task's own
+  scope rule; flagged for a possible new Linear issue rather than
+  silently patched under CAM-20.
+- Design-gate fix cycle: two CSS mechanisms bit twice in one afternoon,
+  both caught only by measuring the rendered rect (ADR-0030's whole
+  point) and not by reading the class names. (1) On a flex container
+  with `justify-content: center` and a single child, an ASYMMETRIC
+  margin on that child (e.g. `margin-left` only) moves the child's
+  RENDERED position by exactly HALF the margin's own value — the
+  browser centers the child's whole margin box, so widening one side of
+  it only shifts the center by half the width added. The side-bench arc
+  fix's first pass used the raw fitted offsets directly and landed at
+  exactly half the intended shift on every row; the fix was doubling
+  every value in `SIDE_BENCH_MARGIN_CLASS`, not changing the fit. (2) A
+  flex child with an explicit `width` still SHRINKS below that width
+  (down to 0 in the extreme) if `margin + width` exceeds the flex
+  container's own size and the child's `flex-shrink` is left at its
+  default of 1 — the container doesn't just let the margin box overflow.
+  This hit only the RIGHT bench (whose margin is positive, mirroring the
+  left bench's negative one): the anchor is 64px wide, and a 114px
+  positive margin plus the 64px-wide visual is way past that, so the
+  browser shrank the visual to 0×0 to fit. The left bench's negative
+  margin never exceeds the container so it never triggered this,
+  masking the bug for exactly half of the mirrored pair until the right
+  bench was checked independently — `regular:shrink-0` on the visual
+  fixed it. Worth remembering for ANY future per-item nudge inside a
+  centered flex/grid cell in this codebase: verify the actual rendered
+  rect, not just that the intended class landed.

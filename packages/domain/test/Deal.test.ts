@@ -21,8 +21,8 @@ const dealt = (n: number, seed = 42) => {
 }
 
 describe("dealGame", () => {
-  it("rejects player counts outside 2–5 (C1.1, §1.1)", () => {
-    for (const n of [0, 1, 6]) {
+  it("rejects player counts outside 2–4 (C1.1, §1.1)", () => {
+    for (const n of [0, 1, 5, 6]) {
       const result = dealGame(
         Array.from({ length: n }, (_, i) => uid(i)),
         1,
@@ -37,7 +37,7 @@ describe("dealGame", () => {
   })
 
   it("deals 4 cards to slots 0–3 per player, one discard, rest as deck (C1.2, §1.1)", () => {
-    for (const n of [2, 3, 4, 5]) {
+    for (const n of [2, 3, 4]) {
       const [state] = dealt(n)
       expect(state.players).toHaveLength(n)
       for (const player of state.players) {
@@ -50,7 +50,7 @@ describe("dealGame", () => {
   })
 
   it("partitions all 52 slugs with no duplicates (C1.4, §4.5)", () => {
-    const [state] = dealt(5)
+    const [state] = dealt(4)
     const cards = allCards(state)
     expect(cards).toHaveLength(52)
     expect(new Set(cards).size).toBe(52)

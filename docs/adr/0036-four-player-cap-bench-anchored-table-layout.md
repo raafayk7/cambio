@@ -60,6 +60,19 @@ load-bearing, and the game rule bends to it.**
    visuals inside/below the slot anchor elements, with upright anchor boxes
    sized to the rotated footprint.
 
+   > **Amended (as-built, creation-gate resolution + review fix cycle):**
+   > two refinements to the sentence above. (1) The anchor box stays plain
+   > upright `card-frame` (the grid track's real estate); only the card
+   > _visual_ takes the gate-minted `card-frame-rotated` footprint —
+   > recorded in `hand.md` r3, reconciled here per the review's F11.
+   > (2) The prohibition covers **transforms**, not layout offsets: the
+   > side-bench arc registration is a `position: relative` offset **on the
+   > anchor itself**, which moves anchor and card together (FLIP reads
+   > `getBoundingClientRect`, which reflects layout position) — the
+   > review's F2 found that offsetting the _visual_ instead displaced the
+   > painted card up to ~57px from the anchor flights land on; verified
+   > fixed on the rendered path (anchor/visual delta 0.0px at 12 cards).
+
 Alternatives considered:
 
 - **Keep radial, tune constants** (the original CAM-20 charter) — rejected:
@@ -87,6 +100,13 @@ Alternatives considered:
   anchors (no transform of any kind above them, extending ADR-0035);
   overflow past 18 cards as an accepted broken edge until a future release
   decides the rule.
+- **Accepted consequence (review F1, user call 2026-09-07):** the cap
+  gates creation and joins only — a game persisted under the old 2–5 rule
+  stays engine-valid and `viewFor` projects all five seats, but the
+  client's `benchAssignment` throws for 5 seats and there is no error
+  boundary, so opening such a game crashes the screen. Accepted pre-launch
+  (no live 5-player games matter yet); revisit with a layout-only
+  degradation if a real 5-player row ever needs rendering.
 - Revisit if: a future layout genuinely seats 5+ (lifting the cap is a
   domain-constant change plus this ADR's supersession), or the flight layer
   moves to transform-aware coordinate math (dissolving consequence 5 along

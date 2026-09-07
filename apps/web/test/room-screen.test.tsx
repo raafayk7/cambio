@@ -114,6 +114,11 @@ describe("join-on-visit (R2)", () => {
     renderApp(`/room/${GAME_ID}`)
 
     expect(await screen.findByText("Room full")).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "Four players are already seated — the table takes no more. Create a room of your own.",
+      ),
+    ).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Back to the start" })).toBeInTheDocument()
   })
 
@@ -273,7 +278,7 @@ describe("start (R5)", () => {
     })
   })
 
-  it("surfaces a 422 BadPlayerCount as the inline alert with the 2–5 copy", async () => {
+  it("surfaces a 422 BadPlayerCount as the inline alert with the 2–4 copy", async () => {
     setupFake()
     const user = userEvent.setup()
     const { handlers } = stubApi({
@@ -290,8 +295,11 @@ describe("start (R5)", () => {
 
     const alert = await screen.findByRole("alert")
     expect(alert).toHaveTextContent(
-      "The game needs 2 to 5 players at the table. Share the link and wait for a friend.",
+      "The game needs 2 to 4 players at the table. Share the link and wait for a friend.",
     )
+    // Clause 4's third copy surface (review F8a): the start helper states
+    // the 2–4 rule too — previously the only unpinned one of the three.
+    expect(screen.getByText(/2–4 players/)).toBeInTheDocument()
     // The seat view stays — an inline failure is never a page error.
     expect(screen.getByText(ME.name)).toBeInTheDocument()
   })
@@ -379,6 +387,26 @@ describe("room states (L4/R ledger)", () => {
       within(alert).getByText("Couldn't reach the room. Check your connection and try again."),
     ).toBeInTheDocument()
     expect(within(alert).getByRole("button", { name: "Try again" })).toBeInTheDocument()
+  })
+})
+
+describe("fluid regular table scope guard (CAM-20 M5, mirrors CAM-21 review F1)", () => {
+  it("keeps the pre-CAM-20 width-driven max-w-2xl sizing byte-for-byte — the fluid max-w-4xl table is game-screen-only", async () => {
+    setupFake()
+    memberBootstrap()
+    renderApp(`/room/${GAME_ID}`)
+    await screen.findByText(ME.name)
+
+    const tableSurfaceRoot = screen
+      .getByText(ME.name)
+      .closest("[data-seat-index]")
+      ?.closest("[data-state]")
+    expect(tableSurfaceRoot).not.toBeNull()
+    const className = tableSurfaceRoot?.className ?? ""
+    expect(className).toContain("regular:block")
+    expect(className).toContain("regular:max-w-2xl")
+    expect(className).not.toContain("regular:max-w-4xl")
+    expect(className).not.toContain("regular:flex-1")
   })
 })
 
