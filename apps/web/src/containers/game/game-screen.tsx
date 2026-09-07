@@ -693,12 +693,13 @@ function GameTable({
             seatAnchor="edge"
             viewerSeat="external"
             center={
-              // CAM-21 design-gate fix: compact-only gap-1 (was the shared
-              // gap-4) — at the 128px compact art cap the painted disc is
-              // only 69px (TABLE_DISC_FRACTION 0.54), and the deck+discard
-              // pair at gap-4 (80px total) hung ~5.5px off each edge onto
-              // the bench art. gap-1 brings the pair to 68px, inside the
-              // disc; regular keeps gap-4 (its disc has plenty of room).
+              // CAM-21 design-gate fix, numbers re-derived after CAM-20's
+              // fix pass raised the compact art cap to 158px (review F10c):
+              // the painted disc is now ~85px (TABLE_DISC_FRACTION 0.54).
+              // gap-4 would put the deck+discard pair at 80px — a ~2.6px
+              // margin per side, still cramped against the disc's painted
+              // edge — so compact keeps gap-1 (pair at 68px, clear air);
+              // regular keeps gap-4 (its disc has plenty of room).
               <div className="flex items-center gap-1 regular:gap-4">
                 <DrawDeck
                   count={view.deckCount}

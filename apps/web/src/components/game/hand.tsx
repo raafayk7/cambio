@@ -98,8 +98,10 @@ export interface HandProps {
 }
 
 /** Row width (hand.md r3): the grid never exceeds 6 slots per row — a
- * 4-card deal is one line, 6×2 is the designed-for footprint. */
-const ROW_WIDTH = 6
+ * 4-card deal is one line, 6×2 is the designed-for footprint. Exported for
+ * the Call Cambio dock-offset derivation pin (game-screen.test.tsx, review
+ * F9): the CTA's 324px offset is (ROW_WIDTH·96 + (ROW_WIDTH−1)·8)/2 + 16. */
+export const ROW_WIDTH = 6
 
 /** Every possible row/column count this component ever produces:
  * `Math.max(4, highest + 1)` floors at 4, and rounding up to a full
@@ -130,14 +132,15 @@ const GRID_ROWS_CLASS: Record<4 | 5 | 6, string> = {
 }
 
 /**
- * Side-bench arc offset (CAM-20 gate fix, finding 3): the bench doctrine
- * anchors a side hand to a single point (`BENCH_POSITION_CLASS`), but the
- * painted bench (`table-top.webp`) is a shallow CRESCENT that bulges
- * outward at its vertical middle and tapers at both ends where it meets
- * the corner post — a straight column of rotated cards (the mechanism
- * above) doesn't follow that curve, so the middle cards land on the dark
- * shadow gap between the crescent and the round tabletop disc instead of
- * the bench itself.
+ * Side-bench arc offset (CAM-20 gate fix, finding 3; mechanism revised by
+ * the review fix cycle, finding F2): the bench doctrine anchors a side
+ * hand to a single point (`BENCH_POSITION_CLASS`), but the painted bench
+ * (`table-top.webp`) is a shallow CRESCENT that bulges outward at its
+ * vertical middle and tapers at both ends where it meets the corner
+ * post — a straight column of rotated cards (the mechanism above) doesn't
+ * follow that curve, so the middle cards land on the dark shadow gap
+ * between the crescent and the round tabletop disc instead of the bench
+ * itself.
  *
  * Measured directly on the rendered asset (2026-09-06, a 4-card hand,
  * regular breakpoint): the crescent's own painted center sits at screen-x
@@ -147,78 +150,80 @@ const GRID_ROWS_CLASS: Record<4 | 5 | 6, string> = {
  * around the grid's own vertical center, tapering toward both ends): at a
  * fixed card pitch (card-md's 89.6px upright height + the grid's 8px gap,
  * regular), the two measured data points (distance-from-center 48.9px →
- * 57px of outward offset; 146.3px → 40px) fit a line closely enough to
- * generate the 5/6-row tables below by the same formula — those two row
- * counts were NOT independently re-verified on the rendered path (a
- * follow-up rendered check is warranted if a 5-6 card side-bench hand
- * needs pixel confirmation; see docs/plans/frontend/CAM-20.md).
+ * 57px of outward offset; 146.3px → 40px) fit a line; the 5/6-row tables
+ * below come from the same formula. The 6-row (12-card) table was
+ * rendered-verified during the review fix cycle; the 5-row table remains
+ * formula-generated (documented in design-system/references/tokens.md,
+ * "art-registration constants").
  *
- * Applied to the CARD VISUAL only (never the flight anchor, which must
- * keep reserving its own upright `card-frame` footprint for the grid
- * track — same rule `card-frame-rotated` already follows), as a `margin-
- * left` rather than a transform: margin composes independently of the
- * `rotate` transform already on the same element (no transform-order
- * ambiguity) and, unlike a transform, is real box-model layout that FLIP
- * measures correctly without any ADR-0035/0036 hazard. Only the FIRST
- * column (`slotIndex < shortSide`, i.e. cards actually adjacent to the
- * bench) gets it — a 13+ card hand's second-and-later columns sit over the
- * round disc, not the bench, and are the pre-existing "tolerated
+ * Applied to the ANCHOR DIV as `position: relative` + a directional
+ * offset — NOT to the card visual (the review's F2: an offset on the
+ * visual left the painted card up to ~57px away from the flight anchor
+ * the FLIP layer measures and highlights, so penalty/give flights landed
+ * visibly off the resting card). Relative positioning moves the anchor's
+ * border box — and therefore its `getBoundingClientRect`, which is all
+ * FLIP reads — WITHOUT disturbing the grid's track layout (the reserved
+ * grid cell stays put), and it is not a transform, so ADR-0035/0036's
+ * ban (which exists because transforms corrupt FLIP's written-back
+ * untransformed pixels) does not apply: anchor and card move together and
+ * flights land exactly on the resting card. Values are the TRUE fitted
+ * offsets (the previous visual-margin mechanism needed doubled values to
+ * defeat the anchor's flex centering; that story is gone with it). Only
+ * the FIRST column (`slotIndex < shortSide`, i.e. cards actually adjacent
+ * to the bench) gets it — a 13+ card hand's second-and-later columns sit
+ * over the round disc, not the bench, and are the pre-existing "tolerated
  * compression" band (root plan clause 7), unaffected by this fix.
  * `regular:`-scoped like every other rotation class here (compact never
  * rotates).
  */
-const SIDE_BENCH_MARGIN_CLASS: Record<
-  "left" | "right",
-  Record<4 | 5 | 6, ReadonlyArray<string>>
-> = {
-  // Left bench: outward is toward smaller x — negative margin-left.
-  // Values are DOUBLE the measured/fitted offset (40/57/32/48/65/23/…,
-  // see the block comment above) — verified live (rendered pass,
-  // 2026-09-06) that a margin-left on this flex-centered visual only
-  // moves its rendered position by HALF the margin value (the anchor's
-  // `justify-content: center` centers the child's whole MARGIN BOX, so
-  // an asymmetric margin shifts the box's center by margin/2, not
-  // margin) — an initial pass at the raw fitted values landed at exactly
-  // half the intended shift on the rendered path, caught only by
-  // measuring `getBoundingClientRect()`, not by reading the classes.
+const SIDE_BENCH_ARC_CLASS: Record<"left" | "right", Record<4 | 5 | 6, ReadonlyArray<string>>> = {
+  // Left bench: outward is toward smaller x — negative `left` offset.
   left: {
-    4: ["regular:-ml-[80px]", "regular:-ml-[114px]", "regular:-ml-[114px]", "regular:-ml-[80px]"],
+    4: [
+      "regular:relative regular:-left-[40px]",
+      "regular:relative regular:-left-[57px]",
+      "regular:relative regular:-left-[57px]",
+      "regular:relative regular:-left-[40px]",
+    ],
     5: [
-      "regular:-ml-[64px]",
-      "regular:-ml-[96px]",
-      "regular:-ml-[130px]",
-      "regular:-ml-[96px]",
-      "regular:-ml-[64px]",
+      "regular:relative regular:-left-[32px]",
+      "regular:relative regular:-left-[48px]",
+      "regular:relative regular:-left-[65px]",
+      "regular:relative regular:-left-[48px]",
+      "regular:relative regular:-left-[32px]",
     ],
     6: [
-      "regular:-ml-[46px]",
-      "regular:-ml-[80px]",
-      "regular:-ml-[114px]",
-      "regular:-ml-[114px]",
-      "regular:-ml-[80px]",
-      "regular:-ml-[46px]",
+      "regular:relative regular:-left-[23px]",
+      "regular:relative regular:-left-[40px]",
+      "regular:relative regular:-left-[57px]",
+      "regular:relative regular:-left-[57px]",
+      "regular:relative regular:-left-[40px]",
+      "regular:relative regular:-left-[23px]",
     ],
   },
-  // Right bench: the mirror image — outward is toward larger x, same
-  // magnitudes, positive margin-left (pushes the flex-centered visual
-  // right of its anchor's center — same half-of-margin relationship as
-  // the left bench above).
+  // Right bench: the mirror image — outward is toward larger x, positive
+  // `left` offset, same magnitudes.
   right: {
-    4: ["regular:ml-[80px]", "regular:ml-[114px]", "regular:ml-[114px]", "regular:ml-[80px]"],
+    4: [
+      "regular:relative regular:left-[40px]",
+      "regular:relative regular:left-[57px]",
+      "regular:relative regular:left-[57px]",
+      "regular:relative regular:left-[40px]",
+    ],
     5: [
-      "regular:ml-[64px]",
-      "regular:ml-[96px]",
-      "regular:ml-[130px]",
-      "regular:ml-[96px]",
-      "regular:ml-[64px]",
+      "regular:relative regular:left-[32px]",
+      "regular:relative regular:left-[48px]",
+      "regular:relative regular:left-[65px]",
+      "regular:relative regular:left-[48px]",
+      "regular:relative regular:left-[32px]",
     ],
     6: [
-      "regular:ml-[46px]",
-      "regular:ml-[80px]",
-      "regular:ml-[114px]",
-      "regular:ml-[114px]",
-      "regular:ml-[80px]",
-      "regular:ml-[46px]",
+      "regular:relative regular:left-[23px]",
+      "regular:relative regular:left-[40px]",
+      "regular:relative regular:left-[57px]",
+      "regular:relative regular:left-[57px]",
+      "regular:relative regular:left-[40px]",
+      "regular:relative regular:left-[23px]",
     ],
   },
 }
@@ -314,24 +319,16 @@ export function Hand({
         const face = faceBySlot.get(slotIndex)
         const awaiting = awaitingGiveSlot === slotIndex
         const anchor = slotAnchorId(playerId, slotIndex)
-        // CAM-20 gate fix (finding 3): only the first column (the one
-        // physically adjacent to the bench) follows the crescent's arc —
-        // see SIDE_BENCH_MARGIN_CLASS above.
-        const sideBenchMarginClass =
+        // CAM-20 gate fix (finding 3), review fix cycle (F2): only the
+        // first column (the one physically adjacent to the bench) follows
+        // the crescent's arc, and the offset rides the ANCHOR div so the
+        // flight anchor and the painted card move together — see
+        // SIDE_BENCH_ARC_CLASS above.
+        const sideBenchArcClass =
           rotate !== undefined && slotIndex < shortSide
-            ? SIDE_BENCH_MARGIN_CLASS[rotate][shortSide][slotIndex]
+            ? SIDE_BENCH_ARC_CLASS[rotate][shortSide][slotIndex]
             : undefined
-        // `regular:shrink-0`: the anchor is a flex container sized to the
-        // UPRIGHT card-frame footprint (64px, card-md), narrower than a
-        // right-bench card's positive margin-left + its own width
-        // combined — without disabling shrink, the browser's default
-        // `flex-shrink: 1` collapses the child to 0×0 to fit the
-        // anchor's box (caught only by measuring the rendered rect, not
-        // by reading the classes: the left bench's NEGATIVE margin never
-        // exceeds the container so it never shrank, masking this for
-        // half of the mirrored pair during development).
-        const visualClass =
-          cn(cardRotateClass, sideBenchMarginClass, rotated && "regular:shrink-0") || undefined
+        const visualClass = cn(cardRotateClass) || undefined
         // Even-rounding grid padding beyond every real signal is NOT a
         // vacancy — a dashed outline there would announce an empty slot
         // that never held a card (CAM-18 gate finding). It renders as an
@@ -339,7 +336,13 @@ export function Hand({
         const isFiller = slotIndex > highest
 
         if (isFiller) {
-          return <span key={slotIndex} aria-hidden className={cn("invisible block", anchorClass)} />
+          return (
+            <span
+              key={slotIndex}
+              aria-hidden
+              className={cn("invisible block", anchorClass, sideBenchArcClass)}
+            />
+          )
         }
 
         if (inFlightSlot === slotIndex) {
@@ -349,7 +352,7 @@ export function Hand({
               data-slot-index={slotIndex}
               data-occupied="true"
               data-flight-anchor={anchor}
-              className={anchorClass}
+              className={cn(anchorClass, sideBenchArcClass)}
             >
               <PlayingCard
                 face="down"
@@ -368,7 +371,7 @@ export function Hand({
               data-slot-index={slotIndex}
               data-occupied="true"
               data-flight-anchor={anchor}
-              className={anchorClass}
+              className={cn(anchorClass, sideBenchArcClass)}
             >
               <PlayingCard
                 face="up"
@@ -422,7 +425,7 @@ export function Hand({
             data-slot-index={slotIndex}
             data-occupied={isOccupied}
             data-flight-anchor={anchor}
-            className={anchorClass}
+            className={cn(anchorClass, sideBenchArcClass)}
           >
             {interactive && slotClickable && onSlotClick ? (
               <button

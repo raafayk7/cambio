@@ -128,7 +128,14 @@ composition):
    art width.
 10. The compact docked composition is unchanged except for the hand's
     internal row-major layout: CAM-21's fold-fit and pinned-chrome test
-    pins still pass at 2, 3, and 4 players.
+    pins still pass at 2, 3, and 4 players. _Amended (review F6, per the
+    Decision-Logged 2026-09-06 user call to fix all design-gate findings
+    in-task): the gate fix pass additionally changed three compact values
+    beyond hand internals — the opponents-row inter-seat gap
+    (`gap-x-5`), the deck-badge inset, and `--size-table-art-compact`
+    (128 → 158px, fold-fit re-verified at 2/3/4 players). The
+    still-binding core of this clause is that CAM-21's docked
+    COMPOSITION and its test pins survive, which they do._
 11. Five-player support is removed coherently from the frontend: no
     5-seat rendering path, gallery, or copy remains; the table-surface
     canon's 5-player scroll fallback is retired in the same canon revision.
@@ -136,8 +143,13 @@ composition):
     and `hand.md` get superseding revisions (bench doctrine, row-major
     anatomy, 2–4 seats); HANDOFF §1.1 carries an amendment blockquote
     pointing at ADR-0036; the `cambio-rules` skill's setup line is amended
-    the same way (harness file — lands on `main` per ADR-0028 and
-    merges down as part of this task's definition of done).
+    the same way. _Amended (review F5): this clause originally routed the
+    skill amendment "on `main` per ADR-0028" — a misreading of the ADR,
+    whose guard rail names that exact file as release-side-diverged and
+    must-not-edit-on-main. The edit was made on `main` anyway (9dc922d)
+    and the merge-down resolved cleanly (release-v0's copy verified
+    correct), so the outcome stands; the correct procedure for this file
+    is a release-side edit — see the Decision Log._
 
 ### Acceptance criteria
 
@@ -147,7 +159,12 @@ composition):
       all rows filled with real test names and assertions); frontend owns
       clauses 5–12 ([frontend/CAM-20.md](../frontend/CAM-20.md) Contract
       coverage, all rows filled, including clause 7's re-verified
-      rendered numbers post-creation-gate and post-fix-pass).
+      rendered numbers post-creation-gate and — per the review fix
+      cycle's fresh measurement, which replaced the stale claim the
+      review's F3 caught here — post-fix-cycle: 12-card left-bench hand
+      re-measured live 2026-09-07 with the arc offsets on the anchors,
+      0.0px anchor/visual delta, 20.1px cluster clearance, 6-row arc
+      table rendered-verified).
 - [x] The design-gate rendered path is re-run at 2, 3, and 4 players on
       both breakpoints (advisory verdicts recorded in this doc's Progress).
       **Scope reduced by explicit user request** to 2 runs — 4 players
@@ -451,6 +468,30 @@ timestamp each entry)_
       (25/25, confirmed independently by the orchestrator after the pass,
       not just accepted from the subagent's own report); web suite
       230/230 (227 + 3 new), UI suite 25/25.
+- [x] 2026-09-07 — `/review` fix cycle executed (all findings F1–F12
+      resolved or dispositioned; see each finding's RESOLUTION line in
+      Outcomes & retrospective). Highlights: F2 fixed structurally (arc
+      offsets moved onto the flight anchors; live rendered probe measured
+      0.0px anchor/visual delta on a 12-card left-bench hand, replacing
+      the ~57px displacement) — which simultaneously closed F3's missing
+      post-fix measurement and rendered-verified the previously
+      extrapolated 6-row arc table; F1 accepted and recorded in ADR-0036;
+      F9 resolved by the "art-registration constants" tokens.md family +
+      derivation pins. Environment hygiene: SLAM_WINDOW_MS temporarily
+      1500 for the growth script and restored to 10000; dev servers
+      stopped after the probe; throwaway driver/probe scripts lived in
+      the session scratchpad only.
+- [x] 2026-09-07 — fix-cycle re-review: sweeps verified (F3/F4/F5/F10
+      phrasings re-grepped; every remaining hit is a historical Progress
+      record, a superseded-marked amendment, or the finding's own quoted
+      text), mutants reasoned for each hardened test (recorded in the
+      RESOLUTION lines), suites re-run fresh: domain 195/195 (194 + the
+      playerCountFor pin), web 233/233 (230 + arc-on-anchor ×2 + the
+      inset lockstep guard), full bare gate exit 0 — one intermediate
+      failure was the gate's own prettier check catching an unformatted
+      hand-applied test edit (the PostToolUse format hook covers
+      Edit/Write, not Bash-applied edits — noted for future cycles),
+      fixed with `prettier --write` and re-run green.
 - [x] 2026-09-07 — `/review` pass: four reviewers (contract +
       architecture × both lanes), independent gate + forced zero-cache
       test run (680/680 green). Verdict **fix-then-ship**; findings
@@ -499,6 +540,30 @@ timestamp each entry)_
   precedent), given the findings were small and precisely located by the
   gate, and one (compact opponent-hand spacing) had real gameplay
   consequence in a hidden-information memory game. User call.
+- 2026-09-07 — **Review F1: accept the 5-seat render crash pre-launch** —
+  a game persisted under the old 2–5 rule would crash the screen
+  (`benchAssignment` throws, no error boundary); accepted and recorded in
+  ADR-0036's consequences rather than building a degradation nobody
+  needs before launch. User call.
+- 2026-09-07 — **Review F2: fix the flight-anchor displacement
+  structurally, not by documenting it** — the arc offset moved from the
+  card visual to the slot anchor (`position: relative` + offset — layout,
+  not a transform, so ADR-0035/0036's ban doesn't apply; anchor and card
+  move together). Rendered-verified: 0.0px anchor/visual delta at 12
+  cards. My recommendation, user call.
+- 2026-09-07 — **Review F9: name-and-pin, don't mint** — the
+  raster-measured values (arc offsets, bench insets, CTA offset, dock
+  nudge) are documented as "art-registration constants" in tokens.md
+  with derivation pins in tests, rather than forced into `@theme` tokens
+  they don't belong in. My recommendation, user call.
+- 2026-09-07 — **ADR-0028 routing deviation recorded (review F5)** — the
+  `cambio-rules` skill amendment was committed on `main` (9dc922d)
+  although the ADR's guard rail names that file as release-side-diverged
+  (must not edit on `main`). Outcome verified fine (merge-down clean,
+  release-v0 copy correct); the plan docs that taught the misreading are
+  corrected. **Standing rule for future tasks: diff a harness file
+  against the release branch BEFORE routing its edit — release-side
+  wins for diverged files.**
 
 ## Surprises & discoveries
 
@@ -540,7 +605,7 @@ this repo does not ship false doc claims; none is a contract violation.
   either (a) record the accepted consequence explicitly in ADR-0036
   (+ optionally verify no live 5-player rows exist), or (b) add a
   layout-only degradation (5th seat falls back to the compact flat row
-  or `bottom`). RESOLUTION: pending user call.
+  or `bottom`). RESOLUTION (2026-09-07): **RESOLVED — accepted** (user call, pre-launch): consequence recorded in ADR-0036 ("Accepted consequence" bullet); no degradation built; the throw and its pin stand.
 - **F2 (behavior consequence undocumented).** The side-bench arc fix
   (`SIDE_BENCH_MARGIN_CLASS`, `hand.tsx:170–224`) moves the painted card
   visual up to **~57px off its own flight anchor** (doubled margin,
@@ -552,8 +617,7 @@ this repo does not ship false doc claims; none is a contract violation.
   card), not this displacement; ADR-0036 §5's "anchors stay where the
   card is" rationale is silently weakened. Fix: document the
   displacement as an accepted artifact in `hand.md` + an ADR-0036
-  amendment note, or bound/redesign the offset mechanism. RESOLUTION:
-  pending.
+  amendment note, or bound/redesign the offset mechanism. RESOLUTION (2026-09-07): **RESOLVED — fixed structurally** (the stronger branch): arc offsets moved to the slot anchors as `position: relative` offsets (`SIDE_BENCH_ARC_CLASS`, true fitted values); rendered probe measured 0.0px anchor/visual delta on all 12 slots of a live left-bench 12-card hand. Canon: hand.md r5; ADR-0036 §5 amended; jsdom pins added for both benches.
 - **F3 (false claim + missing re-measure).** The acceptance box above
   claims clause 7's rendered numbers were re-verified
   "post-creation-gate **and post-fix-pass**"; the coverage row's latest
@@ -566,7 +630,7 @@ this repo does not ship false doc claims; none is a contract violation.
   (validating the extrapolation), update the coverage row, then the
   claim becomes true; or amend the claim. Sweep both phrasings
   ("post-fix-pass", "re-verified") across root + frontend plans.
-  RESOLUTION: pending.
+  RESOLUTION (2026-09-07): **RESOLVED — test strengthened + claim now true**: the fix-cycle rendered probe re-measured the 12-card left-bench case post-arc-fix (0.0px delta, 20.1px cluster clearance, crescent sweep verified), which also rendered-verifies the 6-row table (5-row stays formula-generated, disclosed in tokens.md); the acceptance box and frontend coverage row 7 now carry the fresh numbers. Sweep run ("post-fix-pass"/"re-verified" across both plans): remaining hits are historical Progress records or this finding's own text.
 - **F4 (false enforcement claim, two instances + sweep).** The
   `BENCH_INSET_PCT` "drift guard" is a tautology:
   `table-geometry.test.ts:20` asserts the constant equals its own
@@ -577,7 +641,7 @@ this repo does not ship false doc claims; none is a contract violation.
   "pins `BENCH_INSET_PCT` (41.5)…") advertise a protection that does not
   exist. Fix: make the guard real — assert the class strings contain
   `${50 - BENCH_INSET_PCT}%` and `${50 + BENCH_INSET_PCT}%` — and sweep
-  every statement of the claim. RESOLUTION: pending.
+  every statement of the claim. RESOLUTION (2026-09-07): **RESOLVED — test strengthened**: `table-geometry.test.ts` now asserts the `BENCH_POSITION_CLASS` literals contain `50 ∓ BENCH_INSET_PCT` verbatim (mutant: changing `SEAT_RING_GAP_PCT` or the art fraction now fails the suite); both claim instances amended (table-surface.tsx docstring, frontend plan M3 surprise). Sweep confirmed no further instances.
 - **F5 (process deviation + stale claims).** The `cambio-rules` skill
   amendment was committed on `main` (9dc922d) although **ADR-0028's
   guard rail names that exact file as release-side-diverged and
@@ -591,7 +655,7 @@ this repo does not ship false doc claims; none is a contract violation.
   `development` + `release-v0`; absent from this branch only by
   branch-point ordering). Fix: amend clause 12 + backend step 6 with an
   inline correction note, update the coverage row, log the deviation in
-  the Decision Log. RESOLUTION: pending.
+  the Decision Log. RESOLUTION (2026-09-07): **RESOLVED — claims amended everywhere** (clause 12, backend Context + step 6, backend coverage row 12) + deviation and standing rule recorded in the Decision Log. The `main` commit stands (merge-down verified clean; no history rewrite).
 - **F6 (contract text contradicted).** Clause 10 says compact is
   "unchanged except for the hand's internal row-major layout", but the
   (user-authorized, Decision-Logged) fix pass changed compact beyond
@@ -599,11 +663,11 @@ this repo does not ship false doc claims; none is a contract violation.
   deck badge inset (`draw-deck.tsx:96`), and
   `--size-table-art-compact` 128→158px. Same "revised, not
   contradicted" discipline the clause imposes on canon: add an inline
-  amendment note at clause 10. RESOLUTION: pending.
+  amendment note at clause 10. RESOLUTION (2026-09-07): **RESOLVED — claim amended** (inline amendment at clause 10 citing the Decision-Logged user call; core of the clause — CAM-21 composition + pins survive — reaffirmed).
 - **F7 (coverage-table staleness, frontend).** Row 12 names
   table-surface.md **v5** / hand.md **v3** (actual: v6 / v4); the three
   fix-pass tests (`game-screen.test.tsx:2068`, `:2090`, `:2114`) have no
-  rows; row 10 omits the fix-pass compact changes. RESOLUTION: pending.
+  rows; row 10 omits the fix-pass compact changes. RESOLUTION (2026-09-07): **RESOLVED — rows updated**: row 12 cites v6/v5 with the revision chain; row 7 carries the post-fix-cycle measurement; the fix-pass and fix-cycle pins are recorded in the frontend Progress entry (clause-keyed table; the extra pins ride their clauses' rows).
 - **F8 (coverage gaps, backend).** (a) Clause 4's START_HELPER
   ("2–4 players", `use-room.ts:47`) is asserted by no test — the clause
   names three copy surfaces, two are pinned. (b) The new 5-player
@@ -611,8 +675,7 @@ this repo does not ship false doc claims; none is a contract violation.
   passes; asserting the message contains "outside 2–4" pins the actual
   bound. (c) Nothing pins that `playerCountFor` reaches 4 (a narrowing
   to 2–3 keeps every suite green). Fix: strengthen all three
-  (prefer strengthening tests over weakening claims). RESOLUTION:
-  pending.
+  (prefer strengthening tests over weakening claims). RESOLUTION (2026-09-07): **RESOLVED — all three tests strengthened**: (a) the BadPlayerCount room test also asserts the "2–4 players" start helper; (b) both invariant probes assert the message contains "outside 2–4" (mutant: an unrelated violation no longer passes the pin); (c) a new pin fixes `playerCountFor`'s image over 0–6 at exactly {2,3,4} (mutant: `2+(i%2)` now fails). No claim weakened.
 - **F9 (token discipline, user call on depth).** 15 new off-scale pixel
   literals ship as arbitrary-value utilities backed by no token and
   named in no design-system file: the `SIDE_BENCH_MARGIN_CLASS` table
@@ -625,7 +688,7 @@ this repo does not ship false doc claims; none is a contract violation.
     card-lg width, gap) with nothing pinning the arithmetic. Fix options:
     document the value families in tokens.md/canon (measured-against-art
     values arguably can't be @theme tokens, but canon must name them), and
-    pin 324's derivation in a test. RESOLUTION: pending.
+    pin 324's derivation in a test. RESOLUTION (2026-09-07): **RESOLVED — name-and-pin** (user call): tokens.md gains the "art-registration constants" family (arc offsets, bench insets, CTA offset, dock nudge, each with derivation/provenance); the 324px is pinned as a computation from the exported `ROW_WIDTH` in `game-screen.test.tsx` (mutant: changing ROW_WIDTH fails the pin); the bench insets are pinned by F4's lockstep guard. No @theme tokens minted — raster-registration values are named canon, not spacing-scale members.
 - **F10 (stale prose/comment sweep).** (a) `packages/ui/src/styles.css:274`
   "five opponent hands" (file touched by this diff); (b) HANDOFF §4.1
   "acceptable at a 5-player maximum" and the out-of-scope "more than 5
@@ -641,19 +704,23 @@ this repo does not ship false doc claims; none is a contract violation.
   THERE" — they were documented invariants, no such test existed
   (verified against release-v0); (h) the vacuous `24 > 4`
   literal assertion (`game-screen.test.tsx:2147–2149`) overstated in the
-  plan as "the two underlying constants". RESOLUTION: pending.
+  plan as "the two underlying constants". RESOLUTION (2026-09-07): **RESOLVED — swept**: (a) styles.css comment now says "up to three opponent hands (2–4 cap)"; (b) HANDOFF §4.1 + out-of-scope amended with ADR-0036 notes; (c) deck-gap comment re-derived against the 158px cap; (d) v6 citations fixed in table-geometry.ts/.test.ts; (e) gallery label now "one row of 4"; (f) table-surface reuse comment states the deliberate translate divergence; (g) frontend plan wording corrected to "documented invariants"; (h) the vacuous 24>4 assertion removed, comment explains why the class assertions are the pin.
 - **F11 (ADR drift).** ADR-0036 §5 says "upright anchor boxes **sized to
   the rotated footprint**"; as-built (post creation-gate) the anchor
   keeps upright `card-frame` and only the visual takes
   `card-frame-rotated`. Recorded in `hand.md` r3 but the ADR was never
-  amended. Fix: amendment note in ADR-0036. RESOLUTION: pending.
+  amended. Fix: amendment note in ADR-0036. RESOLUTION (2026-09-07): **RESOLVED — ADR amended**: ADR-0036 §5 carries an as-built amendment blockquote (anchor stays upright `card-frame`, visual takes `card-frame-rotated`; offsets-are-not-transforms clarification from F2's fix).
 - **F12 (advisory, no fix required to ship).** (a) `max-w-4xl` rides
   Tailwind's undocumented-in-tokens.md container namespace (precedent:
   `max-w-2xl`); (b) no jsdom pin that **opponent** seat wrappers carry
   `BENCH_POSITION_CLASS` (only the own-seat wrapper is pinned);
   (c) no gallery showcase for the `rotate` hand variant (logged scope
   note); (d) `.agents/scripts/fill-coverage-row.mjs` corrupts 3-column
-  coverage tables (backend Surprises) — harness issue to file.
+  coverage tables (backend Surprises) — filed as CAM-28.
+  RESOLUTION (2026-09-07): advisory — (b) CLOSED anyway (opponent-wrapper
+  bench-class pin added in the fix cycle); (a) and (c) accepted as-is
+  (max-w-2xl precedent; gallery rotate showcase stays a logged scope
+  note); (d) owned by CAM-28.
 
 ### What was run
 

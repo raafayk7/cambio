@@ -271,8 +271,9 @@
 }
 /* Compact card scale (CAM-21, gate-approved, interview 2026-09-06): the
  * 360×640 fold budget forces smaller footprints than regular's — card-lg
- * shrinks one spacing step, card-md two, so five opponent hands and the
- * viewer's own still fit one screen height. Regular values (96px/64px)
+ * shrinks one spacing step, card-md two, so every opponent hand (up to
+ * three, since ADR-0036's 2–4 cap) and the viewer's own still fit one
+ * screen height. Regular values (96px/64px)
  * are unchanged (root plan clause 10); card-sm is already the same
  * physical size compact and regular need, so it stays flat. */
 @utility card-lg {

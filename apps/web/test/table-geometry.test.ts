@@ -6,9 +6,10 @@ import {
   benchAssignment,
   SEAT_RING_GAP_PCT,
 } from "../src/components/game/table-geometry.js"
+import { BENCH_POSITION_CLASS } from "../src/components/game/table-surface.js"
 
 /**
- * table-surface.md v5 + root plan clause 5, ADR-0036: seats anchor to the
+ * table-surface.md v6 + root plan clause 5, ADR-0036: seats anchor to the
  * four painted benches instead of spacing radially. Migrated from the old
  * seat-arc/ringPositions suite (retired with the polar engine) — these
  * pins cover the bench ASSIGNMENT (which seat gets which bench); the fixed
@@ -18,6 +19,15 @@ import {
 describe("table-geometry", () => {
   it("derives the bench inset from the art's half-width plus the named gap", () => {
     expect(BENCH_INSET_PCT).toBe(ART_HALF_PCT + SEAT_RING_GAP_PCT)
+  })
+
+  it("keeps table-surface's hardcoded bench-inset class literals in lockstep with the derived constant (review F4 — the derivation identity above alone cannot catch an art-proportion change)", () => {
+    const near = `[${50 - BENCH_INSET_PCT}%]`
+    const far = `[${50 + BENCH_INSET_PCT}%]`
+    expect(BENCH_POSITION_CLASS.top).toContain(`top-${near}`)
+    expect(BENCH_POSITION_CLASS.bottom).toContain(`top-${far}`)
+    expect(BENCH_POSITION_CLASS.left).toContain(`left-${near}`)
+    expect(BENCH_POSITION_CLASS.right).toContain(`left-${far}`)
   })
 
   describe("benchAssignment", () => {

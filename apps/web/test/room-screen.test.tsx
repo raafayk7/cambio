@@ -297,6 +297,9 @@ describe("start (R5)", () => {
     expect(alert).toHaveTextContent(
       "The game needs 2 to 4 players at the table. Share the link and wait for a friend.",
     )
+    // Clause 4's third copy surface (review F8a): the start helper states
+    // the 2–4 rule too — previously the only unpinned one of the three.
+    expect(screen.getByText(/2–4 players/)).toBeInTheDocument()
     // The seat view stays — an inline failure is never a page error.
     expect(screen.getByText(ME.name)).toBeInTheDocument()
   })

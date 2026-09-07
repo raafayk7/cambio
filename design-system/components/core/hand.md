@@ -1,6 +1,6 @@
 name: hand
 status: draft
-version: 4
+version: 5
 extends: none
 
 A player's slot grid. Class: **Game object**.
@@ -144,5 +144,22 @@ left` on the card VISUAL only (never the anchor — same rule as the
   over the disc, unaffected, per the existing tolerated-compression
   band. Measured directly for a 4-row bench; 5/6-row values are the same
   fitted curve extrapolated, not independently re-verified on the
-  rendered path (see `hand.tsx`'s `SIDE_BENCH_MARGIN_CLASS` comment and
-  `docs/plans/frontend/CAM-20.md`).
+  rendered path. _Amended (r5): the visual-margin mechanism described
+  here is superseded — see r5._
+- r5 (CAM-20 review fix cycle, 2026-09-07): **the arc offset moves from
+  the card visual to the slot ANCHOR** (`position: relative` + a
+  directional offset, true fitted values — `hand.tsx`'s
+  `SIDE_BENCH_ARC_CLASS`). The review's F2 found the r4 mechanism left
+  the painted card up to ~57px away from the flight anchor the FLIP
+  layer measures and highlights, so penalty/give flights landed visibly
+  off the resting card — an artifact class beyond the accepted
+  upright-clone-lands-on-rotated-card beat. A relative offset is layout,
+  not a transform (ADR-0035/0036's ban does not apply), moves anchor and
+  card together, and leaves grid tracks untouched. Rendered-verified at
+  the 12-card left-bench case (2026-09-07): anchor/visual delta 0.0px on
+  all 12 slots, column-1 centers sweep the crescent symmetrically
+  (430→413→396→396→413→430px at 1280×900), 20.1px clearance to the
+  deck/discard cluster, no page scroll. The 6-row table is thereby
+  rendered-verified; the 5-row table remains formula-generated. Value
+  families are documented in `references/tokens.md` under
+  "art-registration constants".

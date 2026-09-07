@@ -210,6 +210,28 @@ describe("Hand", () => {
       expect(visual).toHaveClass("regular:rotate-90")
     })
 
+    it("applies the side-bench arc offset to the ANCHOR div, not the card visual, so flights land on the resting card (review F2)", () => {
+      const { container } = render(
+        <Hand variant="opponent" playerId="p1" slots={[0, 1, 2, 3]} rotate="left" />,
+      )
+      const anchor = container.querySelector('[data-slot-index="1"]')
+      expect(anchor?.className ?? "").toContain("regular:relative")
+      expect(anchor?.className ?? "").toContain("regular:-left-[57px]")
+      // The visual carries rotation only — no margin/offset that would
+      // displace the painted card from the anchor the FLIP layer measures.
+      const visual = anchor?.querySelector("[data-face]")
+      expect(visual?.className ?? "").not.toMatch(/ml-\[|-left-\[|left-\[/)
+    })
+
+    it("mirrors the arc offset for a right-bench opponent", () => {
+      const { container } = render(
+        <Hand variant="opponent" playerId="p1" slots={[0, 1, 2, 3]} rotate="right" />,
+      )
+      const anchor = container.querySelector('[data-slot-index="1"]')
+      expect(anchor?.className ?? "").toContain("regular:left-[57px]")
+      expect(anchor?.className ?? "").not.toContain("regular:-left-[57px]")
+    })
+
     it("rotates an empty (vacancy) slot's dashed outline the same way as an occupied one", () => {
       const { container } = render(
         <Hand variant="opponent" playerId="p1" slots={[]} rotate="left" />,

@@ -135,7 +135,7 @@ export function HandSection() {
       title="hand"
       note="Row-major slot grids, rows of up to 6 — holes stay holes; indices never reflow."
     >
-      <StateCard label="populated (own, 2×2)">
+      <StateCard label="populated (own, one row of 4)">
         <TableGround>
           <Hand variant="own" playerId={PLAYER_C} slots={[0, 1, 2, 3]} />
         </TableGround>

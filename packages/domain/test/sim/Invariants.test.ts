@@ -7,6 +7,7 @@ import { type GameEvent } from "../../src/GameEvent.js"
 import { allCards, type GameState } from "../../src/GameState.js"
 import { prngStateFromSeed } from "../../src/Prng.js"
 import { card, slot, ts, uid } from "../fixtures.js"
+import { playerCountFor } from "../../src/testing/driver.js"
 import {
   cardPartitionViolations,
   endViolations,
@@ -100,7 +101,10 @@ describe("hand & seat integrity checker (C2.2, §4.5 restated)", () => {
   it("rejects rosters outside 2–4 players (§1.1)", () => {
     const state = healthy()
     const one = { ...state, players: state.players.slice(0, 1) }
-    expect(handIntegrityViolations(one, players3.slice(0, 1))).not.toStrictEqual([])
+    // Review F8b: assert the COUNT violation specifically, not just "some
+    // violation" — an unrelated integrity failure must not keep this pin
+    // green.
+    expect(handIntegrityViolations(one, players3.slice(0, 1)).join(" ")).toContain("outside 2–4")
 
     const roster5 = [...players3, uid(3), uid(4)]
     const five: GameState = {
@@ -111,7 +115,12 @@ describe("hand & seat integrity checker (C2.2, §4.5 restated)", () => {
         { id: uid(4), hand: [{ slotIndex: slot(0), card: card("AD") }] },
       ],
     }
-    expect(handIntegrityViolations(five, roster5)).not.toStrictEqual([])
+    expect(handIntegrityViolations(five, roster5).join(" ")).toContain("outside 2–4")
+  })
+
+  it("playerCountFor spans exactly 2–4 (§1.1, ADR-0036) — the roster generator every sim/fuzz/roundtrip suite draws from", () => {
+    const counts = new Set([0, 1, 2, 3, 4, 5, 6].map(playerCountFor))
+    expect(counts).toStrictEqual(new Set([2, 3, 4]))
   })
 
   it("stepViolations combines both checkers", () => {

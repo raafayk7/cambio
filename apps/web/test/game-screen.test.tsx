@@ -2,7 +2,8 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { BENCH_ANCHOR_CLASS } from "../src/components/game/table-surface.js"
+import { ROW_WIDTH } from "../src/components/game/hand.js"
+import { BENCH_ANCHOR_CLASS, BENCH_POSITION_CLASS } from "../src/components/game/table-surface.js"
 import { setRealtimeClientForTests } from "../src/services/realtime.js"
 import { FakeRealtimeClient } from "./support/fake-realtime.js"
 import {
@@ -2009,6 +2010,18 @@ describe("side-bench rotation (CAM-20)", () => {
     // And the viewer's own hand (always the bottom bench) never rotates.
     const ownAnchor = document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"]`)
     expect(ownAnchor?.querySelector("[data-face]")?.className ?? "").not.toMatch(/rotate-/)
+
+    // Review F12b: opponent seat WRAPPERS carry the shared bench position
+    // classes (previously only the own-seat wrapper's classes were pinned —
+    // dropping BENCH_POSITION_CLASS from seatWrapper would have passed).
+    const friendWrapper = screen.getByText(FRIEND.name).closest("[data-seat-index]")
+    const thirdWrapper = screen.getByText(THIRD.name).closest("[data-seat-index]")
+    for (const token of BENCH_POSITION_CLASS.left.split(" ")) {
+      expect(friendWrapper?.className ?? "").toContain(token)
+    }
+    for (const token of BENCH_POSITION_CLASS.right.split(" ")) {
+      expect(thirdWrapper?.className ?? "").toContain(token)
+    }
   })
 
   it("still carries no scale-or-rotate transform above any flight anchor with a rotated hand on the table (ADR-0035/0036 §5)", async () => {
@@ -2097,7 +2110,17 @@ describe("design-gate fix cycle, regular findings (CAM-20)", () => {
     const callCambio = screen.getByRole("button", { name: "Call Cambio" })
     const wrapper = callCambio.parentElement
     const className = wrapper?.className ?? ""
-    expect(className).toContain("regular:left-[calc(50%+324px)]")
+    // Review F9: the 324px is a live derivation, not a magic number — half
+    // the own hand's full-row width (ROW_WIDTH card-lg columns at 96px
+    // regular + the grid's 8px gaps) plus one 16px step of clearance. If
+    // ROW_WIDTH or the card footprint ever changes, this pin fails instead
+    // of the button silently landing on the hand.
+    const CARD_LG_REGULAR_PX = 96 // card-lg, packages/ui/src/styles.css
+    const GRID_GAP_REGULAR_PX = 8 // regular:gap-2, hand.tsx
+    const derived =
+      (ROW_WIDTH * CARD_LG_REGULAR_PX + (ROW_WIDTH - 1) * GRID_GAP_REGULAR_PX) / 2 + 16
+    expect(derived).toBe(324)
+    expect(className).toContain(`regular:left-[calc(50%+${derived}px)]`)
     expect(className).not.toContain("regular:right-5")
     // Still docked inside the bottom dock region, not the chrome band —
     // the pre-existing structural pin for this element's DOM location
@@ -2139,13 +2162,11 @@ describe("design-gate fix cycle, compact findings (CAM-20)", () => {
     expect(friendHand?.className ?? "").not.toMatch(/(^|\s)gap-2(\s|$)/)
     expect(friendHand?.className ?? "").toContain("regular:gap-2")
 
-    // Inter-seat: the opponents row wrapper widens to gap-x-5 (24px) —
-    // strictly larger than the 4px intra-hand gap above (a structural,
-    // numeric pin, not just "a gap class exists").
+    // Inter-seat: the opponents row wrapper widens to gap-x-5 (24px vs the
+    // 4px intra-hand gap-1 above — the class assertions ARE the pin; a
+    // literal 24 > 4 comparison was removed in the review fix cycle, F10h,
+    // as vacuous).
     const opponentsRow = friendHand?.closest("[data-seat-index]")?.parentElement
     expect(opponentsRow?.className ?? "").toContain("gap-x-5")
-    const INTRA_HAND_GAP_PX = 4 // spacing-1, gap-1
-    const INTER_SEAT_GAP_PX = 24 // spacing-5, gap-x-5
-    expect(INTER_SEAT_GAP_PX).toBeGreaterThan(INTRA_HAND_GAP_PX)
   })
 })

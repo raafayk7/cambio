@@ -67,16 +67,23 @@ export interface TableSurfaceProps {
 // inline ring percentages — a bench's on-screen spot never depends on
 // seat count, only on WHICH seat occupies it (benchAssignment above
 // decides that part). Exported so the game screen's extracted own-seat
-// wrapper (decision 3) reuses the exact same `bottom` entry instead of
-// hand-copying a translate or reproducing a geometry call. -----------------
+// wrapper (decision 3) reuses the same `bottom` POSITION entry instead of
+// reproducing a geometry call. Its TRANSLATE deliberately diverges from
+// `BENCH_ANCHOR_CLASS.bottom` by the gate-fix 4px nudge (review F10f) —
+// scoped to the dock only, documented and pinned at game-screen.tsx /
+// game-screen.test.tsx; the shared constant stays un-nudged for
+// TableSurface's own internal seatWrapper (room screen). -------------------
 
 /** Each bench's fixed spot on the square container: top/bottom center the
  * anchor horizontally at `BENCH_INSET_PCT` from the respective edge;
  * left/right do the same vertically. `8.5%`/`91.5%` are `50 ∓
  * BENCH_INSET_PCT` (41.5, table-geometry.ts) — literal, not computed,
  * because Tailwind's build-time scanner needs the arbitrary-value class
- * text to appear verbatim in source; `table-geometry.test.ts` pins the
- * constant these numbers must track if the art's proportions ever change. */
+ * text to appear verbatim in source; `table-geometry.test.ts` asserts these
+ * class strings contain `50 ∓ BENCH_INSET_PCT` verbatim, so an
+ * art-proportion change fails the suite instead of silently stranding the
+ * literals (review F4 — the previous wording here claimed that guard while
+ * the test only pinned the constant against its own definition). */
 export const BENCH_POSITION_CLASS: Record<Bench, string> = {
   top: "regular:top-[8.5%] regular:left-1/2",
   bottom: "regular:top-[91.5%] regular:left-1/2",

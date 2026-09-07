@@ -65,8 +65,14 @@ boundary here). Clause 4's copy strings live in `apps/web`, so
   takes no more."
 - Close-out docs: `docs/HANDOFF.md` §1.1 (the "2–5 players" line, near
   line 28) gains an amendment blockquote pointing at ADR-0036;
-  `.agents/skills/cambio-rules/SKILL.md` setup line ("2–5 players", line 17) gets the same amendment — **on `main`, per ADR-0028**, merged down as
-  part of this task's definition of done.
+  `.agents/skills/cambio-rules/SKILL.md` setup line ("2–5 players", line 17) gets the same amendment. _Corrected by the review (F5): this plan
+  originally routed that edit "on `main`, per ADR-0028" — a misreading;
+  ADR-0028's guard rail names this exact file as release-side-diverged
+  and must-NOT-edit-on-main. The edit was nonetheless made on `main`
+  (9dc922d) and the merge-down happened to resolve cleanly (release-v0's
+  copy verified correct, both amendment and release-side content
+  present), so the outcome stands; the deviation is recorded in the root
+  plan's Decision Log so no future task inherits the misreading._
 
 ### What does NOT change (verified at plan time — do not hunt)
 
@@ -197,13 +203,16 @@ On the task branch: add an amendment blockquote under `docs/HANDOFF.md`
 original line in place — ADRs outrank the handoff via amendment, never
 silent rewrites; check an existing amended section for the exact idiom).
 
-Separately, **on `main`** (ADR-0028 — harness files never land on release
-branches): amend `.agents/skills/cambio-rules/SKILL.md`'s setup line
-("2–5 players") with the same ADR-0036 pointer, then merge down
-`main` → `development` → `release-v0`. This is a distinct commit/branch
-step outside the task branch's PR; the merge-down is part of this task's
-definition of done. Coordinate with the frontend lane's M6 so the
-merge-down happens once.
+Separately, amend `.agents/skills/cambio-rules/SKILL.md`'s setup line
+("2–5 players") with the same ADR-0036 pointer. _Corrected by the review
+(F5): the original step here said to do this **on `main` per ADR-0028** —
+wrong for this file; ADR-0028's guard rail explicitly names
+`.agents/skills/cambio-rules/SKILL.md` as release-side-diverged
+(must not be edited on `main`; make the change on the release side). The
+edit was in fact made on `main` (9dc922d) before the review caught the
+mis-routing; the merge-down resolved cleanly and release-v0's merged copy
+was verified correct, so no repair is needed — but the correct procedure
+for this file is a release-side edit._
 
 ## Concrete steps & validation
 
@@ -247,13 +256,13 @@ written by `/implement` when the test actually lands. A plan-time row that
 invents a test title and assertion is an overclaim waiting to become a
 review finding.)_
 
-| Clause                                        | Test (file + name)                                                                                                                                                                                   | What is asserted                                                                                                                                                                                                                                                                                         |
-| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1 — deal rejects outside 2–4; 2/3/4 accepted  | `Deal.test.ts::dealGame > rejects player counts outside 2–4 (C1.1, §1.1)`; `Deal.test.ts::dealGame > deals 4 cards to slots 0–3 per player, one discard, rest as deck (C1.2, §1.1)`                  | 0, 1, 5, 6 rejected as `BadPlayerCount`; 2, 3, 4 accepted with the correct hand/discard/deck shape                                                                                                                                                                                                       |
-| 2 — fourth member fills lobby; fifth refused  | `Lobby.test.ts::joinLobby (clause 2) > a fourth member fills the lobby; a fifth is LobbyFull (§1.1 ceiling)`                                                                                         | a fourth join brings the lobby to `MAX_LOBBY_MEMBERS` (4); a fifth join attempt is `LobbyFull`                                                                                                                                                                                                           |
-| 3 — harness rosters span exactly 2–4          | `sim/Invariants.test.ts::hand & seat integrity checker (C2.2, §4.5 restated) > rejects rosters outside 2–4 players (§1.1)`                                                                           | a 5-player roster is flagged by `handIntegrityViolations`; `playerCountFor` cycles 2→4 (`2 + (i % 3)`), so every sim/fuzz/roundtrip roster it drives stays in bound                                                                                                                                      |
-| 4 — room copy states 2–4 everywhere spoken    | `room-screen.test.tsx::start (R5) > surfaces a 422 BadPlayerCount as the inline alert with the 2–4 copy`; `room-screen.test.tsx > renders the no-access panel when the room is full (409 LobbyFull)` | the inline alert reads "The game needs 2 to 4 players at the table…"; the full-room panel body reads "Four players are already seated — the table takes no more…"                                                                                                                                        |
-| 12 (rules-doc half) — HANDOFF + skill amended | _none — prose, no test can pin it; verified by review reading the doc directly_                                                                                                                      | HANDOFF §1.1 gains an amendment blockquote naming ADR-0036 (done, this task branch); the `cambio-rules` skill's setup line amendment + merge-down (`main` → `development` → `release-v0`) is a separate `main`-branch step per ADR-0028, coordinated by the orchestrator — not yet done as of this entry |
+| Clause                                        | Test (file + name)                                                                                                                                                                                   | What is asserted                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — deal rejects outside 2–4; 2/3/4 accepted  | `Deal.test.ts::dealGame > rejects player counts outside 2–4 (C1.1, §1.1)`; `Deal.test.ts::dealGame > deals 4 cards to slots 0–3 per player, one discard, rest as deck (C1.2, §1.1)`                  | 0, 1, 5, 6 rejected as `BadPlayerCount`; 2, 3, 4 accepted with the correct hand/discard/deck shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| 2 — fourth member fills lobby; fifth refused  | `Lobby.test.ts::joinLobby (clause 2) > a fourth member fills the lobby; a fifth is LobbyFull (§1.1 ceiling)`                                                                                         | a fourth join brings the lobby to `MAX_LOBBY_MEMBERS` (4); a fifth join attempt is `LobbyFull`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 3 — harness rosters span exactly 2–4          | `sim/Invariants.test.ts::hand & seat integrity checker (C2.2, §4.5 restated) > rejects rosters outside 2–4 players (§1.1)`                                                                           | a 5-player roster (and a 1-player one) yields a violation whose message contains "outside 2–4" — the COUNT violation specifically, strengthened by the review fix cycle (F8b) from the original any-violation assertion; a new pin asserts `playerCountFor`'s image over indices 0–6 is exactly {2, 3, 4} (F8c), so every sim/fuzz/roundtrip roster it drives stays in bound and REACHES 4                                                                                                                                                                                                        |
+| 4 — room copy states 2–4 everywhere spoken    | `room-screen.test.tsx::start (R5) > surfaces a 422 BadPlayerCount as the inline alert with the 2–4 copy`; `room-screen.test.tsx > renders the no-access panel when the room is full (409 LobbyFull)` | the inline alert reads "The game needs 2 to 4 players at the table…"; the full-room panel body reads "Four players are already seated — the table takes no more…"; and (added by the review fix cycle, F8a) the "2–4 players" start helper renders — all three copy surfaces the clause names are now asserted                                                                                                                                                                                                                                                                                    |
+| 12 (rules-doc half) — HANDOFF + skill amended | _none — prose, no test can pin it; verified by review reading the doc directly_                                                                                                                      | HANDOFF §1.1 gains an amendment blockquote naming ADR-0036 (done, this task branch; the review fix cycle also amended the two downstream mentions, §4.1's single-deck rationale and the out-of-scope list — F10b); the `cambio-rules` skill's setup line amendment is DONE and merged down (`main` 9dc922d → `development` → `release-v0`, verified during review — this row's earlier "not yet done" note was stale, F5). NOTE the routing correction under step 6: ADR-0028's guard rail actually forbids editing this file on `main`; the release-side path is the correct procedure next time |
 
 ## Progress
 
@@ -294,6 +303,19 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       (`table-geometry.ts`/`.test.ts`, `gallery/game.tsx`, `table-surface.tsx`
       — all commented as scenery/seat-arc geometry, clauses 5/9/11, owned by
       the frontend child plan's M3/M5/M6).
+
+- [x] 2026-09-07 — `/review` fix cycle (root plan Outcomes F5, F8, F10):
+      the sim invariant probes now assert the "outside 2–4" violation
+      string specifically (both edges), a new pin fixes
+      `playerCountFor`'s image at exactly {2, 3, 4}, and the
+      `room-screen.test.tsx` BadPlayerCount test additionally asserts the
+      "2–4 players" start helper — all three clause-4 copy surfaces are
+      pinned. Doc corrections: the ADR-0028 mis-routing of the
+      `cambio-rules` amendment is corrected in Context and step 6 (the
+      `main` edit stands, merge-down verified clean; release-side is the
+      procedure next time); the stale "not yet done" merge-down note in
+      coverage row 12 replaced with the verified state; HANDOFF §4.1 and
+      the out-of-scope list gained their 2–4 amendment notes (F10b).
 
 ## Surprises & notes for the root plan
 
