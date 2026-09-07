@@ -100,10 +100,13 @@
    * fixed cap left dead, non-scrolling space above the own-hand dock at
    * any compact viewport taller than 640px, because the art never grew
    * past 158px while its flex container kept growing with the viewport.
-   * The art block now sizes fluidly via real flexbox layout (`flex-1`,
-   * `aspect-square`, `w-auto`, `max-w-full` — table-surface.tsx), and
-   * this token only guarantees it never shrinks below the one measured,
-   * validated floor. */
+   * The art now sizes fluidly via a flex-grown frame (`container-type:
+   * size`) wrapping a container-query-sized square (`width:
+   * min(100%, 100cqh)`, table-surface.tsx — a single element combining
+   * flex-grow with aspect-ratio/max-width does not hold a square once
+   * the width ceiling binds, confirmed live, ADR-0038), and this token
+   * only guarantees it never shrinks below the one measured, validated
+   * floor. */
   --size-table-art-compact: 158px;
 }
 

@@ -127,9 +127,14 @@ min-h-0`) — a normal scrollable, width-driven document. Structurally
    (`regular:flex-1`/`regular:min-h-0`/`regular:max-w-4xl`, CAM-20 M5) is
    byte-identical to today — the existing "fluid regular table (CAM-20
    M5)" test in `game-screen.test.tsx` passes unmodified.
-8. The room screen's compact table (`viewerSeat="internal"`) is
-   byte-identical to today — zero diff to `room-screen.tsx` or the
-   default `TableSurface` rendering path.
+8. The room screen's compact table (`viewerSeat="internal"`) is visually
+   and functionally unaffected — zero diff to `room-screen.tsx` itself.
+   **Amended at review (see Decision Log):** "zero diff to the default
+   `TableSurface` rendering path" overstated it — the shared JSX does
+   gain one new always-present wrapper node (`table-art-frame`) on the
+   internal path too, rendered `display: contents` there (ADR-0038
+   Consequences), which is zero rendered/layout impact but not a
+   byte-identical source diff to that shared path.
 9. `table-geometry.ts`'s bench-position math and `table-geometry.test.ts`
    are unaffected (compact never exercises bench percentages).
 
@@ -220,6 +225,14 @@ window.innerHeight`).
       (`table-surface.md` r7, `tokens.md`), ADR-0038 rewritten to reflect
       the corrected mechanism. Full gate green:
       `pnpm turbo build typecheck lint test`, 9/9 tasks, exit 0.
+- [x] 2026-09-08 — Review fix cycle: both findings from the 2026-09-08
+      review resolved (see Outcomes & Retrospective for detail). Fresh
+      (forced, non-cached) verification: `apps/web/test/game-screen.test.tsx` + `table-geometry.test.ts` re-run bare after the rename, 91/91;
+      full `pnpm turbo build typecheck lint test --force`, 25/25 tasks,
+      0 cached, exit 0 (this run also exercised the Postgres-backed
+      `@cambio/api` integration suites fresh, 121/121 — unaffected by
+      this task's diff but confirmed green as part of the same forced
+      run).
 
 ## Decision log
 
@@ -240,6 +253,19 @@ window.innerHeight`).
   (user sign-off, CAM-27 interview r3): meets the ADR bar (new pattern,
   real alternatives considered and rejected, deviates from the
   documented fixed-token convention).
+
+  > **Amended (implementation + review, 2026-09-08):** this entry
+  > describes the ORIGINAL, planning-time decision — superseded by the
+  > mechanism correction entry below ("Corrected the sizing
+  > mechanism..."). Two things about this entry's own wording turned out
+  > wrong once measured live, not just superseded: (1) the
+  > flex/aspect-ratio layout named here does not actually hold a square
+  > (see Surprises, Mechanism failure #1); (2) centering never lived on
+  > `table-scroll` at any point — it lives on the art's own frame
+  > (`data-region="table-art-frame"`), both before and after the
+  > mechanism correction. Kept verbatim above as historical record; do
+  > not cite this entry for current mechanism behavior.
+
 - 2026-09-07 — No arbitrary upper height cutoff — user call (CAM-27
   interview r1): the mechanism itself must scale correctly at any
   compact height, not just up to a chosen device ceiling (CAM-21's own
@@ -324,7 +350,8 @@ window.innerHeight`).
 
 ## Outcomes & retrospective
 
-**Verdict: fix-then-ship** (2026-09-08 review).
+**Verdict: fix-then-ship** (2026-09-08 review) → **ship** (2026-09-08,
+after the fix cycle below closed both findings).
 
 **What passed:** both the contract and architecture reviewers independently
 confirmed the shipped mechanism (frame + container-query square) is
@@ -339,60 +366,77 @@ orchestrator: `pnpm turbo test --filter @cambio/web --filter @cambio/ui
 `lint --force` independently re-run by the architecture reviewer, exit 0.
 No hidden-information surface (pure CSS/layout, N/A). No scope creep.
 
-**Findings — OPEN, pending user go-ahead for the fix cycle (all
-documentation/comment staleness — no functional defects, nothing here
-changes behavior):**
+**Findings (all documentation/comment staleness — no functional defects,
+nothing here changed behavior):**
 
-1. **Clause 8 / coverage-table wording overstates "zero diff."** Root plan
-   clause 8 says "zero diff to `room-screen.tsx` or the default
-   `TableSurface` rendering path"; the frontend plan's coverage table row 8
-   says "the TableSurface internal-path branches are absent from the final
-   changeset." Both are imprecise: `table-surface.tsx`'s new
-   `data-region="table-art-frame"` wrapper div is rendered **unconditionally**
-   for both `viewerSeat` branches (`"internal"` just gets `className="contents"`
-   instead of the real flex/container-query classes) — the room screen's
-   shared code path DOES gain one new DOM node with two new `data-region`
-   attributes it didn't have before. `display: contents` makes this
-   genuinely zero VISUAL/layout impact (confirmed: `room-screen.test.tsx`
-   uses `.closest()`, depth-independent, so nothing broke), and ADR-0038's
-   own Consequences section already discloses this exact tradeoff
-   accurately — only the root plan's clause 8 and the frontend plan's
-   coverage row 8 overstate it as literally "zero diff." Suggested fix (not
-   yet applied): amend both instances to say "visually/functionally
-   unaffected (display:contents), though the shared TableSurface JSX does
-   gain one new always-present wrapper node — see ADR-0038 Consequences"
-   rather than claiming zero diff.
-2. **Stale mechanism description (5 instances) — the REJECTED first
-   mechanism (single-element `flex-1`/`aspect-square`/`w-auto`/`max-w-full`)
-   is still described as the shipped answer** in places the mid-implementation
-   correction's sweep missed:
+1. **RESOLVED (fix cycle, 2026-09-08) — Clause 8 / coverage-table wording
+   overstated "zero diff."** Root plan clause 8 said "zero diff to
+   `room-screen.tsx` or the default `TableSurface` rendering path"; the
+   frontend plan's coverage table row 8 said "the TableSurface
+   internal-path branches are absent from the final changeset." Both were
+   imprecise: `table-surface.tsx`'s new `data-region="table-art-frame"`
+   wrapper div is rendered **unconditionally** for both `viewerSeat`
+   branches (`"internal"` just gets `className="contents"` instead of the
+   real flex/container-query classes) — the room screen's shared code path
+   DOES gain one new DOM node with two new `data-region` attributes it
+   didn't have before. `display: contents` makes this genuinely zero
+   VISUAL/layout impact (confirmed: `room-screen.test.tsx` uses
+   `.closest()`, depth-independent, so nothing broke), and ADR-0038's own
+   Consequences section already disclosed this exact tradeoff accurately —
+   only the root plan's clause 8 and the frontend plan's coverage row 8
+   overstated it as literally "zero diff." **Branch taken: claim amended**
+   (the claim itself was wrong, not a test-coverage gap) — both instances
+   now say "visually and functionally unaffected... zero diff to
+   `room-screen.tsx` itself," with an explicit note that the shared
+   `TableSurface` JSX gains one new always-present, `display:contents`
+   wrapper node, pointing at ADR-0038's Consequences for detail.
+2. **RESOLVED (fix cycle, 2026-09-08) — Stale mechanism description (5
+   instances)** — the REJECTED first mechanism (single-element
+   `flex-1`/`aspect-square`/`w-auto`/`max-w-full`) was still described as
+   the shipped answer in places the mid-implementation correction's sweep
+   missed:
    - `packages/ui/src/styles.css:103-104` — a comment in the shipped source
      file itself: _"The art block now sizes fluidly via real flexbox layout
      (`flex-1`, `aspect-square`, `w-auto`, `max-w-full` — table-surface.tsx)"_.
+     **Fixed:** rewritten to describe the frame+square/container-query
+     mechanism.
    - `apps/web/test/game-screen.test.tsx:2160-2162` — the block comment above
      `describe("fluid compact table (CAM-27 M2)"`: _"the table art now grows
-     via flex/aspect-ratio instead of a fixed max-width cap"_.
+     via flex/aspect-ratio instead of a fixed max-width cap"_. **Fixed:**
+     rewritten.
    - `apps/web/test/game-screen.test.tsx:2268` — the test's own title:
-     _"...now that it sizes via flex/aspect-ratio (ADR-0035)"_.
-   - `docs/plans/root/CAM-27.md` Decision Log (~line 235-239, dated
-     2026-09-07, describing the pre-correction decision) — _"Compact table
-     art sizes via native flex/aspect-ratio layout... and `table-scroll`
+     _"...now that it sizes via flex/aspect-ratio (ADR-0035)"_. **Fixed:**
+     renamed to "...now that it sizes via container query units
+     (ADR-0035)" — a pure rename, zero behavior change, re-verified green
+     (91/91 in the two touched test files after the rename).
+   - `docs/plans/root/CAM-27.md` Decision Log (the original 2026-09-07
+     entry describing the pre-correction decision) — _"Compact table art
+     sizes via native flex/aspect-ratio layout... and `table-scroll`
      vertically centering to absorb any residual past the width ceiling"_ —
      doubly stale: wrong mechanism, AND centering actually lives on the art
-     frame, never on `table-scroll`.
+     frame, never on `table-scroll`. **Fixed via inline amendment**, not a
+     rewrite (Decision Log entries are historical record): the original
+     sentence is kept verbatim, followed by a blockquoted "Amended
+     (implementation + review, 2026-09-08)" note naming both inaccuracies
+     and pointing at the later correction entries and the Surprises
+     section.
    - `docs/plans/frontend/CAM-27.md` coverage table row 6 ("Test" column) —
-     quotes the stale test title from the second instance verbatim.
+     quoted the stale test title verbatim. **Fixed:** citation updated to
+     the renamed test title.
 
-   Suggested fix (not yet applied): correct all 5 instances to describe the
-   shipped frame+square/container-query mechanism. The test title (instance 3) can be renamed with zero behavior change; the coverage table's quoted
-   citation (instance 5) would follow the rename. The Decision Log entry
-   (instance 4) should get an inline amendment note pointing at the later
-   correction entries already in the same log, rather than being rewritten
-   (Decision Log entries are historical record) — its `table-scroll`
-   centering claim needs correcting in the same edit.
+   Sweep re-run after fixing (not just the 5 listed instances — the same
+   grep patterns across every touched doc and source file) confirmed no
+   further live instances remain; the only remaining matches are inside
+   this retrospective's own quotes of the original stale text and inside
+   the Decision Log entry's preserved-verbatim historical sentence, both
+   intentional.
 
-Both findings are direct instances of the "divergence is a defect" rule
+Both findings were direct instances of the "divergence is a defect" rule
 (AGENTS.md/ADR-0027) already governing this task's own token-comment
-discipline. Neither blocks the mechanism's correctness — the verdict is
-fix-then-ship because the fixes are cheap, well-scoped, and the rule they
-violate is one this exact task cited against itself elsewhere.
+discipline. Neither blocked the mechanism's correctness. Post-fix
+verification: `apps/web/test/game-screen.test.tsx` + `table-geometry.test.ts`
+bare re-run, 91/91; full `pnpm turbo build typecheck lint test --force`,
+25/25 tasks, 0 cached, exit 0 (including a fresh, Postgres-backed
+`@cambio/api` run, 121/121, unaffected by this task's diff).
+
+**Verdict flipped to ship** (2026-09-08, post-fix-cycle re-review).

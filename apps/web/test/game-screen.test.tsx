@@ -2159,11 +2159,15 @@ describe("fluid regular table (CAM-20 M5)", () => {
 
 // ---- CAM-27/ADR-0038: the fluid COMPACT table (clauses 1-4), the same
 // scoping pins as the regular table above but one breakpoint over — the
-// table art now grows via flex/aspect-ratio instead of a fixed max-width
-// cap. Real pixel/fit claims are rendered-path evidence (ADR-0030 — jsdom
-// computes no layout); these are the structural pins that would catch a
-// REGRESSION even though they can't themselves prove the rendered outcome —
-// see docs/plans/frontend/CAM-27.md's Progress for the measured numbers. --
+// table art now grows via a flex-grown frame (container-type: size)
+// wrapping a container-query-sized square, instead of a fixed max-width
+// cap (a single element combining flex-grow with aspect-ratio/max-width
+// does not hold a square once the width ceiling binds — confirmed live,
+// ADR-0038). Real pixel/fit claims are rendered-path evidence (ADR-0030 —
+// jsdom computes no layout); these are the structural pins that would
+// catch a REGRESSION even though they can't themselves prove the
+// rendered outcome — see docs/plans/frontend/CAM-27.md's Progress for
+// the measured numbers. -----------------------------------------------
 
 describe("fluid compact table (CAM-27 M2)", () => {
   it("makes TableSurface's root a real flex item, at compact (flex-1, min-h-0)", async () => {
@@ -2265,7 +2269,7 @@ describe("fluid compact table (CAM-27 M2)", () => {
     expect(className).toContain("regular:aspect-auto")
   })
 
-  it("still carries no scale-or-rotate transform above the table art now that it sizes via flex/aspect-ratio (ADR-0035)", async () => {
+  it("still carries no scale-or-rotate transform above the table art now that it sizes via container query units (ADR-0035)", async () => {
     const fake = setupFake()
     gameBootstrap()
     renderGameApp(GAME_ID)
