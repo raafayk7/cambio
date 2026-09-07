@@ -118,17 +118,16 @@ After this task, `node .agents/scripts/fill-coverage-row.mjs <plan.md> <CLAUSE> 
 
 ### Acceptance criteria
 
-- [ ] All seven contract clauses above hold, demonstrated by
-      `.agents/scripts/fill-coverage-row.test.mjs`.
-- [ ] The scratch repro from planning (3-column table +
+- [x] All seven contract clauses above hold, demonstrated by
+      `.agents/scripts/fill-coverage-row.test.mjs`
+      (`✓ ALL PASS — 9 passed, 0 failed`).
+- [x] The scratch repro from planning (3-column table +
       `--test`/`--asserted`) re-run post-fix produces a correctly-shaped
       3-cell row, not the 4-cell corruption documented above.
-- [ ] The 4-column regression case (also reproduced during planning) still
+- [x] The 4-column regression case (also reproduced during planning) still
       fills correctly.
-- [ ] `pnpm turbo build typecheck lint test` passes (this script sits
-      outside all workspace packages, so the gate's only relevant leg is the
-      repo-wide prettier check — confirm it stays green after editing the
-      script and its comment).
+- [x] `pnpm turbo build typecheck lint test` passes — 19/19 tasks green,
+      including the repo-wide `//:format:check` (prettier) leg.
 - [ ] Close-out: merge-down `main` → `development` → `release-v0` completed,
       and a fresh session on `release-v0` can run the script against a
       3-column table without corruption (ADR-0028 close-out requirement).
@@ -194,7 +193,33 @@ Single milestone, single file plus its test — no lanes, no parallelization.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] YYYY-MM-DD HH:MM — step description
+- [x] 2026-09-07 06:20 — Refactored `fill-coverage-row.mjs`: extracted a pure
+      `fillRow(headerCells, rowCells, opts)` export that detects 3- vs
+      4-column shape from header cell count, maps `--test`/`--asserted`/
+      `--planned` to the right positions per shape, and returns
+      `{ error }` (never throws) for `--planned` on a 3-column table or any
+      unsupported column count. The CLI body now locates the header row by
+      walking back from the matched row to the preceding separator line,
+      then to the header above it, and is guarded behind
+      `import.meta.url === pathToFileURL(process.argv[1]).href` so it
+      doesn't run on import. Header comment rewritten to document both
+      shapes.
+- [x] 2026-09-07 06:22 — Added `.agents/scripts/fill-coverage-row.test.mjs`
+      (no framework, `hardcheck.test.js` pattern): 9 checks — 3-column fill,
+      Clause-cell-untouched, `--planned`-on-3-column error, 4-column fill
+      with all three flags (regression), 4-column fill without `--planned`
+      (no shift), 2-column and 5-column unsupported-shape errors, and two
+      CLI-level smoke checks that round-trip a real temp file through the
+      unmodified subprocess path. `node .agents/scripts/fill-coverage-row.test.mjs`
+      → `✓ ALL PASS — 9 passed, 0 failed`.
+- [x] 2026-09-07 06:24 — Re-ran the planning-time repro by hand against the
+      fixed script: 3-column table + `--test`/`--asserted` now produces
+      `| 1.1 | foo.test.ts > does the thing | the thing happens |` (3 cells,
+      no phantom 4th segment — matches contract clause 1); the 4-column case
+      still fills all three named cells correctly (clause 2, regression
+      confirmed); `--planned` against the 3-column table exits 1 with the
+      documented error message and leaves the file byte-for-byte unchanged
+      (clause 4).
 
 ## Decision log
 
@@ -222,6 +247,18 @@ timestamp each entry)_
   no second file or cross-cutting concern that would benefit from a
   separate implementation-detail document. Confirmed with the user during
   planning (see plan-mode interview).
+- 2026-09-07 — **Merge-down deferred past `/implement`'s close-out** —
+  checked CAM-14 (the only prior harness task with this ADR-0028 routing):
+  its final review-fix-cycle commit landed on `main` and was **already**
+  present on `development`/`release-v0` by the time of inspection, with no
+  merge commit in between — i.e. the merge-down happened as a fast-forward
+  sometime after the full `/implement` → `/review` → fix cycle concluded on
+  `main`, not as a step inside `/implement`'s close-out. Following that
+  precedent: this task's merge-down + fresh-session smoke test stays
+  unchecked at `/implement` close-out and is called out explicitly for
+  whoever runs `/review` (or does the merge-down by hand afterward) rather
+  than performed now, since running it mid-review-cycle would propagate
+  code that hasn't passed review yet.
 
 ## Surprises & discoveries
 
