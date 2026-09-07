@@ -251,6 +251,11 @@ export function DeckAndDiscardSection() {
           <DrawDeck count={32} state="draw" />
         </TableGround>
       </StateCard>
+      <StateCard label="deck slam-window (CAM-26 C4 — held by the open window)">
+        <TableGround>
+          <DrawDeck count={32} slamWindow />
+        </TableGround>
+      </StateCard>
       <StateCard label="discard populated (thrown angles)">
         <TableGround>
           <DiscardPile top="9D" underCount={2} />

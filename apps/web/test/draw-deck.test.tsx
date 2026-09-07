@@ -38,4 +38,34 @@ describe("DrawDeck", () => {
     rerender(<DrawDeck count={20} />)
     expect(container.firstChild).toHaveAttribute("data-state", "populated")
   })
+
+  /**
+   * CAM-26 C4: the deck signals an open slam window instead of going
+   * silently dead. A separate boolean (not a `state` enum member — mirrors
+   * `DiscardPile.slamTarget`), presentational only: no button, no copy.
+   */
+  describe("slam-window state (CAM-26 C4)", () => {
+    it("renders data-state='slam-window' over the populated/low/empty split", () => {
+      const { container, rerender } = render(<DrawDeck count={20} slamWindow />)
+      expect(container.firstChild).toHaveAttribute("data-state", "slam-window")
+
+      rerender(<DrawDeck count={2} slamWindow />)
+      expect(container.firstChild).toHaveAttribute("data-state", "slam-window")
+
+      rerender(<DrawDeck count={0} slamWindow />)
+      expect(container.firstChild).toHaveAttribute("data-state", "slam-window")
+    })
+
+    it("never resurrects the button wrap while the slam window is open, with or without onClick omitted", () => {
+      render(<DrawDeck count={20} slamWindow />)
+      expect(screen.queryByRole("button")).not.toBeInTheDocument()
+    })
+
+    it("choreography wins over the slam-window signal (mirrors DiscardPile's receiving-over-slam-target precedence)", () => {
+      const { container, rerender } = render(<DrawDeck count={20} state="draw" slamWindow />)
+      expect(container.firstChild).toHaveAttribute("data-state", "draw")
+      rerender(<DrawDeck count={20} state="reshuffling" slamWindow />)
+      expect(container.firstChild).toHaveAttribute("data-state", "reshuffling")
+    })
+  })
 })

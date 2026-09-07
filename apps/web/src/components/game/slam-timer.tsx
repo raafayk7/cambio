@@ -3,7 +3,7 @@ import { cn } from "@cambio/ui"
 import * as React from "react"
 
 /**
- * SlamTimer — design-system/components/core/slam-timer.md (r1).
+ * SlamTimer — design-system/components/core/slam-timer.md (r3).
  * Class: Game object.
  *
  * The slam window made visible: "SLAM!" (one of the two shout moments,
@@ -18,20 +18,61 @@ import * as React from "react"
 export interface SlamTimerProps {
   window?: { closesAt: Timestamp; durationMs: number }
   resolving?: boolean
+  /**
+   * CAM-26 C1: fired exactly once per window when local time passes
+   * `closesAt` plus `SLAM_EXPIRY_SKEW_GRACE_MS` — a stale window is one of
+   * four ADR-0037 recovery layers, none load-bearing alone. Behavior only,
+   * not a visual state (no slam-timer.md revision — see the frontend
+   * child plan's Decisions).
+   */
+  onExpire?: () => void
   className?: string
 }
 
-export function SlamTimer({ window: slamWindow, resolving = false, className }: SlamTimerProps) {
+/**
+ * ADR-0037 layer 4: no server-clock offset exists anywhere in `apps/web` or
+ * `contracts`, so this compares `closesAt` to raw `Date.now()`. The grace
+ * absorbs small clock skew; a client whose clock runs slow simply never
+ * fires — the server's own timer, a poke from any other client's refetch,
+ * and the close broadcast all cover that side.
+ */
+const SLAM_EXPIRY_SKEW_GRACE_MS = 500
+
+export function SlamTimer({
+  window: slamWindow,
+  resolving = false,
+  onExpire,
+  className,
+}: SlamTimerProps) {
   const [remaining, setRemaining] = React.useState<number>(() =>
     slamWindow === undefined
       ? 0
       : Math.max(0, Math.min(slamWindow.durationMs, slamWindow.closesAt - Date.now())),
   )
 
+  // Read via a ref (component re-renders every 50ms) so the effect below
+  // never re-subscribes on a new callback identity — same pattern as
+  // `use-game.ts`'s `handleRoomEventRef`.
+  const onExpireRef = React.useRef(onExpire)
+  onExpireRef.current = onExpire
+
+  // Fire-once guard, keyed on the window's own `closesAt`: a genuinely new
+  // window (different `closesAt`) compares unequal and re-arms on its own,
+  // with no separate "have I fired" boolean to reset.
+  const firedForRef = React.useRef<number | null>(null)
+
   React.useEffect(() => {
     if (slamWindow === undefined || resolving) return
-    const update = () =>
+    const update = () => {
       setRemaining(Math.max(0, Math.min(slamWindow.durationMs, slamWindow.closesAt - Date.now())))
+      if (
+        firedForRef.current !== slamWindow.closesAt &&
+        slamWindow.closesAt + SLAM_EXPIRY_SKEW_GRACE_MS <= Date.now()
+      ) {
+        firedForRef.current = slamWindow.closesAt
+        onExpireRef.current?.()
+      }
+    }
     update()
     const handle = window.setInterval(update, 50)
     return () => window.clearInterval(handle)

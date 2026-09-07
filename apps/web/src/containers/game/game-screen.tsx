@@ -313,6 +313,7 @@ function GameTable({
   awaitingGive,
   slamBeatMessage,
   calledBy,
+  onSlamExpire,
 }: {
   view: PlayerGameView
   viewerId: string
@@ -327,6 +328,7 @@ function GameTable({
   awaitingGive: ReturnType<typeof useGame>["awaitingGive"]
   slamBeatMessage: ReturnType<typeof useGame>["slamBeatMessage"]
   calledBy: ReturnType<typeof useGame>["calledBy"]
+  onSlamExpire: ReturnType<typeof useGame>["onSlamExpire"]
 }) {
   const [tableRoot, setTableRoot] = React.useState<HTMLElement | null>(null)
   const [confirmCambioOpen, setConfirmCambioOpen] = React.useState(false)
@@ -630,6 +632,7 @@ function GameTable({
           <SlamTimer
             window={{ closesAt: slamPhase.closesAt, durationMs: view.config.slamWindowMs }}
             resolving={slamReveal !== null}
+            onExpire={onSlamExpire}
             className="regular:order-1"
           />
         ) : null}
@@ -708,6 +711,7 @@ function GameTable({
                     : drawing
                       ? { state: "draw" as const }
                       : {})}
+                  {...(slamPhase !== undefined ? { slamWindow: true } : {})}
                   {...(affordances.phase === "AwaitingDraw" &&
                   affordances.holder &&
                   affordances.drawFromDeck
@@ -986,6 +990,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
     awaitingGive,
     slamBeatMessage,
     calledBy,
+    onSlamExpire,
   } = useGame(gameId)
 
   let content: React.ReactNode
@@ -1046,6 +1051,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
         awaitingGive={awaitingGive}
         slamBeatMessage={slamBeatMessage}
         calledBy={calledBy}
+        onSlamExpire={onSlamExpire}
       />
     )
   } else {

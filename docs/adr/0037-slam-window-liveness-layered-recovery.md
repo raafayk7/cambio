@@ -85,11 +85,20 @@ envelope becomes part of the actor's contract and must stay reply-less and
 idempotent. The view route now touches the registry, so actors become
 resident on read traffic; eviction on game end (ADR-0020) is unchanged,
 and `Poke` must not resurrect an evicted, ended game's actor beyond a
-no-op. Bootstrap-armed timers change observable orderings that two restart
-tests pinned under the old "bootstrap arms nothing" behavior (a late slam
-after restart may now be refused as `WrongPhase` when the close wins the
-race, rather than `SlamTooLate`); the client's CAM-23 copy remap already
-treats both as "too late", and the tests are updated deliberately rather
-than preserved accidentally. Revisit if a deployment gains an always-on
+no-op. As implemented, the poke path also widens ADR-0020's eviction
+trigger slightly: a poked room whose bootstrap load fails (no game row, or
+a transient storage error — the reload swallows all failures identically)
+is flagged for eviction alongside the ended case, which is free because
+rooms are reconstructible from rows _(amended 2026-09-07, CAM-26
+review)_. Bootstrap-armed timers do **not** change the restart tests'
+observable orderings, contrary to this section's original worry: a
+bootstrap-armed timer can only enqueue a `TimerClose` envelope behind the
+in-flight command, and queue serialization guarantees the late slam is
+judged inside its own envelope first — `SlamTooLate`, never `WrongPhase`,
+deterministically. Both restart tests kept their assertions unchanged;
+only their "bootstrap arms nothing" comments were rewritten _(amended
+2026-09-07, CAM-26 review — the original text predicted a possible
+`WrongPhase` flip and deliberate test updates that the design itself
+forecloses)_. Revisit if a deployment gains an always-on
 scheduler (a boot sweep would then be cheap) or if read traffic makes
 actor residency costly.

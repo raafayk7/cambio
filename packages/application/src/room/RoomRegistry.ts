@@ -32,7 +32,11 @@ import { type GameAdvanced, startGame } from "../use-cases/StartGame.js"
  *     successful save and loads only at bootstrap; that load IS the
  *     "rebuild on first command after restart" story. One fiber per room
  *     makes the cache race-free.
- *   - **`VersionConflict`: surface + invalidate, never retry.**
+ *   - **`VersionConflict`: surface + invalidate, never retry** — but the
+ *     invalidation is followed by an eager reload in the same envelope
+ *     (CAM-26, ADR-0037, S2), so a live `SlamWindow`'s timer is re-armed
+ *     immediately rather than waiting on a next command that might never
+ *     arrive.
  *   - **Lazy slam-close** — the engine never auto-closes the window, so
  *     before a queued command while the cached phase is `SlamWindow` with
  *     `now >= closesAt`, the actor first executes `CloseSlamWindow` as its
@@ -40,6 +44,14 @@ import { type GameAdvanced, startGame } from "../use-cases/StartGame.js"
  *     gets the engine's `SlamTooLate`, not `WrongPhase`) and for an explicit
  *     `CloseSlamWindow`. The timer fiber merely enqueues the same close
  *     earlier — an optimization, never the authority (ADR-0011).
+ *   - **Arm on load, and on read** (CAM-26, ADR-0037, S1/S3/S4) — every
+ *     bootstrap that populates the cache (the `Execute` restart path, and
+ *     the reply-less `Poke` envelope enqueued by `GET /games/:gameId/view`)
+ *     re-arms the timer, so a persisted, past-due `SlamWindow` closes
+ *     promptly even with no player command in flight. `Poke` is idempotent
+ *     and never resurrects a dead room beyond a no-op: a failed bootstrap
+ *     load or an already-`Ended` phase evicts the room via the same
+ *     empty-queue path below, rather than lingering.
  *   - **Eviction on end** — game `Ended` or lobby abandoned removes the
  *     actor once its queue is drained; a later message finds a fresh actor
  *     whose bootstrap reads rows/state and whose reply is a typed error.
@@ -83,6 +95,12 @@ type Envelope =
     }
   /** Internal timer enqueue — no reply; an illegal-when-processed close is dropped. */
   | { readonly _tag: "TimerClose" }
+  /**
+   * Liveness nudge from a read (CAM-26, ADR-0037) — no reply. Bootstraps the
+   * cache if cold, runs `closeIfDue`, and re-arms. Idempotent: a second poke
+   * finds the phase already advanced and does nothing.
+   */
+  | { readonly _tag: "Poke" }
 
 export class RoomRegistry extends Context.Tag("@cambio/application/RoomRegistry")<
   RoomRegistry,
@@ -94,6 +112,13 @@ export class RoomRegistry extends Context.Tag("@cambio/application/RoomRegistry"
     readonly join: (gameId: GameId, userId: UserId) => Effect.Effect<LobbyChanged, JoinError>
     readonly leave: (gameId: GameId, userId: UserId) => Effect.Effect<LobbyChanged, LeaveError>
     readonly start: (gameId: GameId, input: StartInput) => Effect.Effect<GameAdvanced, StartError>
+    /**
+     * Reply-less liveness nudge (CAM-26, ADR-0037): enqueue-only, cannot
+     * fail. Handling it bootstraps the actor's cache if cold, runs
+     * `closeIfDue`, and re-arms the timer — the mechanism behind
+     * poke-on-read (`GET /games/:gameId/view`).
+     */
+    readonly poke: (gameId: GameId) => Effect.Effect<void>
     /**
      * Live actors right now — observability for tests and ops (it is how
      * eviction is asserted), never part of the §6 room semantics.
@@ -148,6 +173,18 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
       })
 
       /**
+       * Reload the cache from persistence, swallowing failure (cache stays
+       * null — there is no reply to fail here). Used to bootstrap a `Poke`
+       * on a cold actor and to re-arm after a `VersionConflict` invalidates
+       * the cache (S2, CAM-26): a conflict must not leave a live window
+       * timer-less until the next command happens to arrive.
+       */
+      const reload = Effect.gen(function* () {
+        const loaded = yield* Effect.exit(games.load(gameId).pipe(Effect.provide(context)))
+        cache = Exit.isSuccess(loaded) ? loaded.value : null
+      })
+
+      /**
        * Close the slam window iff the authority says it is due
        * (`ClockPort.now >= closesAt` — never the timer). Its own persisted
        * + published batch; failures are dropped silently (the other path
@@ -168,7 +205,7 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
         if (Exit.isSuccess(exit)) {
           cache = { state: exit.value.state, version: exit.value.version }
         } else if (failureTag(exit.cause) === "VersionConflict") {
-          cache = null
+          yield* reload
         }
       })
 
@@ -183,6 +220,9 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
                   return yield* Deferred.failCause(envelope.reply, loaded.cause)
                 }
                 cache = loaded.value
+                // S1 (CAM-26): arm on load — a cached SlamWindow always ends
+                // up with a timer, independent of what the command does next.
+                yield* manageTimer
               }
               const tag = envelope.command._tag
               if (tag !== "Slam" && tag !== "CloseSlamWindow") yield* closeIfDue
@@ -197,7 +237,11 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
                 cache = { state: exit.value.state, version: exit.value.version }
                 if (exit.value.state.phase._tag === "Ended") evict = true
               } else if (failureTag(exit.cause) === "VersionConflict") {
-                cache = null
+                // S2 (CAM-26): re-arm after conflict — reload eagerly, in
+                // this same envelope, so the trailing manageTimer below sees
+                // fresh state rather than leaving a live window timer-less
+                // until (if ever) another command arrives.
+                yield* reload
               }
               yield* Deferred.done(envelope.reply, exit)
               return yield* manageTimer
@@ -233,6 +277,28 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
               yield* closeIfDue
               return yield* manageTimer
             }
+            case "Poke": {
+              // S3/S4 (CAM-26): bootstrap if cold, judge the clock, re-arm.
+              // Idempotent — a second poke finds the phase already advanced
+              // (or the actor already gone) and does nothing further.
+              if (cache === null) yield* reload
+              if (cache === null || cache.state.phase._tag === "Ended") {
+                // A dead-or-unloadable room must not linger just because it
+                // was poked (ADR-0037): ANY failed load lands here —
+                // usually no game row (unknown id, or a lobby-only room the
+                // route never pokes in practice), but also a transient
+                // StorageError, since `reload` swallows every failure
+                // identically — as does an already-Ended game. All drain
+                // via the existing empty-queue eviction path below, never a
+                // special case; eviction is free because rooms are
+                // reconstructible from rows, and `evict`, once set, stays
+                // set for this actor's life (a fresh actor rebuilds on the
+                // next envelope).
+                evict = true
+              }
+              yield* closeIfDue
+              return yield* manageTimer
+            }
             default:
               return envelope satisfies never
           }
@@ -250,7 +316,7 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
           // persisted state.
           const handled = yield* Effect.exit(handle(envelope))
           if (Exit.isFailure(handled)) {
-            if (envelope._tag !== "TimerClose") {
+            if (envelope._tag !== "TimerClose" && envelope._tag !== "Poke") {
               // Cause<never> (defect/interrupt only) fits any reply's E.
               yield* Deferred.failCause(
                 envelope.reply as unknown as Deferred.Deferred<never, never>,
@@ -297,7 +363,7 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
               const leftovers = yield* Queue.takeAll(queue)
               yield* Queue.shutdown(queue)
               for (const left of leftovers) {
-                if (left._tag !== "TimerClose") {
+                if (left._tag !== "TimerClose" && left._tag !== "Poke") {
                   // Union of invariant Deferred types — interrupt is shape-agnostic.
                   yield* Deferred.interrupt(
                     left.reply as unknown as Deferred.Deferred<unknown, unknown>,
@@ -312,26 +378,38 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
       return loop.pipe(Effect.ensuring(cleanup))
     }
 
+    /**
+     * Get-or-create the room and run `use` against it, all under the
+     * creation lock in one atomic step — the same lock the eviction paths
+     * take, so a room can never be deleted out from under a concurrent
+     * enqueue. Shared by `send` (awaits a reply) and `poke` (fire-and-forget).
+     */
+    const withRoom = <A, E>(
+      gameId: GameId,
+      use: (room: { readonly queue: Queue.Queue<Envelope> }) => Effect.Effect<A, E>,
+    ): Effect.Effect<A, E> =>
+      lock.withPermits(1)(
+        Effect.gen(function* () {
+          let room = rooms.get(gameId)
+          if (room === undefined) {
+            const queue = yield* Queue.unbounded<Envelope>()
+            // Forked into the layer scope: actors outlive callers and are
+            // interrupted (with their timer children) at layer shutdown.
+            yield* runRoom(gameId, queue).pipe(Effect.forkIn(scope))
+            room = { queue }
+            rooms.set(gameId, room)
+          }
+          return yield* use(room)
+        }),
+      )
+
     const send = <A, E>(
       gameId: GameId,
       make: (reply: Deferred.Deferred<A, E>) => Envelope,
     ): Effect.Effect<A, E> =>
       Effect.gen(function* () {
         const reply = yield* Deferred.make<A, E>()
-        yield* lock.withPermits(1)(
-          Effect.gen(function* () {
-            let room = rooms.get(gameId)
-            if (room === undefined) {
-              const queue = yield* Queue.unbounded<Envelope>()
-              // Forked into the layer scope: actors outlive callers and are
-              // interrupted (with their timer children) at layer shutdown.
-              yield* runRoom(gameId, queue).pipe(Effect.forkIn(scope))
-              room = { queue }
-              rooms.set(gameId, room)
-            }
-            yield* Queue.offer(room.queue, make(reply))
-          }),
-        )
+        yield* withRoom(gameId, (room) => Queue.offer(room.queue, make(reply)))
         return yield* Deferred.await(reply)
       })
 
@@ -344,6 +422,8 @@ export const RoomRegistryLive: Layer.Layer<RoomRegistry, never, Deps> = Layer.sc
         send<LobbyChanged, LeaveError>(gameId, (reply) => ({ _tag: "Leave", userId, reply })),
       start: (gameId, input) =>
         send<GameAdvanced, StartError>(gameId, (reply) => ({ _tag: "Start", input, reply })),
+      poke: (gameId) =>
+        withRoom(gameId, (room) => Queue.offer(room.queue, { _tag: "Poke" })).pipe(Effect.asVoid),
       roomCount: Effect.sync(() => rooms.size),
     }
   }),

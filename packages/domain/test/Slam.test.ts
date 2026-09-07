@@ -333,6 +333,39 @@ describe("exhaustion during slams (C4.5, ADR-0011)", () => {
   })
 })
 
+describe("slam window recovery (S7, CAM-26)", () => {
+  it("false opponent slam, then CloseSlamWindow: window closes and the next player can draw", () => {
+    const [afterSlam] = apply(base, {
+      _tag: "Slam",
+      playerId: p1,
+      target: { playerId: p0, slotIndex: slot(1) },
+      giveSlot: slot(1),
+    })
+    // window discipline: a failed slam never moves closesAt or the phase
+    expect(afterSlam.phase).toStrictEqual(base.phase)
+
+    const [afterClose, closeEvents] = apply(afterSlam, { _tag: "CloseSlamWindow" }, closesAt)
+    expect(closeEvents.map((e) => e._tag)).toStrictEqual(["SlamWindowClosed", "TurnAdvanced"])
+    expect(afterClose.phase).toStrictEqual({ _tag: "AwaitingDraw", playerId: p1 })
+
+    expect(errorTag(afterClose, { _tag: "DrawFromDeck", playerId: p1 }, closesAt)).toBe("LEGAL")
+    const [afterDraw, drawEvents] = apply(
+      afterClose,
+      { _tag: "DrawFromDeck", playerId: p1 },
+      closesAt,
+    )
+    // the earlier penalty draw already consumed 2S, so this draws 3S — a
+    // non-power rank, landing in HoldingCard rather than ResolvingPower
+    expect(drawEvents.map((e) => e._tag)).toStrictEqual(["CardDrawn"])
+    expect(afterDraw.phase).toStrictEqual({
+      _tag: "HoldingCard",
+      playerId: p1,
+      card: card("3S"),
+      source: "deck",
+    })
+  })
+})
+
 describe("window discipline (C4.2, C4.6–7, ADR-0011)", () => {
   it("anyone may slam, several times, and closesAt never moves", () => {
     const [afterFirst] = apply(base, {

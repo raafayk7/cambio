@@ -206,11 +206,20 @@ describe("SlamTiming (CAM-7 C1.3, C2.3, C4.2)", () => {
         if (pureProbe._tag === "Left") throw new Error("pure probe should be legal")
 
         h.journal.splice(0)
-        // Lifetime two: a fresh registry over the same persisted rows. The
-        // bootstrap load arms nothing; the refused late slam's envelope then
-        // re-arms a zero-duration timer (the window is past due), so the
-        // close may arrive via that timer or via the probe's lazy path —
-        // the journal sequence below is identical either way (ADR-0020).
+        // Lifetime two: a fresh registry over the same persisted rows.
+        // CAM-26 (S1): the bootstrap load itself now arms a zero-duration
+        // timer for the past-due window — it no longer arms nothing. The
+        // late slam still gets SlamTooLate (never WrongPhase) by QUEUE
+        // SERIALIZATION, not scheduling luck: the timer fiber can only
+        // enqueue a TimerClose ENVELOPE, and the slam is judged inside its
+        // own in-flight envelope, which the queue finishes before any
+        // TimerClose can be processed — deterministic, however fast the
+        // fiber fires (CAM-26 review finding 5).
+        // Once the late slam's envelope finishes, its own trailing
+        // manageTimer re-arms (again zero-duration, since the phase is
+        // still SlamWindow and still past due), so the close may arrive via
+        // that timer or via the probe's lazy path — the journal sequence
+        // below is identical either way (ADR-0020).
         yield* Effect.gen(function* () {
           const registry = yield* RoomRegistry
 

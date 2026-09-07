@@ -36,11 +36,17 @@ export const AppConfig = Config.all({
   )("SESSION_COOKIE_SAMESITE").pipe(Config.withDefault("lax" as const)),
   /**
    * Slam window duration fed into `GameConfig` at start (ADR-0011: config,
-   * never a literal). The 10000 default is a placeholder pending further
-   * playtesting (raised from 5000, CAM-23 — the give-pick flow was burning
-   * the window before a player could complete it).
+   * never a literal). 7500 (CAM-26 — the duration call lives in the root
+   * plan's Decision Log, not ADR-0037) is a middle ground: CAM-23
+   * raised the original 5000 to 10000 because the give-pick flow was
+   * burning the window before a player could complete it, but CAM-23 also
+   * shipped a pre-armed "Ready a give" flow that removes most of that
+   * pressure, and CAM-26 adds layered recovery for a window that genuinely
+   * strands — so the window can shrink back toward the original 5000
+   * without reopening the give-pick problem. Games already in flight keep
+   * the value they started with (`GameConfig` is captured at deal time).
    */
-  slamWindowMs: Config.integer("SLAM_WINDOW_MS").pipe(Config.withDefault(10000)),
+  slamWindowMs: Config.integer("SLAM_WINDOW_MS").pipe(Config.withDefault(7500)),
   /**
    * Supabase Realtime base URL (ADR-0024). The tenant is resolved from the
    * Host's first label, so locally this must be realtime-dev.localhost, not

@@ -25,6 +25,10 @@ const StubRegistry = Layer.succeed(RoomRegistry, {
   join: () => dying(),
   leave: () => dying(),
   start: () => dying(),
+  // Not exercised by this file's suites (neither test hits GET
+  // /games/:gameId/view) — a harmless no-op keeps the stub total against
+  // the CAM-26 `poke` addition to the RoomRegistry interface.
+  poke: () => Effect.void,
   roomCount: Effect.succeed(0),
 })
 

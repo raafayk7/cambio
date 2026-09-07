@@ -273,6 +273,76 @@ describe("version guard + refetch authority (C2, ADR-0033)", () => {
       expect(screen.getByLabelText("10 cards in the draw deck")).toBeInTheDocument()
     })
   })
+
+  it("a room broadcast that fails to decode still schedules a refetch, and a decoded follow-up still works (C3)", async () => {
+    const fake = setupFake()
+    const { calls } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+    const getsBefore = calls.filter((call) => call === GET_VIEW).length
+
+    // No choreography, no crash — but ADR-0033 still holds: the refetch is
+    // the authority, so an undecodable trigger must still trigger it.
+    act(() => {
+      room.emit("GameEvent", { not: "a game event" })
+    })
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsBefore + 1)
+    })
+
+    // The handler skip is surgical — only the early return moved. A decoded
+    // event right after still goes through the normal path, proven by its
+    // choreography landing (the peek beat's selected treatment), not just
+    // by another refetch — an inverted decode guard would still refetch
+    // but could never produce this DOM effect (review finding 3).
+    const getsAfterGarbage = calls.filter((call) => call === GET_VIEW).length
+    act(() => {
+      room.emit("CardPeeked", {
+        _tag: "CardPeeked",
+        viewerId: FRIEND.id,
+        target: { playerId: ME.userId, slotIndex: 2 },
+      })
+    })
+    expect(
+      document.querySelector(`[data-flight-anchor="slot:${ME.userId}:2"] [data-selected="true"]`),
+    ).not.toBeNull()
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsAfterGarbage + 1)
+    })
+  })
+
+  it("a player broadcast that fails to decode still schedules a refetch, and a decoded follow-up still works (C3)", async () => {
+    const fake = setupFake()
+    const { calls } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { player } = await channelsReady(fake)
+    const getsBefore = calls.filter((call) => call === GET_VIEW).length
+
+    act(() => {
+      player.emit("PlayerEvent", { not: "a game event" })
+    })
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsBefore + 1)
+    })
+
+    // Same discipline as the room case: the decoded follow-up must land its
+    // handled effect (the private peek's revealed rank), not merely another
+    // refetch (review finding 3).
+    const getsAfterGarbage = calls.filter((call) => call === GET_VIEW).length
+    act(() => {
+      player.emit("PrivateCardPeeked", {
+        _tag: "PrivateCardPeeked",
+        target: { playerId: ME.userId, slotIndex: 0 },
+        card: "7H",
+      })
+    })
+    expect(screen.getByText("7")).toBeInTheDocument()
+    await waitFor(() => {
+      expect(calls.filter((call) => call === GET_VIEW).length).toBe(getsAfterGarbage + 1)
+    })
+  })
 })
 
 describe("denials and errors (C3)", () => {
@@ -844,6 +914,23 @@ describe("slam window rendering + targeting (SL1)", () => {
 
     const bar = screen.getByRole("progressbar", { name: "Slam window" })
     expect(bar).toHaveAttribute("aria-valuemax", "8000")
+  })
+
+  it("(CAM-26 C4) the draw deck carries the slam-window state while the window is open, driven off slamPhase like DiscardPile's slamTarget", async () => {
+    const fake = setupFake()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    expect(document.querySelector('[data-flight-anchor="deck"]')).toHaveAttribute(
+      "data-state",
+      "slam-window",
+    )
   })
 
   it("renders no slam timer outside the SlamWindow phase (ADR-0012, empty discard pile)", async () => {

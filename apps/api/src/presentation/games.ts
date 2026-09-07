@@ -68,9 +68,15 @@ export const gamesRoutes =
         if (user === undefined) return reply.code(401).send(errorBody(401))
         const gameId = decodeGameId(request.params.gameId)
         if (Either.isLeft(gameId)) return reply.code(400).send(errorBody(400))
-        // A read needs no actor serialization: the state row is the
-        // materialized authority (ADR-0014/0020); the actor's cache is an
-        // optimization, not the source of truth.
+        // The read itself still needs no actor serialization: the state row
+        // is the materialized authority (ADR-0014/0020); the actor's cache
+        // is an optimization, not the source of truth. What's new (CAM-26,
+        // ADR-0037 S3) is a fire-and-forget liveness nudge to the room actor
+        // once membership is confirmed — a poke-on-read, so a client
+        // refetching a stale, past-due SlamWindow gives the actor a chance
+        // to close it even with no command in flight. The poke cannot fail
+        // and adds no meaningful latency; the direct row read above remains
+        // the response's source of truth.
         return run(
           reply,
           Effect.flatMap(GameRepository, (games) => games.load(gameId.right)).pipe(
@@ -79,12 +85,16 @@ export const gamesRoutes =
             // fetched. A non-participant fails with the SAME typed
             // `GameNotFound` the unknown-game path produces, so both take
             // one route through `statusOf` to a byte-identical 404 body —
-            // no existence leak, no sentinel branch.
+            // no existence leak, no sentinel branch. The poke below runs
+            // only past this check: unknown games, non-participants, and
+            // lobby-only rows never create or wake an actor via a read.
             Effect.flatMap(({ state, version }) =>
               Effect.gen(function* () {
                 if (Option.isNone(seatOf(state, user.id))) {
                   return yield* Effect.fail(new GameNotFound({ gameId: gameId.right }))
                 }
+                const rooms = yield* RoomRegistry
+                yield* rooms.poke(gameId.right)
                 const view = yield* viewForEffect(user.id, state)
                 return { view, version }
               }),

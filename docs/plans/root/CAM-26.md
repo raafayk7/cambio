@@ -146,15 +146,15 @@ whose `closesAt` has passed per the authoritative `ClockPort`.
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes.
-- [ ] Every S/C clause above has a row in a child plan's contract coverage
+- [x] `pnpm turbo build typecheck lint test` passes.
+- [x] Every S/C clause above has a row in a child plan's contract coverage
       table with a landed test (or a documented reason none can).
-- [ ] The two restart tests that pinned "bootstrap arms nothing"
+- [x] The two restart tests that pinned "bootstrap arms nothing"
       (`apps/api/test/SlamWindow.test.ts` restart case,
       `packages/application/test/SlamTiming.test.ts` restart case) are
       deliberately updated for the new arming behavior, not deleted.
-- [ ] F1's finding is posted to CAM-26.
-- [ ] Manual liveness check: with the api running and a game mid-window,
+- [x] F1's finding is posted to CAM-26.
+- [x] Manual liveness check: with the api running and a game mid-window,
       kill and restart the api; after the window's `closesAt` passes, a
       page refresh (or the client's own nudge) unsticks the game.
 
@@ -203,7 +203,25 @@ that's the new fixture). S7/S8 close the brief's named test gaps.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-07 — planning complete; implementation not started
+- [x] 2026-09-07 — planning complete; implementation not started
+- [x] 2026-09-07 — M0 forensics done: no persisted stall found in any
+      2026-09-06 game; finding posted to CAM-26 (see Surprises).
+- [x] 2026-09-07 — M1 (backend, S1–S8, F1) and M2 (frontend, C1–C5)
+      implemented in parallel on the task branch — both lanes' full
+      per-package gates green independently; see
+      [backend](../backend/CAM-26.md) and [frontend](../frontend/CAM-26.md)
+      child plans' Progress sections for step-by-step detail.
+- [x] 2026-09-07 — M3 integration pass: repo-wide
+      `pnpm turbo build typecheck lint test` green (25/25 tasks, run bare,
+      exit 0) once both lanes landed on the same tree. Manual restart-
+      mid-window walkthrough performed against a real (non-test) dev api
+      process — see Surprises for the full transcript. All acceptance
+      criteria met.
+- [x] 2026-09-07 — review fix cycle: all nine findings RESOLVED (see
+      Outcomes & retrospective for the branch taken per finding — code +
+      strengthened tests for 1 and 3; claim amendments for 2, 4–8;
+      gallery specimen for 9). Sweeps re-run; suites re-run fresh + full
+      gate; re-review below flipped the verdict to ship.
 
 ## Decision log
 
@@ -233,6 +251,12 @@ timestamp each entry)_
   `SlamTooLate`; UX-safe because CAM-23 already remaps `WrongPhase` →
   slam-too-late copy for `Slam` commands. The two restart tests are
   updated deliberately (accept either ordering or pin the new one).
+  _Resolved at review (2026-09-07): the race cannot happen — queue
+  serialization means a bootstrap-armed timer only enqueues `TimerClose`
+  behind the in-flight envelope, so the late slam is always judged first;
+  `SlamTooLate` is deterministic, both tests kept their assertions, only
+  comments changed (review finding 5; ADR-0037 Consequences amended to
+  match)._
 - 2026-09-07 — **No boot-time sweep of in-progress games** — rejected in
   ADR-0037 (demand-driven poke covers it; a sleeping host can't sweep).
 
@@ -250,7 +274,230 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 - 2026-09-07 (planning) — `VersionConflict` doesn't merely fail to arm; it
   actively interrupts the live timer (`manageTimer` leads with
   `clearTimer`). The window is more stranded after a conflict than before.
+- 2026-09-07 (M0 forensics) — **F1 finding: no persisted evidence of a
+  stall.** Queried `game_events` for every 2026-09-06 game with exactly 2
+  players (13 games, all Raafay vs. Moony). Of those, 3 contain a
+  `SlamFailed` whose `target.playerId` differs from the slammer (the
+  "false slam on the opponent's card" shape the report describes):
+  `22ffe19d-ec92-41c8-a730-52f51d32e648`,
+  `e11e92cd-2f14-4f0e-8347-8692cb159ff8`,
+  `f89ce987-e181-484b-a249-692f5d0f281f`. In all three, the ordered log
+  (by `seq`) shows `SlamFailed` → `PenaltyDrawn` → `SlamWindowClosed` →
+  `TurnAdvanced` landing correctly on the opponent, with no gap and no
+  stall. No 2026-09-06 game is currently persisted in a `SlamWindow`
+  phase, and no game's log shows a false slam with no following
+  close/turn-advance. **Classification: the reported incident left no
+  trace of an actual liveness failure in the durable event log** — this
+  supports the ticket's own "mundane alternative" hypothesis (the
+  give-slot prompt appearing before the outcome, plus the ~1200ms public
+  reveal, being misread as a stall) over a reproduction of the structural
+  defect. The structural defect itself (no recovery path for a genuinely
+  stale `SlamWindow`) is real and independently confirmed by code
+  inspection (see Context & orientation above) — this task fixes it
+  regardless of whether this specific incident was its cause. Posted to
+  CAM-26 as a comment.
+- 2026-09-07 (M3, manual liveness check) — **live walkthrough against a
+  real dev api process (not a test harness), confirming all four recovery
+  layers end to end.** Started `apps/api`'s dev server, created two real
+  users (Alice, Bob) via `POST /users`, formed a lobby, joined, and
+  started a 2-player game over plain HTTP/curl. Alice drew and discarded
+  a 4♦, opening a `SlamWindow` (`closesAt` ~5.5s out, version 5). Then:
+  killed the api process outright (simulating a crash — the in-memory
+  `RoomRegistry` actor and its timer fiber are gone, nothing but the
+  persisted Postgres row survives); slept past `closesAt` with the api
+  still down; restarted the api fresh (a brand-new process, cold
+  `RoomRegistry`, no in-memory state at all); then, as Bob, did a plain
+  `GET /games/:id/view` — the same request a page refresh makes. The
+  first response still showed the stale `SlamWindow` at version 5
+  (expected — S3's read stays a direct, unserialized row read; the
+  poke's effect is fire-and-forget and lands slightly after the
+  response). A **second** `GET /view` one second later (the "client's
+  own nudge" round-trip C2 models) showed `AwaitingDraw` for Bob at
+  version 6 — the window had closed and the turn had advanced, with no
+  command ever sent and no server code running continuously in between.
+  Confirmed for real, not just observed: Bob's `DrawFromDeck` immediately
+  succeeded (200, version 7), proving the game was genuinely live again,
+  not just showing a different phase tag. This is the acceptance
+  criterion's exact scenario (kill+restart mid-window, refresh unsticks
+  the game), performed against real process boundaries and real
+  wall-clock time rather than the application/API test harnesses'
+  simulated restarts and settable clocks.
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+_(filled by `/review`, 2026-09-07)_
+
+**Verdict: fix-then-ship.** One probe-confirmed client bug plus
+documentation/coverage corrections; no contract clause is behaviorally
+violated on the happy path, no architecture or hidden-information
+violation anywhere, and the four-layer recovery design works end to end
+(fresh forced suites + the manual restart walkthrough both green).
+
+### What passed
+
+- Independent verification: full gate `pnpm turbo build typecheck lint
+test` exit 0; then, because 24/25 tasks were cache hits, a forced fresh
+  run `pnpm turbo test --filter <each pkg> --force` against live Postgres
+  — domain 196, application 92, api 121, web 249 tests, all green.
+- Contract verdicts: S2–S8 satisfied with real pinning tests (verified by
+  test-body reading, not titles); S1 satisfied in code, split on coverage
+  (finding 2). C1, C3, C4, C5 satisfied; C2 satisfied on the happy path
+  with the unmount lifecycle bug below. F1 forensics consistent across
+  both plans.
+- Architecture: import boundaries, domain purity (S7 test-only), typed
+  errors (poke's `Effect<void>` E=never), ports/clock discipline,
+  ADR-0020 read-path semantics, hidden-information (poke placed after the
+  membership check — no existence oracle; response byte-identical),
+  design-token law (zero arbitrary values; overlay is the established
+  `slamEligible` idiom, not an AI-default), ADR-0030/0033 test and
+  refetch conventions — all clean.
+- The strict batch test (`getsBefore + 1`) survived untouched, fixture
+  unchanged, as the frontend plan predicted.
+
+### Findings (rank order; fix cycle loads from here)
+
+1. **[code bug — probe-confirmed] The nudge loop survives unmount when a
+   fetch is in flight.** The cleanup (`use-game.ts:290-295`) clears
+   `nudgeTimeoutRef` but never nulls `nudgeStateRef`, so an in-flight
+   refetch's `.then` (`:252-272`) passes its cancellation guard (`:255`)
+   and re-arms `setTimeout(runNudge, …)` (`:271`) on a dead component —
+   continuing GETs (each also a server poke) up to the cap. Review probe
+   (throwaway test, deleted): GET count grew 4 → 6 after `cleanup()` with
+   a fetch held in flight. The comment at `:253-254` claims unmount
+   cancellation the cleanup does not provide. The shipped unmount test
+   (`slam-expiry-nudge.test.tsx:228-252`) cannot catch this: it unmounts
+   _between_ attempts and its sync `vi.advanceTimersByTime` never drains
+   microtasks. **Fix:** call `clearNudge()` in the cleanup; strengthen
+   the unmount test to hold a fetch in flight across `cleanup()` (deferred
+   handler + `advanceTimersByTimeAsync`), which fails against today's
+   code. RESOLUTION: **RESOLVED 2026-09-07 — code fixed AND test
+   strengthened.** The cleanup now calls `clearNudge()` (nulling
+   `nudgeStateRef` so the settling fetch's cancellation guard catches
+   unmount), and a new test in `slam-expiry-nudge.test.tsx` holds a
+   deferred fetch in flight across `cleanup()` then advances async timers
+   — the review probe's exact failing scenario, now green; the old
+   unmount test was renamed to "between attempts" to say what it covers.
+2. **[coverage overclaim] S1's Execute-bootstrap arming has no pinning
+   test.** The backend coverage table's S1 row cites the `SlamTiming`
+   restart test as asserting "bootstrap arms a timer", but that test's own
+   rewritten comment says the observed sequence is "identical either way",
+   and no landed test fails if the arming at `RoomRegistry.ts:225` is
+   removed (the trailing `manageTimer` at `:247` and the lazy `closeIfDue`
+   cover every tested path; the Poke-path load _is_ genuinely pinned by
+   the cold-poke test). **Fix:** either land a test isolating `:225` or
+   amend the S1 row to state the pin covers the Poke-path load only, with
+   the Execute-half documented as unpinned-by-redundancy. Sweep: backend
+   coverage S1 row; backend Progress step 2 ("7 new tests" — actually 6
+   new + 1 deliberately rewritten). RESOLUTION: **RESOLVED 2026-09-07 —
+   claim amended** (the arming is externally indistinguishable from the
+   envelope-end `manageTimer`, so no isolating test is possible without a
+   contrived short-circuit): the S1 row now cites only the poke test and
+   documents the `Execute`-bootstrap site as unpinned-by-redundancy; the
+   Progress count reads "6 new + 1 deliberately rewritten".
+3. **[coverage phrase mismatch] Frontend C3 row overstates its test.**
+   "a decoded event right after is still handled normally" — the test
+   bodies (`game-screen.test.tsx` C3 pair) only assert another `+1` GET,
+   which passes even if the decode guard were inverted and the handler
+   never ran. **Fix:** strengthen the follow-up assertion to observe a
+   handled effect (choreography/state), or amend the phrase to what is
+   asserted. RESOLUTION: **RESOLVED 2026-09-07 — test strengthened** (the
+   preferred branch): both decoded follow-ups now land observable handled
+   effects — the room case emits `CardPeeked` and asserts the selected
+   slot beat; the player case emits `PrivateCardPeeked` and asserts the
+   revealed rank — in addition to their refetch counts; the coverage
+   phrase was updated to name those assertions.
+4. **[load-bearing comment false] `isSameStaleWindow`'s docblock**
+   (`use-game.ts:150-159`) claims it inspects "the FETCHED result … never
+   the applied cache"; on exactly the guard-dropped path it describes, the
+   query fn returns the cache (`:196`), so `result.data` _is_ the cache.
+   (Corollary: the `data === undefined` branch is unreachable from this
+   call path.) Behavior is correct; the C5 rationale comment is not.
+   **Fix:** rewrite to the true discipline — "the loop never requires its
+   own response to be _applied_". RESOLUTION: **RESOLVED 2026-09-07 —
+   claim amended**: the docblock now states the real discipline (the loop
+   never requires its own response applied; `data` may be the cache on
+   the guard-dropped path, and a cache that moved ahead reads as
+   progress).
+5. **[ADR accuracy] ADR-0037's Consequences describes an outcome that
+   didn't happen.** It predicts restart tests may flip `SlamTooLate` →
+   `WrongPhase` "when the close wins the race" and says the tests were
+   "updated deliberately" — but queue serialization forecloses the race (a
+   bootstrap-armed timer can only _enqueue_ `TimerClose` behind the
+   in-flight `Execute`), and only comments changed, zero assertions.
+   Relatedly, the rewritten comments in `SlamTiming.test.ts:213-215` and
+   `SlamWindow.test.ts:658-661` credit scheduler timing rather than queue
+   serialization for a deterministic guarantee. **Fix:** amend 0037's
+   Consequences (proposed ADR, same release — Consequences amendment, the
+   Decision stands) and correct both test comments. Sweep the root
+   Decision Log's arm-only entry for the same "accept either ordering"
+   phrasing and annotate it resolved-deterministic. RESOLUTION:
+   **RESOLVED 2026-09-07 — claim amended everywhere**: ADR-0037's
+   Consequences carries a dated amendment (queue serialization forecloses
+   the race; assertions unchanged, comments-only updates); both test
+   comments now credit queue serialization; the root Decision Log entry
+   carries a resolved-deterministic note. Sweep re-run across all four
+   task docs: the remaining `WrongPhase`/"either ordering" hits are the
+   backend plan's accurate conditional prose (its Step 3 correctly says
+   `WrongPhase` needs a _second_ envelope) and this retrospective itself.
+6. **[misdirected citation] `config.ts` and `.env.example` cite
+   "CAM-26/ADR-0037" for the 7500 default**, but ADR-0037 carries no
+   duration decision — it lives in this plan's Decision Log. **Fix:**
+   re-point both comments at the root plan's Decision Log (or add the
+   duration line to 0037). RESOLUTION: **RESOLVED 2026-09-07 — claim
+   amended**: both comments now point at the root plan's Decision Log
+   explicitly ("not ADR-0037").
+7. **[comment narrower than code + unlogged widening] The Poke eviction
+   comment** (`RoomRegistry.ts:286-291`) attributes `evict = true` to
+   "no game row", but `reload` swallows _every_ failure identically, so a
+   transient `StorageError` also evicts; the `evict` flag is also sticky
+   once set. Both benign (cold cacheless actor, reconstructible rooms),
+   but ADR-0020's "eviction on game end only" has silently widened.
+   **Fix:** correct the comment; add one sentence to ADR-0037's
+   Consequences acknowledging poke-path eviction of dead/unloadable
+   rooms. RESOLUTION: **RESOLVED 2026-09-07 — claim amended**: the
+   `RoomRegistry` comment now names the transient-`StorageError` path and
+   the sticky `evict` flag; ADR-0037's Consequences gained the
+   eviction-widening sentence with a dated amendment note.
+8. **[stale plan note] Frontend plan's closing Surprise** still reports
+   the repo-wide gate red at `//#format:check` on
+   `EndToEndGame.test.ts` — resolved by the backend lane before M3; the
+   gate is green. **Fix:** annotate the Surprise as resolved.
+   RESOLUTION: **RESOLVED 2026-09-07 — claim amended** (annotation added
+   to the frontend plan's Surprise).
+9. **[convention gap] No gallery specimen for the new canonical
+   `slam-window` deck state.** Every other canonical `DrawDeck` state has
+   a `StateCard` in `apps/web/src/components/gallery/game.tsx`, including
+   both r2 additions and the two precedents this change cites
+   (`slamTarget`, `slamEligible`). **Fix:** add the StateCard.
+   RESOLUTION: **RESOLVED 2026-09-07** — `StateCard` "deck slam-window
+   (CAM-26 C4)" added to the gallery's deck section, using the canonical
+   prop only.
+
+### Advisory (no action required; recorded for future tasks)
+
+- The poke idempotency test (`RoomRegistry.test.ts:548-571`) is
+  near-vacuous — an unprocessed poke and an inert poke are
+  indistinguishable; no positive control. S4's "wrong phase" sub-case and
+  S2's `closeIfDue`-conflict site are correct by construction but
+  unpinned. C2's 2s pacing is unpinned (a synchronous burst of 5 would
+  pass). C1's re-fire guard for an already-fired window across a
+  `resolving` toggle is covered by inspection only.
+- "Progress = version advance" ends the nudge loop on any concurrent
+  command (e.g. another player's failed slam) while the window is still
+  stale — self-heals because that nudge's GET already poked the actor,
+  but the loop's invariant is looser than its comment states.
+- `poke` takes the registry-wide creation semaphore on every GET view
+  (non-blocking work only — fine today; a sentence in ADR-0037 if read
+  volume grows). An ended game pays a load + actor create/evict per view
+  read; a cheap guard would skip the poke when the just-read phase is
+  `Ended`.
+- The overlay's `card-frame card-md` + `inset-0` are redundant
+  constraints that agree only while the stack footprint is `card-md`; two
+  test titles promise more than their bodies run (`draw-deck.test.tsx`
+  "with or without onClick omitted"; the nudge suite's unmount title —
+  the latter is fixed by finding 1).
+
+### Deferred
+
+Nothing from the contract. The manual walkthrough, forensics, and 7500ms
+tuning all landed as specified.

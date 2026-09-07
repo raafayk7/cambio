@@ -400,23 +400,120 @@ written by `/implement` when the test actually lands. A plan-time row that
 invents a test title and assertion is an overclaim waiting to become a
 review finding.)_
 
-| Clause                             | Test (file + name)                                                                                                                                                                                                                                                                          | What is asserted                 |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| S1 — arm on load                   | _planned:_ application-layer two-lifetime restart idiom — a rebuilt actor whose bootstrap loads a `SlamWindow` ends up with an armed timer (past-due → prompt close); covered jointly by the poke-closes-cold-window test and the deliberately updated `SlamTiming` restart test            | _(filled at implement)_          |
-| S2 — re-arm after conflict         | _planned:_ extend the `RoomRegistry.test.ts` VersionConflict self-heal test (or a sibling beside it) with a `SlamWindow` variant: conflict surfaces unchanged, then the close still arrives with no further command                                                                         | _(filled at implement)_          |
-| S3 — poke-on-read                  | _planned:_ two layers — application-level `registry.poke` on a cold past-due window closes it (journal `["load","save","publishGame"]`); API-level GET view with expired window triggers the close batch while the HTTP response shape stays unchanged                                      | _(filled at implement)_          |
-| S4 — poke inert when nothing to do | _planned:_ application-level pokes against a still-open window / ended game / missing game row — nothing persisted or published, no resident actor left, eviction semantics intact; API-level in-window GET publishes nothing                                                               | _(filled at implement)_          |
-| S5 — close publishes               | _planned:_ API-level assertion that the poke-triggered close's published batch is exactly `["SlamWindowClosed","TurnAdvanced"]` — the same journal assertion the existing timer-fired test ("the timer-fired close arrives through the same persist+publish path, unprompted (C1.6)") makes | _(filled at implement)_          |
-| S6 — 7500 default                  | _planned:_ update the existing default-pinning test in `apps/api/test/Config.test.ts`; games-in-flight semantics already pinned by the untouched `ViewFor.test.ts` config-projection test                                                                                                   | _(filled at implement)_          |
-| S7 — domain sequence               | _planned:_ new pure test in `packages/domain/test/Slam.test.ts` on the file's `base` fixture: false opponent slam → `CloseSlamWindow` → next player's `DrawFromDeck` legal and succeeds                                                                                                     | _(filled at implement)_          |
-| S8 — integration sequence          | _planned:_ new focused test in `EndToEndGame.test.ts`'s large-window suite: in-window slam → clock past `closesAt` → next player draws over HTTP (lazy close as its own batch first), replay-mirrored and leak-checked                                                                      | _(filled at implement)_          |
-| F1 — forensics                     | _planned:_ not a test — the M0 psql queries above; deliverable is the classification recorded in Surprises (both plans) and a Linear comment on CAM-26                                                                                                                                      | _(n/a — documented deliverable)_ |
+| Clause                             | Test (file + name)                                                                                                                                                                                                                                                      | What is asserted                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S1 — arm on load                   | packages/application/test/RoomRegistry.test.ts — "poke closes a cold, past-due window — bootstrap, judge the clock, close (S1+S3+S5)"                                                                                                                                   | the Poke-path load arms: a cold actor with a past-due persisted window closes it with no command at all. The `Execute`-bootstrap arming site has **no isolating test** — it is redundant-by-design with the envelope-end `manageTimer` (every tested sequence passes with it removed), documented here per review finding 2 rather than overclaimed |
+| S2 — re-arm after conflict         | packages/application/test/RoomRegistry.test.ts — "VersionConflict during an open window: eager reload keeps the timer armed, closing with no further command (S2, CAM-26)"                                                                                              | conflict surfaces unchanged; eager reload re-arms the timer, closing with no further command                                                                                                                                                                                                                                                        |
+| S3 — poke-on-read                  | packages/application/test/RoomRegistry.test.ts — "poke closes a cold, past-due window..."; apps/api/test/SlamWindow.test.ts — "GET view pokes the room actor: an expired window closes via the read, unprompted by any command (S3+S5, CAM-26)"                         | application: registry.poke bootstraps+closes; API: GET view triggers the close with unchanged response shape                                                                                                                                                                                                                                        |
+| S4 — poke inert when nothing to do | packages/application/test/RoomRegistry.test.ts — 5 Poke tests (still-open / ended / unknown-or-lobby-only / idempotent); apps/api/test/SlamWindow.test.ts — "GET view while the window is still open: the poke is inert, a subsequent slam still succeeds (S4, CAM-26)" | poke with nothing to do persists/publishes nothing and does not disturb eviction; API GET publishes nothing while the window is open                                                                                                                                                                                                                |
+| S5 — close publishes               | apps/api/test/SlamWindow.test.ts — "GET view pokes the room actor: an expired window closes via the read, unprompted by any command (S3+S5, CAM-26)"                                                                                                                    | poke-triggered close publishes SlamWindowClosed+TurnAdvanced exactly like the timer-fired close                                                                                                                                                                                                                                                     |
+| S6 — 7500 default                  | apps/api/test/Config.test.ts — "slam window and realtime URL take the documented defaults"                                                                                                                                                                              | SLAM_WINDOW_MS with no env override decodes to 7500                                                                                                                                                                                                                                                                                                 |
+| S7 — domain sequence               | packages/domain/test/Slam.test.ts — "false opponent slam, then CloseSlamWindow: window closes and the next player can draw"                                                                                                                                             | close emits SlamWindowClosed+TurnAdvanced; next player DrawFromDeck legal and succeeds                                                                                                                                                                                                                                                              |
+| S8 — integration sequence          | apps/api/test/EndToEndGame.test.ts — "after an in-window slam, the window expires and the next player draws over HTTP (S8, CAM-26)"                                                                                                                                     | in-window slam, window expiry, lazy close batch, then next player DrawFromDeck all round-trip leak-free over HTTP                                                                                                                                                                                                                                   |
+| F1 — forensics                     | not a test — the M0 psql queries above, run against the local database (Step 0, done before this implementation pass began)                                                                                                                                             | _(n/a — documented deliverable)_ the classification is recorded in this plan's Surprises, the root plan's Surprises, and as a Linear comment on CAM-26                                                                                                                                                                                              |
 
 ## Progress
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [ ] 2026-09-07 — backend child plan written; implementation not started
+- [x] 2026-09-07 — Step 1 done: S7 domain test landed in
+      `packages/domain/test/Slam.test.ts` (pure addition, no engine changes).
+      Passed against the existing engine on the first run —
+      `pnpm turbo test --filter @cambio/domain` green (196 tests, 23 files).
+- [x] 2026-09-07 — Step 2 done: `Poke` envelope, `registry.poke`,
+      `reload` helper, arm-on-load, and eager re-arm-after-conflict landed in
+      `packages/application/src/room/RoomRegistry.ts`. TDD followed: 6 new
+      tests plus 1 deliberately rewritten, written first in
+      `packages/application/test/RoomRegistry.test.ts`
+      (1 rewritten VersionConflict test + 1 new SlamWindow-conflict variant +
+      5 new Poke tests; count corrected at review, finding 2), confirmed
+      they exercised the not-yet-existing
+      `registry.poke` (compile failure), then implemented.
+      `pnpm turbo test --filter @cambio/application` green on the first run
+      after implementation (92 tests, 14 files).
+- [x] 2026-09-07 — Step 3 done: `SlamTiming.test.ts`'s restart-mid-window
+      test comment rewritten (the old "bootstrap load arms nothing" claim is
+      false post-S1). Verified, not assumed: reran the suite before touching
+      the comment — `SlamTooLate` (not `WrongPhase`) and the five-op journal
+      both still held unchanged, because the late slam is itself the
+      bootstrapping envelope and is judged before the newly-forked
+      zero-duration timer fiber can be scheduled. Only the comment changed;
+      no assertion touched.
+- [x] 2026-09-07 — Step 4 done: `apps/api/src/presentation/games.ts`'s GET
+      handler now pokes `RoomRegistry` after the load + membership check
+      succeed (unknown games/non-participants never wake an actor). Adding
+      `poke` to the `RoomRegistry` service interface required a mechanical
+      fix to `apps/api/test/DyingActor.test.ts`'s `StubRegistry` object
+      literal (missing-property compile error — confirmed by running
+      `pnpm turbo typecheck --filter @cambio/api` before the fix, which
+      failed with exactly that TS2345, and again after, which passed): a
+      no-op `poke: () => Effect.void` was added since neither of that
+      file's suites exercise the GET route. This is a narrower deviation
+      than "no edits expected" from the child plan's Step 4 description,
+      but purely mechanical — no assertion in that file changed. Two new
+      tests landed in `apps/api/test/SlamWindow.test.ts` ("GET view pokes
+      the room actor..." and "GET view while the window is still open:
+      the poke is inert..."), and the restart test's stale
+      "(its bootstrap arms nothing)" comment was rewritten, mirroring
+      Step 3's reasoning. `pnpm turbo test --filter @cambio/api` green
+      before AND after the new tests (118 → 120 tests, 20 files;
+      `SlamWindow.test.ts` 7 → 9, `DyingActor.test.ts` still 2/2).
+- [x] 2026-09-07 — Step 5 done: a new S8 test landed in
+      `apps/api/test/EndToEndGame.test.ts`'s "a real Slam over HTTP (large
+      window)" suite — an in-window slam, then the window expiring, then
+      the next turn player's `DrawFromDeck` over HTTP, closing the named
+      gap where the acceptance suite's `slamWindowMs: 1` and the sibling
+      slam test both stop short of a post-window command. Needed an
+      injected settable clock (`makeSettableClock`, not previously used in
+      this file) to make the expiry deterministic, matching
+      `SlamWindow.test.ts`'s pattern. One incidental fix: the new test's
+      compound `.filter((e) => e._tag === "game" && e.gameId === gameId)`
+      needed an explicit `e is Extract<...>` type predicate — TypeScript's
+      automatic predicate inference (which is why the file's older,
+      simpler `.filter((e) => e._tag === "game")` typechecks with no
+      predicate) does not fire for compound `&&` conditions.
+      `pnpm turbo test --filter @cambio/api` green (121 tests, 20 files;
+      `EndToEndGame.test.ts` 2 → 3).
+- [x] 2026-09-07 — Step 6 done: `SLAM_WINDOW_MS` default 10000 → 7500 in
+      `apps/api/src/config.ts` (value + rewritten doc comment),
+      `.env.example` (value + comment), and
+      `apps/api/test/Config.test.ts`'s "slam window and realtime URL take
+      the documented defaults" test, one change set.
+      `apps/api/test/support/http.ts`'s `baseConfig.slamWindowMs: 5000`
+      and `packages/application/test/ViewFor.test.ts`'s config-projection
+      test were left untouched, per the plan.
+      `pnpm turbo test --filter @cambio/api` green (121 tests, 20 files).
+- [x] 2026-09-07 — Step 7 done: backend M1 complete. Full repo-wide gate
+      (`pnpm turbo build typecheck lint test`, run bare, exit status
+      checked directly) surfaced one pre-existing prettier formatting
+      issue in this task's own new file
+      (`apps/api/test/EndToEndGame.test.ts`), fixed with `prettier
+--write`, then reran green for `//:format:check`. The gate's ONE
+      remaining red task is `@cambio/web#test` (2 timeouts in
+      `apps/web/test/game-screen.test.tsx`) — out of this lane's scope
+      (`apps/web/` belongs to the parallel frontend agent's M2 work, which
+      was still in progress on this branch at gate time; see Surprises
+      below). Backend-owned packages verified green independently and
+      definitively, standalone (not just as part of the mixed full-repo
+      run, since turbo aborts remaining tasks after a sibling failure and
+      the full-gate log's own per-task summaries for domain/application/
+      api got cut off mid-stream as a result):
+      `pnpm turbo build typecheck test --filter @cambio/domain --filter
+@cambio/application --filter @cambio/api` → 10/10 tasks green;
+      `pnpm turbo lint --filter @cambio/domain --filter @cambio/application
+--filter @cambio/api` → 7/7 tasks green (this run also re-confirmed
+      root `//:format:check` green repo-wide). Final counts: domain 196
+      tests/23 files, application 92 tests/14 files, api 121 tests/20
+      files — all green.
+- [x] 2026-09-07 — review fix cycle (this side): S1 coverage row and Step
+      2 test count corrected (finding 2); `SlamTiming`/`SlamWindow`
+      restart-test comments now credit queue serialization (finding 5);
+      `config.ts`/`.env.example` citations re-pointed at the root plan's
+      Decision Log (finding 6); the `Poke` eviction comment corrected and
+      ADR-0037's Consequences amended for the eviction widening
+      (finding 7). Comments/docs only — no assertion or behavior changed
+      on this side.
 
 ## Surprises & notes for the root plan
 
@@ -439,3 +536,66 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
   succeed, so unknown games, non-participants, and lobby-only rows never
   create or wake an actor via reads; the `Poke` handler still tolerates a
   failing bootstrap load defensively (and evicts rather than lingering).
+- 2026-09-07 (M0, Step 0) — **F1 forensics result: no persisted stall.**
+  13 two-player games exist for 2026-09-06 (all Raafay vs. Moony). 3 have
+  an opponent-targeted `SlamFailed` (`22ffe19d-ec92-41c8-a730-52f51d32e648`,
+  `e11e92cd-2f14-4f0e-8347-8692cb159ff8`,
+  `f89ce987-e181-484b-a249-692f5d0f281f`); all three show
+  `SlamFailed`→`PenaltyDrawn`→`SlamWindowClosed`→`TurnAdvanced` with the
+  turn correctly landing on the opponent, no gap. No 2026-09-06 game is
+  persisted in a `SlamWindow` phase today. Classification: the reported
+  symptom is not reproduced in the durable event log — likely the
+  give-slot-prompt/reveal-delay UX moment, per the ticket's own mundane
+  alternative — not evidence the structural liveness gap fired that day.
+  The gap itself stands, confirmed by code inspection, independent of
+  this incident. Full queries and output are in this task's implement
+  transcript; not re-pasted here to keep the plan lean.
+- 2026-09-07 (Step 2, implement) — **deviation from the plan's assumption
+  that "the existing [VersionConflict] test's non-window assertions stay
+  valid; extend, don't rewrite."** Reality disagrees, necessarily: S2's
+  whole point is that a conflict re-arms without waiting for a next
+  command, which means the reload happens eagerly inside the SAME
+  conflicted envelope, not lazily on the next one. That changes
+  `RoomRegistry.test.ts`'s original "VersionConflict: surfaced unchanged,
+  cache dropped, next command reloads (clause 6)" test in two concrete
+  ways: (a) the conflicted call's own journal now shows `["load"]` (the
+  eager reload) instead of `[]`, and (b) the follow-up "healed" call no
+  longer shows a `"load"` op (`["save","publishGame"]`, not
+  `["load","save","publishGame"]`) because the cache is already warm from
+  the eager reload. Deferring the reload to preserve the old assertions
+  literally would mean NOT re-arming inside the conflicted envelope —
+  i.e. not actually implementing S2, since a stuck window has no
+  guaranteed "next command" to trigger a lazy reload (that is the entire
+  liveness bug this task fixes). Renamed and updated the test
+  (`"VersionConflict: surfaced unchanged, cache reloaded eagerly in the
+same envelope (clause 6, CAM-26 S2)"`) rather than leaving a
+  now-inaccurate comment; added a sibling SlamWindow-phase variant
+  alongside it per the plan's "or add a sibling test beside it" option.
+  Nothing was deleted — both the conflict-surfaces-unchanged assertion and
+  the self-heal-succeeds assertion still hold, just with corrected journal
+  shapes.
+- 2026-09-07 (Step 4, implement) — **narrower deviation than "no edits
+  expected" for `apps/api/test/DyingActor.test.ts`.** Adding `poke` to the
+  `RoomRegistry` service interface (required for S3) makes the file's
+  `StubRegistry` object literal (`Layer.succeed(RoomRegistry, {...})`)
+  fail to typecheck — TS2345, "Property 'poke' is missing" — confirmed by
+  running `pnpm turbo typecheck --filter @cambio/api` before and after a
+  one-line fix (`poke: () => Effect.void`, since neither of that file's
+  two suites exercise the GET route this poke lives on). This is
+  unavoidable for ANY new `RoomRegistry` service method under this repo's
+  `Layer.succeed`-with-a-full-object-literal stubbing convention, not
+  specific to how `Poke` was designed — worth the child-plan author (or a
+  future one) knowing about ahead of time next time the actor interface
+  grows. No assertion in the file changed.
+- 2026-09-07 (Step 7, gate) — **the full repo-wide gate's only red task,
+  `@cambio/web#test`, is two timeouts in
+  `apps/web/test/game-screen.test.tsx`** (`"(CAM-23) arming a give-slot
+sends no command..."` and `"offers exactly one exit — back to the
+lobby..."`, both `Test timed out in 30000ms`). `apps/web/` is the
+  parallel frontend agent's M2 lane (`git status` at the time showed
+  `draw-deck.tsx`, `slam-timer.tsx`, `game-screen.tsx`, `use-game.ts`, and
+  three test files modified/added there, none of it touched by this
+  backend lane) — out of scope for this plan to fix or diagnose further,
+  flagged here only so the orchestrator doesn't mistake it for a backend
+  regression. All three backend-owned packages (domain, application, api)
+  were verified green independently of this failure — see Progress.

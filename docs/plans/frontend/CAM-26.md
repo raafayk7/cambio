@@ -383,20 +383,69 @@ time, fill only the Clause column plus a planned-approach note**; test
 file, name, and assertion phrase are written by `/implement` when the
 test actually lands.)_
 
-| Clause                                                                                                                                                                                                                                      | Test (file + name) | What is asserted |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------- |
-| **C1** — planned: fake-timer component tests in the existing SlamTimer suite — fire-once past `closesAt` + grace despite the 50ms interval; suppressed during `resolving`, fires once when it clears; re-arms per new window; no early fire |                    |                  |
-| **C2** — planned: new fake-timer screen-harness suite — expired window with stale same-version answers yields paced refetches counted via `stubApi.calls`, stopping at the cap; a progress response ends the loop early                     |                    |                  |
-| **C3** — planned: garbage `FakeChannel.emit` on each of the room and player topics in the existing screen suite — refetch count still increments, decoded events still handled after                                                        |                    |                  |
-| **C4** (component + wiring) — planned: DrawDeck suite pins `data-state="slam-window"`, no button, choreography precedence; one screen-suite assertion pins the `slamPhase`-driven wiring                                                    |                    |                  |
-| **C4** (doc) — planned: no test can pin a design doc; `draw-deck.md` r3 lands in the same change and `/review` verifies it against the creation-gate authorization                                                                          |                    |                  |
-| **C5** — planned: same new suite — every nudge response is same-version (guard-dropped), close arrives as a broadcast-triggered higher-version refetch, table moves on                                                                      |                    |                  |
+| Clause                                                                                                                                                                                                                                      | Test (file + name)                                                                                                                                                                                                                                                       | What is asserted                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **C1** — planned: fake-timer component tests in the existing SlamTimer suite — fire-once past `closesAt` + grace despite the 50ms interval; suppressed during `resolving`, fires once when it clears; re-arms per new window; no early fire | apps/web/test/slam-timer.test.tsx — "onExpire (C1)" describe block (6 tests)                                                                                                                                                                                             | fires once past closesAt+grace despite the 50ms interval; suppressed during resolving then fires once on clear; re-arms per new closesAt; never fires past unmount                                                                                                                                                      |
+| **C2** — planned: new fake-timer screen-harness suite — expired window with stale same-version answers yields paced refetches counted via `stubApi.calls`, stopping at the cap; a progress response ends the loop early                     | apps/web/test/slam-expiry-nudge.test.tsx — "nudges on expiry, keeps nudging while the view stays the same stale window, and stops at the cap"; "a refetch showing progress ends the nudge loop — no further GETs after it"                                               | an already-expired window with no broadcast produces paced refetches that stop growing at the cap; a same-refetch response showing a moved-on phase/version ends the loop with no further GETs                                                                                                                          |
+| **C3** — planned: garbage `FakeChannel.emit` on each of the room and player topics in the existing screen suite — refetch count still increments, decoded events still handled after                                                        | apps/web/test/game-screen.test.tsx — "a room broadcast that fails to decode still schedules a refetch, and a decoded follow-up still works (C3)"; "a player broadcast that fails to decode still schedules a refetch, and a decoded follow-up still works (C3)"          | a garbage payload on each of the room and player topics still increments the GET /view count, and a decoded event right after lands its handled effect — the public peek beat's selected slot treatment (room) and the private peek's revealed rank (player) — plus its own refetch (strengthened at review, finding 3) |
+| **C4** (component + wiring) — planned: DrawDeck suite pins `data-state="slam-window"`, no button, choreography precedence; one screen-suite assertion pins the `slamPhase`-driven wiring                                                    | apps/web/test/draw-deck.test.tsx — "slam-window state (CAM-26 C4)" describe block (3 tests); apps/web/test/game-screen.test.tsx — "(CAM-26 C4) the draw deck carries the slam-window state while the window is open, driven off slamPhase like DiscardPile's slamTarget" | data-state="slam-window" over the count split, no button in slam-window, choreography state wins when also active; the screen wires slamPhase !== undefined to DrawDeck's slamWindow prop exactly like DiscardPile.slamTarget                                                                                           |
+| **C4** (doc) — planned: no test can pin a design doc; `draw-deck.md` r3 lands in the same change and `/review` verifies it against the creation-gate authorization                                                                          | design-system/components/core/draw-deck.md r3 (reviewed by /review, not a test)                                                                                                                                                                                          | slam-window added to States, a Rules line pins it presentational-only, and the r3 Revisions entry cites CAM-26 and the creation-gate authorization                                                                                                                                                                      |
+| **C5** — planned: same new suite — every nudge response is same-version (guard-dropped), close arrives as a broadcast-triggered higher-version refetch, table moves on                                                                      | apps/web/test/slam-expiry-nudge.test.tsx — "recovery lands through the broadcast path while nudging — every nudge response stays version-guard-dropped (C5)"                                                                                                             | every nudge refetch during the loop is answered with the same stale version (guard-dropped, never applied); recovery still lands once the poke-triggered close broadcast's own debounced refetch carries a newer version                                                                                                |
 
 ## Progress
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [ ] 2026-09-07 — frontend child plan written; implementation not started
+- [x] 2026-09-07 — Step 1 (C1) landed: `SlamTimer.onExpire`, fire-once
+      guard keyed on `closesAt`, `SLAM_EXPIRY_SKEW_GRACE_MS = 500`.
+      `apps/web/test/slam-timer.test.tsx` grew from 4 to 10 tests, all
+      green (`npx vitest run test/slam-timer.test.tsx`).
+- [x] 2026-09-07 — Step 2 (C3) landed: both `use-game.ts` subscription
+      sites (`onEvent` for room and player topics) now call
+      `scheduleRefetch()` unconditionally, decode-guarding only the
+      choreography handler call. Two new tests in
+      `apps/web/test/game-screen.test.tsx`'s "version guard + refetch
+      authority (C2, ADR-0033)" describe; the strict batch test
+      ("SlamWindowClosed + TurnAdvanced arrive as one batch...") stayed
+      green untouched, as expected (suite total: 74 → 76 tests).
+- [x] 2026-09-07 — Step 3 (C2+C5) landed: the bounded nudge loop in
+      `use-game.ts` (`NUDGE_INTERVAL_MS = 2000`, `NUDGE_MAX_ATTEMPTS = 5`,
+      `isSameStaleWindow` helper, `onSlamExpire` callback) plus the
+      three-hop wiring (`use-game.ts` → `game-screen.tsx` →
+      `SlamTimer.onExpire`). New file
+      `apps/web/test/slam-expiry-nudge.test.tsx` (4 tests, fake timers
+      with `shouldAdvanceTime: true` — see Surprises), all green.
+- [x] 2026-09-07 — Step 4 (C4) landed: `DrawDeck` gained a new
+      `slamWindow` boolean prop, folded into `data-state` with
+      choreography-wins precedence, and the alarm-frame overlay (existing
+      tokens only: `border-accent-alarm`, `animate-pulse-soft`,
+      `card-frame card-md`). Wired in `game-screen.tsx`
+      (`slamPhase !== undefined` → `slamWindow: true`, symmetric with the
+      `DiscardPile` line). `apps/web/test/draw-deck.test.tsx` grew from 4
+      to 7 tests; one new integration assertion added to
+      `game-screen.test.tsx`'s "slam window rendering + targeting (SL1)"
+      describe (suite total: 76 → 77). The design doc
+      (`draw-deck.md`) revised r2 → r3 in the same change. All green.
+- [x] 2026-09-07 — Step 5 (close-out): `pnpm turbo build typecheck lint
+test --filter @cambio/web` is green — 6/6 tasks, 249 tests across 21
+      files (includes `@cambio/ui`/`contracts`/`domain` as cached
+      dependency tasks). The repo-wide bare gate
+      (`pnpm turbo build typecheck lint test`, no filter) currently fails
+      at `//#format:check` on `apps/api/test/EndToEndGame.test.ts` only —
+      that file belongs to the concurrent backend lane (M1, same branch,
+      shared working tree) and is out of this side's scope per the task
+      boundary; see Surprises. Contract coverage table filled for all six
+      rows via `fill-coverage-row.mjs`.
+- [x] 2026-09-07 — review fix cycle (this side): unmount-mid-flight bug
+      fixed (`clearNudge()` in the cleanup) with a new strengthened test
+      in `slam-expiry-nudge.test.tsx` reproducing the review probe
+      (finding 1); both C3 decoded follow-ups now assert handled DOM
+      effects and the coverage phrase matches (finding 3); the
+      `isSameStaleWindow` docblock rewritten to the true C5 discipline
+      (finding 4); the stale gate Surprise annotated resolved
+      (finding 8); gallery `StateCard` added for the `slam-window` deck
+      state (finding 9).
 
 ## Surprises & notes for the root plan
 
@@ -411,4 +460,54 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
   it's a one-sentence r4, done through the design-system change process.
 - `slam-timer.tsx`'s doc comment cites `slam-timer.md (r1)` while the
   canonical doc is at r3 — worth refreshing the citation while editing
-  the file (comment-only; no behavior).
+  the file (comment-only; no behavior). Fixed in the same edit as C1
+  (the citation now reads r3); confirmed the canonical doc was already at
+  r3 from unrelated prior work (CAM-21), so this is a stale-citation fix
+  only — no doc revision was needed or made for `onExpire` itself, per
+  the plan-time decision above.
+- **The flagged fake-timer/`waitFor` hazard did not bite, on the first
+  attempt.** `vi.useFakeTimers({ shouldAdvanceTime: true })` (not plain
+  `vi.useFakeTimers()`) turned out to be the seam: vitest's mocked clock
+  (and the `Date.now()` it also fakes) keeps auto-advancing alongside real
+  wall-clock time under this option, so testing-library's `waitFor`/
+  `findBy*` polling — which uses the same globally-faked timer functions —
+  kept working unmodified, while `await vi.advanceTimersByTimeAsync(ms)`
+  (not the sync `advanceTimersByTime`, so pending fetch-mock promises
+  drain at each tick) still let the test jump straight over the ~2s
+  nudge interval instead of waiting it out for real. All four
+  `slam-expiry-nudge.test.tsx` tests passed on the first run against the
+  finished implementation, each in ~2.2s wall-clock rather than the ~10s+
+  the cap's worth of real 2s intervals would otherwise cost. No manual
+  microtask-flush loop or promoted fixture was needed; the already-past
+  `closesAt` fixture (`Date.now() - 1000`) was enough on its own to arm
+  the loop on the mount tick.
+- The `slamWindowView` fixture in `game-screen.test.tsx` was **not**
+  promoted into `test/support/harness.tsx` (the plan left this to
+  implementer's judgment) — `slam-expiry-nudge.test.tsx` needed a
+  different shape anyway (an already-expired `closesAt`, a swappable
+  `version` for the progress tests), so a small local `expiredSlamView`
+  fixture in the new file was more direct than generalizing the shared
+  one for a single extra caller.
+- The strict batch test's fixture window (`slamWindowView("7", closesAt)`,
+  `closesAt = Date.now() + 8000`, real timers) never needed widening — the
+  5s worst case in this suite (fake timers, different file) doesn't touch
+  it, and 8s comfortably outlasts every real-timer test's own runtime
+  (each completed in well under 1s per test, ~9s for the whole 77-test
+  file).
+- **The repo-wide bare gate is red for a reason outside this side's
+  control.** `pnpm turbo build typecheck lint test` (no filter) fails at
+  `//#format:check` on `apps/api/test/EndToEndGame.test.ts` — a file the
+  backend child plan owns (M1, same branch, shared working tree with the
+  concurrent backend-lane agent), unformatted at the moment this side's
+  gate ran. `apps/api`, `packages/domain`, and `packages/application` are
+  explicitly out of scope for this side's task boundary, so this was left
+  alone rather than run through prettier. `pnpm turbo build typecheck lint
+test --filter @cambio/web` (which pulls in `@cambio/ui`, `contracts`,
+  and `domain` as dependency tasks, all cached green) passes clean: 6/6
+  tasks, 249 tests across 21 files. The root plan's M3 (integration pass,
+  after both lanes land) is where the repo-wide bare gate needs to go
+  green — flagging here rather than silently working around it by
+  touching a backend-owned file. _Resolved before M3: the backend lane
+  formatted its own file; the repo-wide bare gate went green at the M3
+  pass (root plan Progress) and was independently re-verified at review
+  (stale-note annotation: review finding 8)._

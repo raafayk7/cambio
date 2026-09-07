@@ -15,7 +15,13 @@ import { legalCandidates, ts } from "@cambio/domain/testing"
 import { Either, Schema } from "effect"
 
 import { apply, normalize, setupGame, toWire } from "./support/game-driver.js"
-import { makeTestApp, publisherJournal, TEST_SEED } from "./support/http.js"
+import {
+  clearPublisherJournal,
+  makeSettableClock,
+  makeTestApp,
+  publisherJournal,
+  TEST_SEED,
+} from "./support/http.js"
 import { entitledSlugs, expectNoLeak, rulePublicSlugs, slugsIn } from "./support/leaks.js"
 
 /**
@@ -253,6 +259,112 @@ describe("a real Slam over HTTP (large window)", () => {
       const body = res.json() as { view: PlayerGameView; version: number }
       expect(normalize(body.view)).toEqual(normalize(viewFor(slam!.playerId, state, nameById)))
       expectNoLeak(body, entitledSlugs(state, slam!.playerId), "slam reply")
+    } finally {
+      await app.close()
+      await runtime.dispose()
+    }
+  }, 60_000)
+
+  it("after an in-window slam, the window expires and the next player draws over HTTP (S8, CAM-26)", async () => {
+    // Closes the brief's named gap: EndToEndGame's scripted suite filters
+    // Slam out entirely (slamWindowMs: 1 makes every window lazily closed
+    // before a real slam could land); this suite's own slam test never
+    // continues past the slam itself. An injected settable clock (as in
+    // SlamWindow.test.ts) lets the window expire deterministically.
+    const clock = makeSettableClock(0)
+    const { app, runtime } = await makeTestApp({ slamWindowMs: 60_000 }, { clock: clock.layer })
+    try {
+      const { gameId, players, byId, nameById } = await setupGame(app, ["Alice", "Bob"])
+      const [alice, bob] = players
+
+      const dealt = dealGame(
+        [toUserId(alice!.userId), toUserId(bob!.userId)],
+        TEST_SEED,
+        decodeGameConfig({ slamWindowMs: 60_000 }),
+        ts(0),
+      )
+      if (Either.isLeft(dealt)) throw new Error("local deal failed")
+      let state = dealt.right[0]
+
+      // Play turns until a slam window opens (mirrors the sibling test).
+      let at = 0
+      for (let step = 0; step < 40 && state.phase._tag !== "SlamWindow"; step++) {
+        at += 50
+        clock.set(at)
+        const command = choose(state, at, 0, new Set())
+        const actor = byId.get(command.playerId)!
+        const res = await app.inject({
+          method: "POST",
+          url: `/games/${gameId}/commands`,
+          cookies: { cambio_session: actor.cookie },
+          payload: toWire(command),
+        })
+        expect(res.statusCode, command._tag).toBe(200)
+        state = apply(state, command, at)
+      }
+      expect(state.phase._tag).toBe("SlamWindow")
+      if (state.phase._tag !== "SlamWindow") return
+
+      // Slam inside the window — round-trips exactly like the sibling test.
+      const inWindow = Timestamp.make(state.phase.closesAt - 1)
+      clock.set(inWindow)
+      const slam = legalCandidates(state, inWindow).find(
+        (c): c is Extract<Command, { readonly _tag: "Slam" }> => c._tag === "Slam",
+      )
+      expect(slam, "a legal slam candidate exists").toBeDefined()
+      const slamActor = byId.get(slam!.playerId)!
+      const slamRes = await app.inject({
+        method: "POST",
+        url: `/games/${gameId}/commands`,
+        cookies: { cambio_session: slamActor.cookie },
+        payload: toWire(slam!),
+      })
+      expect(slamRes.statusCode).toBe(200)
+      state = apply(state, slam!, inWindow)
+      expect(state.phase._tag, "window discipline: the slam never closes the window").toBe(
+        "SlamWindow",
+      )
+      if (state.phase._tag !== "SlamWindow") return
+
+      // The window expires; the next command over HTTP is the turn player's
+      // DrawFromDeck. The lazy close runs as its own persisted+published
+      // batch first — mirrored locally, then asserted from the journal.
+      const closesAt = state.phase.closesAt
+      const past = Timestamp.make(closesAt + 1)
+      clock.set(past)
+      const closedState = apply(state, { _tag: "CloseSlamWindow" }, past)
+      const draw = legalCandidates(closedState, past).find(
+        (c): c is Extract<Command, { readonly _tag: "DrawFromDeck" }> => c._tag === "DrawFromDeck",
+      )
+      expect(draw, "a legal DrawFromDeck candidate exists for the next turn player").toBeDefined()
+      const drawActor = byId.get(draw!.playerId)!
+      clearPublisherJournal()
+      const drawRes = await app.inject({
+        method: "POST",
+        url: `/games/${gameId}/commands`,
+        cookies: { cambio_session: drawActor.cookie },
+        payload: toWire(draw!),
+      })
+      expect(drawRes.statusCode).toBe(200)
+      state = apply(closedState, draw!, past)
+
+      const drawBody = drawRes.json() as { view: PlayerGameView; version: number }
+      expect(normalize(drawBody.view)).toEqual(normalize(viewFor(draw!.playerId, state, nameById)))
+      expectNoLeak(drawBody, entitledSlugs(state, draw!.playerId), "post-window draw reply")
+
+      // Exactly two batches: the lazy close, then the draw — replay-mirrored
+      // and leak-checked, closing the S8 gap end to end.
+      const entries = publisherJournal.filter(
+        (e): e is Extract<(typeof publisherJournal)[number], { readonly _tag: "game" }> =>
+          e._tag === "game" && e.gameId === gameId,
+      )
+      expect(entries.length).toBe(2)
+      expect(entries[0]!.events.map((e) => e._tag)).toEqual(["SlamWindowClosed", "TurnAdvanced"])
+      const projectedClose = projectEvents(entries[0]!.events)
+      expect(
+        slugsIn(projectedClose.room).filter((s) => !rulePublicSlugs(entries[0]!.events).has(s)),
+        "published room stream (lazy close)",
+      ).toEqual([])
     } finally {
       await app.close()
       await runtime.dispose()
