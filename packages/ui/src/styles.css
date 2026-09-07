@@ -65,15 +65,16 @@
    * beat. A glance, not a memorization window (that's duration-peek). */
   --duration-reveal: 1200ms;
 
-  /* tokens.md §Shape (CAM-21, revised CAM-20 gate fix finding 3): the
-   * compact game screen's table-art max-width cap — a square asset, so
-   * this is also the height cap. Compact only (game-screen.tsx cancels
-   * it at regular via max-w-none). Off the spacing scale deliberately: it
-   * is a measured fold-budget constant (viewport minus chrome, dock, and
-   * opponent rows at the tuned card scale), not a rhythm step — and it
-   * stays a bare primitive (no @theme role) because exactly one consumer
-   * exists, table-surface.tsx's docked-composition art cap (review F5.8;
-   * promote to a role if a second consumer ever appears).
+  /* tokens.md §Shape (CAM-21, revised CAM-20 gate fix finding 3, revised
+   * again CAM-27/ADR-0038): the compact game screen's table-art MINIMUM
+   * size — a square asset, so this is also the height floor. Compact
+   * only (table-surface.tsx cancels it at regular). Off the spacing
+   * scale deliberately: it is a measured fold-budget constant (viewport
+   * minus chrome, dock, and opponent rows at the tuned card scale), not
+   * a rhythm step — and it stays a bare primitive (no @theme role)
+   * because exactly one consumer exists, table-surface.tsx's
+   * docked-composition art block (review F5.8; promote to a role if a
+   * second consumer ever appears).
    *
    * CAM-21 originally tuned this DOWN from 160px to 128px at the M5
    * rendered pass (measured fold-budget shortfall, root plan Surprises).
@@ -91,7 +92,21 @@
    * rendered pass, 2026-09-06): still zero page-level scroll — the row-
    * major hand and tightened compact card scale (card-lg 48px, card-md
    * 32px) this task already landed freed enough of the same budget that
-   * the M5-era shortfall does not reproduce at 158px. */
+   * the M5-era shortfall does not reproduce at 158px.
+   *
+   * CAM-27/ADR-0038: this value's CSS role changed from a `max-width`
+   * cap to a `min-width`/`min-height` floor — the number itself (158px)
+   * is untouched, still exactly the CAM-21 360×640 reference above. A
+   * fixed cap left dead, non-scrolling space above the own-hand dock at
+   * any compact viewport taller than 640px, because the art never grew
+   * past 158px while its flex container kept growing with the viewport.
+   * The art now sizes fluidly via a flex-grown frame (`container-type:
+   * size`) wrapping a container-query-sized square (`width:
+   * min(100%, 100cqh)`, table-surface.tsx — a single element combining
+   * flex-grow with aspect-ratio/max-width does not hold a square once
+   * the width ceiling binds, confirmed live, ADR-0038), and this token
+   * only guarantees it never shrinks below the one measured, validated
+   * floor. */
   --size-table-art-compact: 158px;
 }
 

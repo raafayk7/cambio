@@ -687,7 +687,14 @@ function GameTable({
       >
         <div
           data-region="table-scroll"
-          className="w-full flex-1 min-h-0 overflow-y-auto regular:contents"
+          // CAM-27/ADR-0038: `flex flex-col` (was a plain block box) so
+          // `TableSurface`'s root below can actually become a flex ITEM of
+          // this element and claim its real available height via its own
+          // `flex-1` — a `flex-1` on a non-flex-item child of a block
+          // parent has no effect. `regular:contents` already dissolves
+          // this element's own box (and therefore its `display` value)
+          // entirely at regular, so this addition is inert there.
+          className="flex w-full flex-1 min-h-0 flex-col overflow-y-auto regular:contents"
         >
           <TableSurface
             state={ended ? "game-over" : "in-game"}

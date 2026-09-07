@@ -18,7 +18,12 @@ there is no business logic here to accidentally migrate into a container.
 token whose role changes (cap → floor); ADR-0027 ("divergence is a defect")
 requires the design-system docs to carry that change, not just the code.
 
-Files this side touches, current state as re-read for this plan:
+Files this side touches, current state as re-read for this plan. **Note
+(added at close-out):** the line numbers and code excerpts below are the
+PRE-implementation state (what this plan was written against); several
+shifted once the fix landed. The Plan of Work section's "As shipped"
+notes carry the final, as-built classes and structure — treat those,
+and the linked files themselves, as authoritative over the numbers here:
 
 - [apps/web/src/containers/game/game-screen.tsx](../../../apps/web/src/containers/game/game-screen.tsx) —
   the `table-scroll` div, currently line 688-691:
@@ -69,7 +74,7 @@ regular:order-9`). Below `table-root`'s scroll wrapper sits the extracted
   `regular:absolute`, centered, sized at 75% of the now-square,
   height-driven TableSurface root). There is no existing `regular:w-*`
   override. This is a load-bearing fact for step 4 below.
-- [packages/ui/src/styles.css:68-95](../../../packages/ui/src/styles.css) —
+- [packages/ui/src/styles.css:68-107](../../../packages/ui/src/styles.css) —
   `--size-table-art-compact: 158px`, a bare `:root` custom property (not
   `@theme`, deliberately — exactly one consumer) with a long comment tracing
   its CAM-21 → CAM-20 tuning history against the 640px reference height.
@@ -115,7 +120,7 @@ Steps are ordered so the repo compiles and the existing suite stays green
 after each one; only step 6 (new test) and step 8 (docs) are additive
 rather than modifications to shared code.
 
-**1 — Token role change (`packages/ui/src/styles.css:68-95`).** Keep the
+**1 — Token role change (`packages/ui/src/styles.css:68-107`).** Keep the
 value (`158px`) unchanged. Rewrite the comment: preserve the existing
 CAM-21/CAM-20 derivation paragraph in full (it is still the basis for why
 158px specifically, and the number itself is not being re-measured by this
@@ -137,71 +142,71 @@ entirely at regular, so this addition has zero effect at regular — clause 7
 holds by construction, not by a compensating override. No `data-region`
 attribute moves, so the containment test (line 1925) is unaffected.
 
-**3 — `TableSurface` root stretches and vertically centers, external only
+**3 — `TableSurface` root claims compact height, external only
 (`table-surface.tsx`, root `cn(...)` call, the `viewerSeat === "external"`
-ternary already at line 187-189).** Extend that same ternary — the exact
-scope boundary the regular fluid classes already use — to also carry
-unprefixed `flex-1 min-h-0 justify-center`:
-
-- `flex-1 min-h-0`: now that `table-scroll` (step 2) is a real flex column,
-  this lets the root actually claim its available height instead of
-  sizing to content, mirroring the shape of `regular:flex-1 regular:min-h-0`
-  one line below but scoped to compact.
-- `justify-center`: the root's unconditional `items-center` (line 163) only
-  centers the flex column's cross axis (horizontal); nothing today governs
-  the main axis (vertical). Once `flex-1` makes the root taller than its
-  content (opponent row + gap + art block), `justify-center` is what turns
-  the leftover into symmetric top/bottom margin instead of the default
-  flex-start pack-at-top — this is clause 4's vertical-centering
-  requirement, and it belongs here (not on `table-scroll`) because
-  `table-scroll`'s only child already fills it fully via `flex-1`, so
-  `justify-content` on `table-scroll` itself would have nothing left to
-  distribute.
-- The `viewerSeat === "internal"` branch (room screen) is untouched by
-  this ternary edit — clause 8 holds by the same scoping technique already
-  proven for the regular fluid classes.
-
-Advisory sketch only (confirm exact tokens against the live file at
-implement time — this is not the artifact `/review` checks):
+ternary).** **As shipped** — the plan's original sketch also added
+`justify-center` here, but that turned out to belong on the frame instead
+(step 4): the root's `flex-1` always consumes exactly what `table-scroll`
+leaves after step 2, so it never has leftover space of its own to center.
+The as-built ternary:
 
 ```
 viewerSeat === "external"
-  ? "flex-1 min-h-0 justify-center regular:w-auto regular:flex-1 regular:min-h-0 regular:max-w-4xl"
+  ? "flex-1 min-h-0 regular:w-auto regular:flex-1 regular:min-h-0 regular:max-w-4xl"
   : "regular:block regular:max-w-2xl",
 ```
 
-**4 — The art block itself grows via aspect-ratio, external only
-(`table-surface.tsx`, the art `<div>` at line 212-222).** Replace the fixed
-cap with flex-driven, aspect-locked sizing:
+`flex-1 min-h-0` (unprefixed) lets the root claim `table-scroll`'s
+available height at compact, mirroring the shape `regular:flex-1
+regular:min-h-0` already had at regular. The `"internal"` branch (room
+screen) is untouched — clause 8 holds by the same scoping technique
+already proven for the regular fluid classes.
 
-- Drop `max-w-(--size-table-art-compact)` (the fixed cap that causes the
-  bug).
-- Add, unprefixed and external-only: flex growth (`flex-1 min-h-0`) so it
-  can consume the root's now-real available height; `aspect-square` +
-  `w-auto` so the browser derives width from the flex-resolved height
-  (mirroring the root's own `regular:aspect-square`/`regular:w-auto`
-  pattern, just applied one level down because at compact the square block
-  is this art div, not the whole root); `max-w-full` as the width ceiling
-  (ADR-0038 clause 4 — once width would need to exceed the column, growth
-  stops); the token applied as `min-w-(--size-table-art-compact)
-min-h-(--size-table-art-compact)` — its new floor role (clause 1, exactly
-  158px at the 360×640 reference).
-- **Required companion check, load-bearing** (identified during this
-  planning pass, re-verify against the live file before editing): the
-  element's current unprefixed base class is `w-3/4`, with **no existing
-  `regular:w-*` override** — regular's own sizing today implicitly depends
-  on that same unprefixed value (the art block is `regular:absolute`,
-  sized to 75% of the height-driven square root). If the unprefixed
-  `w-3/4` is replaced by `w-auto` for the compact fix, an explicit
-  `regular:w-3/4` twin must be added in the **same** edit, or regular's
-  rendered width silently changes — no existing test would catch this,
-  since the "fluid regular table" test (line 2136) only inspects the
-  root's className, never this nested art div's. This is exactly the kind
-  of shared-unprefixed-value hazard clause 7 exists to guard against.
-- Every other existing `regular:*` class on this element
+**4 — The art becomes a frame + square pair, external only
+(`table-surface.tsx`).** **Revised mid-implementation** (see ADR-0038 and
+the root plan's Surprises: a single element combining `flex-1` with
+`aspect-square`/`max-width` does not hold a square once the width ceiling
+binds — confirmed live, not theoretical). As shipped, the single art
+`<div>` became two nested elements:
+
+- **Outer, `data-region="table-art-frame"`**: `viewerSeat === "external"`
+  gets `"flex grow basis-[0px] min-h-0 w-full items-center justify-center
+[container-type:size] regular:contents"`; `"internal"` gets `"contents"`
+  unconditionally. `grow basis-[0px]` (NOT Tailwind's `flex-1`, which is
+  `flex: 1 1 0%`) is load-bearing: a `container-type: size` element sized
+  via a _percentage_ flex-basis, nested two flex-grow levels deep (this
+  frame inside the root above, itself flex-grown from `table-scroll`),
+  resolves `cqh` queries in its descendants to `0` in this browser —
+  confirmed by isolated reproduction outside this component tree, not a
+  guess. A literal `0px` basis does not have this problem. `items-center
+justify-center` center the inner square once it renders shorter than
+  the frame's own flex-grown height (clause 4's symmetric-margin
+  requirement) — the frame is the one element that ends up taller than
+  its content, so centering has to live here, not on `table-scroll` or
+  the root.
+- **Inner, `data-region="table-art"`** (the img, center overlay, and
+  game-over scrim all moved inside this element): `viewerSeat ===
+"external"` gets `"aspect-square w-[min(100%,100cqh)]
+min-w-(--size-table-art-compact) min-h-(--size-table-art-compact)
+regular:aspect-auto regular:w-3/4 regular:min-w-0 regular:min-h-auto"`;
+  `"internal"` keeps `"w-3/4"` unconditionally, unchanged from before this
+  task. `width: min(100%, 100cqh)` is the actual "biggest square that fits
+  the frame" expression — never wider than the frame (`100%`), never
+  taller than the frame's resolved height (`100cqh`, a container-query
+  unit read off the outer frame) — with `aspect-square` deriving whichever
+  dimension `min()` didn't pick. The token floor
+  (`min-w`/`min-h-(--size-table-art-compact)`) preserves the CAM-21
+  reference as a lower bound (clause 1, amended — no longer an exact value
+  guaranteed AT 360×640, see the root plan's Decision Log).
+- **The companion check this plan flagged before implementation held**:
+  the square's base class had no `regular:w-*` twin before this task,
+  so regular silently depended on the same unprefixed value being
+  repurposed for compact — `regular:w-3/4` above is that required twin,
+  landed in the same edit, confirmed byte-identical to pre-change
+  rendering via a live A/B comparison (git stash) at 1280×900.
+- Every other pre-existing `regular:*` position class on the square
   (`regular:absolute regular:top-1/2 regular:left-1/2
-regular:-translate-x-1/2 regular:-translate-y-1/2 regular:max-w-none`)
-  stays as-is, plus the `regular:w-3/4` twin from the point above.
+regular:-translate-x-1/2 regular:-translate-y-1/2`) is unchanged.
 
 **5 — Compile checkpoint.** After steps 1-4:
 `pnpm turbo build typecheck lint test --filter @cambio/ui --filter @cambio/web`
@@ -211,31 +216,28 @@ and the **existing** suite (no new test yet) is still green before adding
 new coverage, isolating any regression to steps 1-4 rather than conflating
 it with the new test in step 6.
 
-**6 — Structural test coverage (M2).** In
-`apps/web/test/game-screen.test.tsx`, add a new `describe` block
-immediately after `"fluid regular table (CAM-20 M5)"` (line 2136-2158),
-following its exact pattern (same DOM-lookup technique via
-`screen.getByText(FRIEND.name).closest("[data-seat-index]")` →
-`.closest("[data-state]")`, same `gameBootstrap()`/`channelsReady`
-scaffolding) to assert the compact-side classes landed in step 3: the root
-`className` contains `flex-1`, `min-h-0`, and `justify-center`
-(unprefixed), and does not contain a leftover unprefixed sizing class from
-before the change. A second assertion (either the same test or a sibling
-one, whichever reads more naturally once the actual classes are known)
-should check the art block itself no longer carries
-`max-w-(--size-table-art-compact)` and instead carries the min-width/
-min-height floor plus `max-w-full`/`aspect-square` — locate it via
-`document.querySelector('[data-region="table-scroll"]')` and a class-list
-walk, or by adding a `data-region` marker to the art div if none exists
-today (check the live file — if there is no existing hook for this div,
-prefer adding one over a fragile `querySelector` on Tailwind classes,
-matching this codebase's own `data-region` convention rather than
-inventing a new lookup style).
-Then re-run the full `game-screen.test.tsx` and `table-geometry.test.ts`
-suites (not just the new test) to confirm the ADR-0035/0036 no-transform
-sweep (line 1982, 2114), the containment test (line 1925), and every
-`table-geometry.test.ts` assertion still pass unmodified — this is the
-concrete confirmation for clauses 6 and 9.
+**6 — Structural test coverage (M2).** **As shipped** in
+`apps/web/test/game-screen.test.tsx`: a new `describe("fluid compact
+table (CAM-27 M2)", ...)` block, immediately after `"fluid regular table
+(CAM-20 M5)"`, with five tests — the root carries unprefixed
+`flex-1`/`min-h-0` (and explicitly does NOT carry `justify-center`,
+guarding against the centering job drifting back onto the wrong
+element); `table-scroll` is a real `flex`/`flex-col` container;
+`data-region="table-art-frame"` carries `grow`/`basis-[0px]`/`min-h-0`/
+`[container-type:size]`/`regular:contents` and NOT `flex-1` (guarding
+against the `cqh`-breaking regression this task found and fixed);
+`data-region="table-art"` no longer carries the old
+`max-w-(--size-table-art-compact)` cap, carries the new
+`min-w`/`min-h-(--size-table-art-compact)` floor and
+`aspect-square`/`w-[min(100%,100cqh)]`, and restores
+`regular:w-3/4`/`regular:aspect-auto` at regular; and a no-transform
+sweep walking up from the new `table-art` element confirms no
+`scale`/`rotate`/`transform-[` class or inline `style.transform`
+anywhere in its ancestor chain. The pre-existing no-transform sweep
+tests, the own-hand containment test, and the "fluid regular table"
+test all re-run unmodified alongside these — 91/91 across
+`game-screen.test.tsx` and `table-geometry.test.ts` — confirming clauses
+6, 7, and 9.
 
 **7 — Rendered verification (M3).** Not unit-testable (ADR-0030 — jsdom
 computes no real layout). Start the dev server per AGENTS.md's
@@ -244,34 +246,42 @@ before trusting anything it renders; restart if stale), then check each
 viewport below against the game screen's docked composition
 (`viewerSeat="external"`), 2-4 players:
 
-| Viewport          | What to look for                                                                                                                                                                                                                                                                                                           |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 360×640           | Zero regression from today: table art renders at 158px, zero page-level scroll (the CAM-21 invariant), composition visually unchanged.                                                                                                                                                                                     |
-| 1280×900          | Regular is byte-identical to pre-change — same table position/size, no visual diff.                                                                                                                                                                                                                                        |
-| 360×770           | The dead band previously observed here (~200px) is gone; the table art has visibly grown to fill the space instead.                                                                                                                                                                                                        |
-| 421×770           | Same check as 360×770, confirming the fix isn't width-specific.                                                                                                                                                                                                                                                            |
-| 360×1400 (stress) | The art has hit its width ceiling (`max-w-full`) and stopped growing; the remaining vertical space in `table-scroll` reads as **symmetric** margin above and below the table content, not a single gap pinned above the dock (clause 4's fallback) — confirm this looks like a deliberate layout choice, not a broken one. |
+| Viewport          | Measured (live dev server, real 2-player game, via `getBoundingClientRect`)                                                                                                                                      |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 360×640           | Art 293.5×293.5px (**not** 158px — clause 1 amended mid-implementation, see root plan Decision Log: the pre-existing baseline residue closes too); zero page-level scroll.                                       |
+| 1280×900          | Art 607.125×607.125px at the same top/left as pre-change code, confirmed via a live A/B comparison (`git stash` the implementation diff, reload, measure, `git stash pop`, reload, re-measure) — byte-identical. |
+| 360×770           | Art 328×328px (square, at the width ceiling), symmetric margins 47.75px/47.77px above/below; zero page-level scroll. The originally reported ~200px dead band is gone.                                           |
+| 421×770           | Art 389×389px, symmetric margins 17.25px/17.27px; zero page-level scroll. Confirms the fix isn't width-specific.                                                                                                 |
+| 360×1400 (stress) | Art 328×328px (hit the width ceiling, stopped growing); leftover distributed as symmetric margins 362.75px/362.77px above/below — not a gap pinned above the dock; zero page-level scroll.                       |
 
-Record actual measurements/screenshots in the Progress log below as they're
-taken (this is the only evidence clauses 1-4 and 8 have, per the root
-plan's Validation section).
+Every viewport: `document.documentElement.scrollHeight === window.innerHeight`
+(zero page-level scroll, the CAM-21 invariant). Full detail and the two
+mechanism corrections found during this pass (a single flex+aspect-ratio
+element does not hold a square once the width ceiling binds; a
+`container-type: size` element sized via a percentage flex-basis
+resolves `cqh` to 0 when nested two flex-grow levels deep) are in the
+root plan's Surprises section and ADR-0038.
 
-**8 — Canon update (M4).** Update
-`design-system/components/core/table-surface.md`: bump frontmatter
-`version` to `7` and append an `r7` entry to the Revisions section (after
-r6, line 172) in that section's established voice — describe the cap→floor
-semantics change, cite ADR-0038 and CAM-27, and note the value itself
-(158px) is unchanged, only its CSS role. Update
+**8 — Canon update (M4).** **As shipped:** `design-system/components/core/table-surface.md`
+frontmatter `version` bumped to `7`; an `r7` entry appended to the
+Revisions section (after r6) describing the frame+square/container-query
+mechanism (revised from the plan's original flex/aspect-ratio sketch —
+see this doc's Plan of Work step 4) and the measured results at all five
+verification viewports; the Anatomy section's "Compact art cap" bullet
+rewritten to "Compact art sizing" (cap → floor, fluid). Updated
 `design-system/references/tokens.md`'s `--size-table-art-compact` entry
-(line 122-133): replace "the compact-only max-width cap ... also the
-height cap" with the floor description, and update the cross-reference
-from "see table-surface.md r6" to "r7". Then confirm ADR-0038's status
-(currently `proposed`, line 3) and the ADR index
-(`docs/adr/README.md`) are consistent with this task landing — flip to
-`accepted` if this repo's ADR convention expects that at implementation
-close (check the `adr` skill / a recently-accepted ADR's status field
-for the convention actually followed here before editing). Run the full
-gate: `pnpm turbo build typecheck lint test`.
+to describe the floor role and point at r7. `table-surface.tsx`'s own
+header comment bumped from citing r6 to r7 (ADR-0027 "divergence is a
+defect" — the component's own doc-citation, not just the design-system
+files, has to track the current revision). ADR-0038 rewritten to
+describe the corrected (frame+square, container-query) mechanism as the
+actual decision, with the original single-element flex/aspect-ratio
+attempt moved to "alternatives considered, rejected — confirmed live,
+not theoretical." **ADR status stays `proposed`**, not `accepted` — per
+the `adr` skill, a proposed ADR only becomes accepted by explicit human
+approval when its release branch merges into `development`, never at
+implementation close; only the ADR index's title wording needed a
+touch-up to match the corrected mechanism. Full gate run after: `pnpm turbo build typecheck lint test`.
 
 ## Concrete steps & validation
 
@@ -296,37 +306,79 @@ apps/web/test/game-screen.test.tsx` and `apps/web/test/table-geometry.test.ts`
 
 ## Contract coverage
 
-| Clause                                                                                                                                                          | Test (file + name)                                                                                                                                                                                                                                                                                                                                                                                          | What is asserted |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| 1. At 360×640, table art renders at 158px and the composition is unchanged from today.                                                                          | Verified by manual rendered pass (step 7, 360×640 row) — jsdom cannot measure real pixel sizes (ADR-0030), so no unit test can assert this directly; the structural test in step 6 only pins class names, not resolved geometry.                                                                                                                                                                            | —                |
-| 2. At compact heights above 640px, the art's rendered box grows to track additional height, up to clause 4's limit.                                             | Verified by manual rendered pass (step 7, 360×770 / 421×770 rows) — real layout, not unit-testable.                                                                                                                                                                                                                                                                                                         | —                |
-| 3. At any compact height, no unclaimed dead space appears between the table region and the dock; `table-scroll`'s content fills the box it occupies.            | Primarily manual rendered pass (step 7); partially corroborated by the structural test in step 6 confirming `flex-1`/`min-h-0` classes actually landed on the root (a necessary but not sufficient condition — the class being present doesn't prove the rendered gap is gone).                                                                                                                             | —                |
-| 4. Once art growth would exceed available width, growth stops and remaining space is symmetric margin, never a gap above the dock.                              | Verified by manual rendered pass (step 7, 360×1400 stress row) — the "symmetric" claim is a real-layout judgment call no unit test can make; the structural test in step 6 pins that `justify-center` and `max-w-full` classes exist, which is the mechanism but not proof of the visual outcome.                                                                                                           | —                |
-| 5. Card sizes (deck, discard, held card, hand) are unchanged at compact at every height.                                                                        | Verified by absence of change: no diff touches `hand.tsx`, `draw-deck.tsx`, `discard-pile.tsx`, `held-card.tsx`, or the `card-lg`/`card-md`/`card-sm` tokens. Existing tests for these components (untouched by this task) continue to pass as an implicit regression guard; no new test is needed since nothing here changes.                                                                              | —                |
-| 6. No flight anchor up through `tableRoot` carries a `transform`/`scale-*`/`rotate-*` class or inline style; the existing no-transform sweep passes unmodified. | The pre-existing ADR-0035/0036 no-transform sweep in `game-screen.test.tsx` (line 1982 and its side-bench-rotation sibling at line 2114) re-run unmodified per step 6's validation — none of steps 2-4's new classes (`flex`, `flex-col`, `flex-1`, `min-h-0`, `justify-center`, `aspect-square`, `w-auto`, `max-w-full`, `min-w-(...)`, `min-h-(...)`) match the sweep's scale/rotate/transform- patterns. | —                |
-| 7. The regular (≥720px) fluid table layout is byte-identical to today; the existing "fluid regular table (CAM-20 M5)" test passes unmodified.                   | The pre-existing test at `game-screen.test.tsx` line 2136 re-run unmodified per step 6's validation, plus the step 4 companion check (adding an explicit `regular:w-3/4` twin if the unprefixed base class changes) specifically to prevent a silent regular regression this particular existing test does not cover (it only inspects the root's className, not the nested art div's).                     | —                |
-| 8. The room screen's compact table (`viewerSeat="internal"`) is byte-identical to today; zero diff to `room-screen.tsx` or the default `TableSurface` path.     | Verified by the diff itself touching only the `viewerSeat === "external"` branches in `table-surface.tsx` plus `game-screen.tsx`/`styles.css`/docs — `room-screen.tsx` is not in the changed-files list. Existing `room-screen.test.tsx` (unmodified) re-run as a regression guard.                                                                                                                         | —                |
-| 9. `table-geometry.ts`'s bench-position math and `table-geometry.test.ts` are unaffected.                                                                       | The pre-existing `table-geometry.test.ts` suite re-run unmodified per step 6's validation — zero diff to `table-geometry.ts` itself.                                                                                                                                                                                                                                                                        | —                |
+| Clause                                                                                                                                                                                 | Test (file + name)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | What is asserted                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. At 360×640, the table art never renders smaller than the 158px floor, and the layout is structurally unchanged (amended mid-implementation — see root plan Decision Log).           | Manual rendered pass (live dev server, real 2-player game) — jsdom cannot measure real pixel sizes (ADR-0030)                                                                                                                                                                                                                                                                                                                                                                                                                       | At 360×640: art renders 293.5×293.5px (not 158px — clause amended mid-implementation, see Decision Log); docScrollHeight === innerHeight (zero page-level scroll)                                                                                                                                                     |
+| 2. At compact heights above 640px, the art's rendered box grows to track additional height, up to clause 4's limit.                                                                    | Manual rendered pass, 360×770 / 421×770 / 360×1400                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Art grows with height: 328×328 (360×770), 389×389 (421×770), 328×328 capped at the width ceiling (360×1400) — up from 158×158 at every one of these under the old fixed cap                                                                                                                                           |
+| 3. At any compact height, no unclaimed dead space appears between the table region and the dock; `table-scroll`'s content fills the box it occupies.                                   | Manual rendered pass, all 5 viewports; game-screen.test.tsx > fluid compact table (CAM-27 M2) > makes TableSurface's root a real flex item, at compact (flex-1, min-h-0)                                                                                                                                                                                                                                                                                                                                                            | document.documentElement.scrollHeight === window.innerHeight at 360×640, 1280×900, 360×770, 421×770, and 360×1400; root carries unprefixed flex-1/min-h-0                                                                                                                                                             |
+| 4. Once art growth would exceed available width, growth stops and remaining space is symmetric margin, never a gap above the dock.                                                     | Manual rendered pass, 360×770 / 421×770 / 360×1400; game-screen.test.tsx > fluid compact table (CAM-27 M2) > frames the table art as a size query container at compact, dissolved everywhere else (CAM-27, revised)                                                                                                                                                                                                                                                                                                                 | Symmetric margins measured: 47.75px/47.77px above/below at 360×770, 17.25px/17.27px at 421×770, 362.75px/362.77px at 360×1400 (all within rounding); frame carries flex/items-center/justify-center                                                                                                                   |
+| 5. Card sizes (deck, discard, held card, hand) are unchanged at compact at every height.                                                                                               | No new test — verified by absence of diff to hand.tsx, draw-deck.tsx, discard-pile.tsx, held-card.tsx, and the card-lg/card-md/card-sm tokens; existing suites for those files re-run unmodified as a regression guard                                                                                                                                                                                                                                                                                                              | Zero diff to every card-size-consuming file or token in the final changeset                                                                                                                                                                                                                                           |
+| 6. No flight anchor up through `tableRoot` carries a `transform`/`scale-*`/`rotate-*` class or inline style; the existing no-transform sweep passes unmodified.                        | game-screen.test.tsx > compact docked composition (CAM-21) > carries no scale-or-rotate transform class from every flight anchor up through the root's ancestors (ADR-0035, widened to rotation by ADR-0036 §5); > side-bench rotation (CAM-20) > still carries no scale-or-rotate transform above any flight anchor with a rotated hand on the table (ADR-0035/0036 §5); > fluid compact table (CAM-27 M2) > still carries no scale-or-rotate transform above the table art now that it sizes via container query units (ADR-0035) | No scale-/rotate-/transform-[ class or non-empty inline style.transform anywhere from a flight anchor, or the new art frame/square, up through tableRoot                                                                                                                                                              |
+| 7. The regular (≥720px) fluid table layout is byte-identical to today; the existing "fluid regular table (CAM-20 M5)" test passes unmodified.                                          | game-screen.test.tsx > fluid regular table (CAM-20 M5) > sizes the table square from height at regular...; > fluid compact table (CAM-27 M2) > grows the table art...(regular-restore assertions); manual live A/B rendered comparison at 1280×900 via git stash                                                                                                                                                                                                                                                                    | Regular-scoped classes (regular:flex-1/regular:min-h-0/regular:max-w-4xl on the root; regular:w-3/4/regular:aspect-auto on the square) unchanged; live-measured art rect at 1280×900 identical before and after this diff (607.125×607.125 at the same top/left)                                                      |
+| 8. The room screen's compact table (`viewerSeat="internal"`) is visually and functionally unaffected; zero diff to `room-screen.tsx` itself (amended at review — see Asserted column). | No new test — verified by reading the diff directly; existing room-screen test suite re-run unmodified as a regression guard                                                                                                                                                                                                                                                                                                                                                                                                        | room-screen.tsx has zero diff. Amended at review: the shared TableSurface JSX does gain one new always-present wrapper node (table-art-frame) on the internal path too, rendered display:contents there — zero visual/layout impact (ADR-0038 Consequences), but not a byte-identical source diff to that shared path |
+| 9. `table-geometry.ts`'s bench-position math and `table-geometry.test.ts` are unaffected.                                                                                              | table-geometry.test.ts (full suite)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | All 9 pre-existing assertions pass unmodified; zero diff to table-geometry.ts                                                                                                                                                                                                                                         |
 
 ## Progress
 
-- [ ] YYYY-MM-DD HH:MM — step
+- [x] 2026-09-07 14:20 — Steps 1-4 implemented (token comment/role,
+      `table-scroll` flex column, `TableSurface` root, art frame+square
+      split with the corrected container-query mechanism). Compile
+      checkpoint (step 5): `pnpm turbo build typecheck lint test --filter
+@cambio/ui --filter @cambio/web`, existing suite unaffected.
+- [x] 2026-09-07 14:45 — Step 6: 5 new tests added to `game-screen.test.tsx`
+      (`describe("fluid compact table (CAM-27 M2)", ...)`). 91/91 across
+      `game-screen.test.tsx` + `table-geometry.test.ts`.
+- [x] 2026-09-07 15:10 — Step 7: rendered verification at all 5 viewports,
+      live dev server (Postgres + api + web, a real 2-player game).
+      Results in the step 7 table above. Two mechanism corrections found
+      and fixed along the way — see Surprises below and ADR-0038.
+- [x] 2026-09-07 15:20 — Step 8: canon updated (`table-surface.md` r7,
+      `tokens.md`, `table-surface.tsx` header comment), ADR-0038 rewritten.
+      Full gate: `pnpm turbo build typecheck lint test`, 9/9 tasks, exit 0.
+- [x] 2026-09-08 — Review fix cycle: coverage table rows 6 and 8 corrected
+      (row 6's quoted test-title citation updated after the rename below;
+      row 8's "zero diff" claim amended to note the shared TableSurface
+      JSX gains one new always-present `display:contents` wrapper node on
+      the internal path). `game-screen.test.tsx`'s renamed test
+      ("...now that it sizes via container query units") re-verified
+      green. Full detail in the root plan's Outcomes & Retrospective.
 
 ## Surprises & notes for the root plan
 
-- The art block's current unprefixed `w-3/4` has no explicit `regular:w-*`
-  twin — regular's own sizing today silently depends on the same
-  unprefixed value this task must change for compact. Flagged in Plan of
-  work step 4 as a required companion edit; if `/implement` finds this
-  assumption wrong (e.g. a `regular:w-*` override already exists by the
-  time this lands, or the live structure otherwise differs from this
-  read), update this note and the step rather than silently diverging.
-- `table-scroll` needing to become a real flex container (step 2) is not
-  called out explicitly in ADR-0038's Decision section, which frames the
-  fix mostly in terms of the art block and the root's own sizing. It
-  follows necessarily from `table-scroll` being a plain block box today
-  (no `flex` class) — a `flex-1` on a non-flex-item child of a block
-  parent has no effect. If `/implement`'s read of the live file finds
-  `table-scroll` already flex by the time this lands, this step becomes a
-  no-op confirmation rather than a real edit; note that in Progress either
-  way.
+- The art block's unprefixed `w-3/4` had no explicit `regular:w-*` twin
+  before this task — confirmed true against the live file, and the
+  required `regular:w-3/4` companion edit landed in the same commit as
+  the compact fluid-sizing change (step 4), verified byte-identical to
+  pre-change regular rendering via a live A/B comparison (`git stash`).
+- `table-scroll` did need to become a real flex container (step 2) — the
+  live file confirmed it was a plain block box (no `flex` class),
+  exactly as this plan predicted; not a no-op.
+- **Mechanism correction #1:** the plan's original single-element
+  `flex-1` + `aspect-square` + `w-auto` + `max-w-full` sketch (step 4)
+  does not hold a square once the width ceiling binds. Measured live at
+  360×770: 328×423.5px, a stretched rectangle, despite every individual
+  class computing correctly in isolation. Corrected to a two-element
+  frame (flex-grown, `container-type: size`) + square
+  (`width: min(100%, 100cqh)`) split — the standard CSS answer for
+  "grow to the smaller of available width or height, then stay square."
+  User sign-off obtained before implementing the correction (see root
+  plan Decision Log); ADR-0038 rewritten to document this as the actual
+  decision, with the original attempt moved to rejected alternatives.
+- **Mechanism correction #2:** after the frame/square split, the square
+  still collapsed to its 158px floor at 360×770 instead of growing to
+  328px. Root-caused by building isolated reproductions directly in the
+  browser (not by reasoning about the spec): a `container-type: size`
+  element sized via Tailwind's `flex-1` (`flex: 1 1 0%`, a _percentage_
+  basis), nested two flex-grow levels deep, resolves `cqh` queries in
+  its descendants to `0` — confirmed with a synthetic test tree outside
+  this component, so it is a genuine, reproducible browser behavior.
+  Fixed with a literal `0px` basis (`grow basis-[0px]`) on the frame
+  only; `table-scroll` and the `TableSurface` root keep the ordinary
+  `flex-1`/`min-h-0` idiom, since neither is itself a
+  `container-type: size` element.
+- Root plan clause 1 was amended mid-implementation (not by this side,
+  but affecting this side's Contract coverage row 1): at 360×640 the art
+  now renders at 293.5×293.5px, not 158px, because the reference height
+  itself already had ~53-70px of the same unclaimed-slack bug under the
+  old fixed cap. See root plan Decision Log for the full reasoning and
+  user sign-off.

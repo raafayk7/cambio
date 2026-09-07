@@ -1,4 +1,4 @@
-# 0038 — Compact table art sizes fluidly via flex layout, not a fixed pixel token
+# 0038 — Compact table art sizes fluidly via container-query units, not a fixed pixel token
 
 - **Status:** proposed
 - **Date:** 2026-09-07
@@ -40,29 +40,79 @@ measurement hooks. `card-lg`/`card-md`/`card-sm` and every other
 compact/regular size in this area are a flat two-step jump at the
 `regular` breakpoint, not a continuous function of height.
 
+**Revised mid-implementation.** The first mechanism attempted — a
+single element carrying `flex-1` (to claim available height) plus
+`aspect-square`/`w-auto`/`max-width: 100%` (to derive width from that
+height, capped at the column) — does **not** hold a 1:1 square once the
+width ceiling binds. Confirmed live: at 360×770 it rendered a visibly
+stretched 328×423.5px rectangle, not a square, even though every
+class's computed style was individually correct in isolation
+(`aspect-ratio: 1 / 1`, `max-width: 100%`). The browser resolves a flex
+item's main-axis size via `flex-grow` independently of its cross-axis
+`max-width` clamp, and never re-runs the aspect-ratio derivation
+backwards to shrink the already-resolved main size once the cross axis
+gets capped. Plain CSS has no built-in "grow to the smaller of
+available width or height, then stay square" primitive without
+container query **size** units — the standard modern answer to
+precisely this problem, and still real declarative CSS with no JS
+measurement and no `clamp()` magic number, so it fits this ADR's intent
+even though it wasn't the first mechanism proposed (user sign-off,
+CAM-27 implementation interview, on the corrected direction).
+
 ## Decision
 
-The compact table art's box size is computed by native flexbox layout,
-not a fixed token or a hand-tuned `clamp()` expression:
+The compact table art's box is split into two elements and sized via
+container query units, not a fixed token or flex-grow's own cross-axis
+clamping:
 
-- The art's containing block fills whatever height `table-scroll`
-  actually has available (a real flex-grown box, not a capped one).
-- The art itself keeps `aspect-ratio: 1` (the asset is square) with
-  `width: auto` and `max-width: 100%` of its column — the browser's own
-  layout algorithm resolves the tension between "grow to fill height"
-  and "never exceed the viewport's width" without any JS measurement or
-  magic constant.
+- An **outer frame** becomes the real flex item: it claims whatever
+  height `table-scroll` has available (`grow`, full width) and is
+  marked a **size query container** (`container-type: size`).
+  `display: contents` everywhere else (the room screen's `"internal"`
+  path always; the docked composition at `regular`) dissolves it
+  entirely — zero DOM/layout impact, the same idiom `table-scroll`
+  already uses for its own `regular:contents`.
+- An **inner square** (the actual art, disc overlay, and game-over
+  scrim) sizes itself as `width: min(100%, 100cqh)` — never wider than
+  the frame's own width, never taller (via the `100cqh` container-query
+  height unit) than the frame's resolved height — with `aspect-ratio: 1`
+  deriving the matching dimension. This is a plain width-then-
+  aspect-ratio derivation with no flex-grow involved, so it holds
+  regardless of which axis binds.
+- The outer frame also centers the inner square (`flex`,
+  `items-center`, `justify-content: center`) for the case where the
+  square renders shorter than the frame's own flex-grown height (the
+  width ceiling bound first) — turning the leftover into symmetric
+  margin above and below, never a gap pinned above the dock. Neither
+  `table-scroll` nor the `TableSurface` root above ever has leftover
+  space of its own to redistribute (the frame's `grow` always consumes
+  exactly what they leave), so centering has to live on the frame,
+  where the leftover space actually appears.
 - `--size-table-art-compact`'s value becomes a **floor** (`min-width`/
-  `min-height: 158px`), not a cap — preserving CAM-21's one validated
-  reference (360×640) exactly, while removing the upper bound that
-  caused the bug.
-- `table-scroll` centers its content vertically (was top-aligned by
-  default block flow). Because the art is square, height growth is
-  capped by the viewport's width once the two converge — on an unusually
-  tall, narrow viewport there can still be leftover vertical space past
-  that point. Centering turns that leftover into balanced margin above
-  and below the table rather than one dead gap sitting just above the
-  dock.
+  `min-height: 158px` on the inner square), not a cap — preserving
+  CAM-21's 360×640 reference as a lower bound. It is no longer an exact
+  value this task guarantees AT 360×640 specifically: CAM-20's own
+  investigation found ~53–70px of this same unclaimed-slack bug already
+  present at 640px under the old fixed cap ("accepted flex residue"),
+  which this fix closes there too (confirmed live: 293.5×293.5px at
+  360×640, up from the old 158×158px, zero page-level scroll either
+  way) — user call, CAM-27 implementation interview.
+- **A real, reproducible engine quirk, found and fixed during
+  implementation:** a `container-type: size` element whose own size
+  comes from Tailwind's `flex-1` (`flex: 1 1 0%` — a _percentage_
+  flex-basis), nested two flex-grow levels deep (this frame inside the
+  `TableSurface` root, itself flex-grown from `table-scroll`), resolves
+  `cqh` queries in its descendants to `0` — even though the frame's own
+  `getBoundingClientRect()` reports the correct, fully-resolved height.
+  Reproduced in isolation outside this component tree, so it is a
+  genuine browser behavior, not a class-application mistake. Swapping
+  the frame's flex-basis from `0%` to a literal `0px`
+  (`grow basis-[0px]` instead of `flex-1`) — numerically identical,
+  different CSS value _type_ — makes the container correctly report its
+  real size to `cqh` queries. Scoped to this one element only;
+  `table-scroll` and the `TableSurface` root keep the ordinary
+  `flex-1`/`min-h-0` idiom unchanged, since neither of them is itself a
+  `container-type: size` element.
 - Card sizes (`card-lg`/`card-md`/`card-sm`, and therefore `DrawDeck`/
   `DiscardPile`/`HeldCard`/`Hand`) are explicitly **not** part of this
   mechanism and stay pinned at their existing fixed compact values — only
@@ -79,14 +129,19 @@ not a fixed token or a hand-tuned `clamp()` expression:
 
 Alternatives considered:
 
+- **A single element combining `flex-1` + `aspect-square` + `w-auto` +
+  `max-width: 100%`** — rejected: does not stay square once the width
+  ceiling binds (see Context above) — confirmed live, not a theoretical
+  concern.
 - **CSS `clamp()` interpolating between a min and max px value** —
   rejected: requires a hand-tuned magic maximum, which either
   reintroduces a cap (contradicting the "any height, no cutoff" bar this
   task was given) or has to be set implausibly high; also duplicates
-  work flexbox already does for free from the real available space.
+  work the layout engine already computes for free from the real
+  available space.
 - **JS/`ResizeObserver`-measured sizing** — rejected: no precedent
   anywhere in this codebase; adds real indirection for something
-  declarative flex layout already solves. `game-screen.tsx`'s own
+  declarative CSS already solves. `game-screen.tsx`'s own
   Call-Cambio-dock-offset comment already ruled out this approach for a
   similarly-shaped problem, citing the same "no measurement hook exists,
   `window.matchMedia` isn't polyfilled in jsdom" reasoning.
@@ -102,22 +157,34 @@ Alternatives considered:
 ## Consequences
 
 - Easier: any future compact-height edge case in this region is handled
-  by the same flex/aspect-ratio mechanism with zero new magic constants;
+  by the same container-query mechanism with zero new magic constants;
   the 158px token's only remaining job is documenting and enforcing the
   CAM-21 floor, which is easier to reason about than a cap that silently
   stops being correct past one height.
-- Harder: this is the first continuous (non-breakpoint-stepped) real-size
-  mechanism in the codebase — the next person to reach for `clamp()` or
-  a similar technique elsewhere should know this precedent and its
-  reasoning exist here first.
+- Harder: this is the first container-query mechanism in the codebase —
+  the next person to reach for `clamp()`, a plain flex-grow +
+  aspect-ratio attempt, or a similar technique elsewhere should know
+  this precedent, its `cqh`-on-flex-item pitfall, and the
+  `grow basis-[0px]` workaround exist here first, rather than
+  re-discovering the engine quirk from scratch. Introducing a size query
+  container also means one extra wrapping DOM element
+  (`data-region="table-art-frame"`) around the art on the docked
+  composition, dissolved to zero impact everywhere else via
+  `display: contents`.
 - Committed to: the disc/deck/discard/hand proportions look different at
   very tall compact viewports than at 640px (a visibly larger table
   against fixed-size cards) — an accepted, deliberate tradeoff, not a
   latent bug; the width-ceiling/centering behavior described above is
   the intended fallback for viewports where the art can't grow further.
+  The 640px reference viewport itself now renders a bigger table than
+  before this task (293.5px vs. the old 158px) — a deliberate
+  consequence of closing the same class of bug there too, not a
+  regression.
 - Revisit if: card sizes are ever asked to scale in tandem with the
   table art (would need a new fluid card-size mechanism, none exists
-  today), or if the room screen's compact table is ever reported as
-  having its own space-distribution problem (it uses a fundamentally
-  different, non-height-bounded layout and was explicitly out of this
-  decision's scope).
+  today), if the room screen's compact table is ever reported as having
+  its own space-distribution problem (it uses a fundamentally different,
+  non-height-bounded layout and was explicitly out of this decision's
+  scope), or if a future browser update changes the `cqh`-on-percentage-
+  flex-basis behavior this ADR works around (re-test before removing the
+  `basis-[0px]` workaround).

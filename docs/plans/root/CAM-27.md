@@ -3,7 +3,7 @@
 - **Linear:** [CAM-27](https://linear.app/raafayk7/issue/CAM-27/compact-game-screen-flex-residue-leaves-growing-dead-space-above-the)
 - **Scope:** frontend
 - **Child plans:** [frontend](../frontend/CAM-27.md)
-- **ADRs:** [0038](../../adr/0038-compact-table-art-fluid-flex-sizing-not-fixed-token.md) — compact table art sizes fluidly via flex layout, not a fixed pixel token (extends 0035)
+- **ADRs:** [0038](../../adr/0038-compact-table-art-fluid-flex-sizing-not-fixed-token.md) — compact table art sizes fluidly via container-query units, not a fixed pixel token (extends 0035)
 
 > This is a **living document** (ExecPlan-style). The implementer updates
 > Progress, Decision Log, and Surprises as work happens — not at the end.
@@ -34,13 +34,17 @@ overflow-y-auto`, line ~690) → `TableSurface`. `table-scroll` is the
   box that grows past its fixed-size content today.
 - [apps/web/src/components/game/table-surface.tsx](../../../apps/web/src/components/game/table-surface.tsx) —
   renders the table. At compact (`viewerSeat="external"`, the game
-  screen's docked composition), the painted art block (line ~218-221)
-  is capped at `max-w-(--size-table-art-compact)` = a fixed 158px — the
-  one element that actually creates the residue. The root itself carries
-  no `flex-1`/`min-h-0` at compact today (those are `regular:`-scoped
-  only, line ~188) — it just flows at natural content width inside
-  `table-scroll`.
-- [packages/ui/src/styles.css:68-95](../../../packages/ui/src/styles.css) —
+  screen's docked composition), the painted art block was capped at
+  `max-w-(--size-table-art-compact)` = a fixed 158px — the one element
+  that actually created the residue. **As shipped** (revised
+  mid-implementation, see ADR-0038 and this doc's Surprises): the art is
+  now two elements — `data-region="table-art-frame"` (a real flex item,
+  `container-type: size`) wrapping `data-region="table-art"` (the actual
+  square, sized via `width: min(100%, 100cqh)`) — because a single
+  element combining flex-grow with `aspect-square`/`max-width` does not
+  stay square once the width ceiling binds (confirmed live, not just
+  theoretical).
+- [packages/ui/src/styles.css:68-107](../../../packages/ui/src/styles.css) —
   `--size-table-art-compact: 158px`, a bare (non-`@theme`) custom
   property with a long comment documenting its CAM-21/CAM-20 tuning
   history against the 640px reference height. This task turns it from a
@@ -51,7 +55,7 @@ overflow-y-auto`, line ~690) → `TableSurface`. `table-scroll` is the
   container, not pixel constants — they stay correct at any art size.
   Bench-position math (`BENCH_POSITION_CLASS`) is `regular:`-only and
   inert at compact; untouched by this task.
-- Card sizing (`card-lg`/`card-md`/`card-sm`, `packages/ui/src/styles.css:279-297`,
+- Card sizing (`card-lg`/`card-md`/`card-sm`, `packages/ui/src/styles.css:284-307`,
   consumed by `hand.tsx`, `draw-deck.tsx`, `discard-pile.tsx`,
   `held-card.tsx`) is a flat two-step breakpoint jump, decoupled from
   the art's box size (the deck/discard center overlay sizes itself as a
@@ -83,13 +87,19 @@ min-h-0`) — a normal scrollable, width-driven document. Structurally
 ## Functional contract
 
 1. At the compact breakpoint (<720px), on the game screen's docked
-   composition, at the 360×640 reference floor, the table art renders at
-   its existing validated size (158px) and the overall composition is
-   unchanged from today — no regression at the one height CAM-21 ever
-   pinned.
-2. At compact viewport heights above 640px, the table art's rendered box
-   grows to track the additional available height (does not stay pinned
-   at 158px), up to the point described in clause 4.
+   composition, at the 360×640 reference viewport, the table art never
+   renders smaller than 158px (the CAM-21-validated floor) and the layout
+   is otherwise structurally unchanged (same regions, same DOM
+   containment, no page-level scroll). **Amended during implementation
+   (see Decision Log):** the art is NOT pinned to exactly 158px at this
+   height — CAM-20's own investigation found ~53–70px of dead space
+   already present at 640px under the old fixed cap ("accepted flex
+   residue," CAM-21's term), and clause 3 requires that closed too, same
+   as any other compact height. 158px is a floor, never an exact value
+   this task guarantees at any specific height.
+2. At compact viewport heights above the CAM-21 floor, the table art's
+   rendered box grows to track the additional available height (does not
+   stay pinned at any fixed size), up to the point described in clause 4.
 3. At any compact height, no unclaimed dead space appears between the
    table region and the own-hand dock beyond ordinary token-driven gaps
    — the `table-scroll` flex box's rendered content fills the box it
@@ -97,9 +107,14 @@ min-h-0`) — a normal scrollable, width-driven document. Structurally
 4. Once the art's growth would require its width to exceed the available
    column width (a square asset can only grow as far as the narrower of
    the two dimensions allows), further height growth stops; any
-   remaining vertical space in `table-scroll` is distributed as
-   symmetric margin above and below the table content (vertical
-   centering), never as a single gap immediately above the dock.
+   remaining vertical space is distributed as symmetric margin above and
+   below the table content (vertical centering), never as a single gap
+   immediately above the dock. **As shipped:** this centering lives on
+   the art's own flex-grown frame (`data-region="table-art-frame"`), not
+   on `table-scroll` — neither `table-scroll` nor the `TableSurface` root
+   ever has leftover space of its own to redistribute, since the frame's
+   growth always consumes exactly what they leave; the frame is the one
+   element that ends up taller than its own (now width-capped) content.
 5. Card sizes — deck, discard pile, held card, and every hand card — are
    unchanged at compact (`card-lg`/`card-md`, existing fixed values) at
    every height; only the table art (and its disc/center-overlay, which
@@ -112,17 +127,22 @@ min-h-0`) — a normal scrollable, width-driven document. Structurally
    (`regular:flex-1`/`regular:min-h-0`/`regular:max-w-4xl`, CAM-20 M5) is
    byte-identical to today — the existing "fluid regular table (CAM-20
    M5)" test in `game-screen.test.tsx` passes unmodified.
-8. The room screen's compact table (`viewerSeat="internal"`) is
-   byte-identical to today — zero diff to `room-screen.tsx` or the
-   default `TableSurface` rendering path.
+8. The room screen's compact table (`viewerSeat="internal"`) is visually
+   and functionally unaffected — zero diff to `room-screen.tsx` itself.
+   **Amended at review (see Decision Log):** "zero diff to the default
+   `TableSurface` rendering path" overstated it — the shared JSX does
+   gain one new always-present wrapper node (`table-art-frame`) on the
+   internal path too, rendered `display: contents` there (ADR-0038
+   Consequences), which is zero rendered/layout impact but not a
+   byte-identical source diff to that shared path.
 9. `table-geometry.ts`'s bench-position math and `table-geometry.test.ts`
    are unaffected (compact never exercises bench percentages).
 
 ### Acceptance criteria
 
-- [ ] Clauses 1–9 above hold, verified per the Validation section below.
-- [ ] `pnpm turbo build typecheck lint test` passes.
-- [ ] `design-system/components/core/table-surface.md` and
+- [x] Clauses 1–9 above hold, verified per the Validation section below.
+- [x] `pnpm turbo build typecheck lint test` passes.
+- [x] `design-system/components/core/table-surface.md` and
       `design-system/references/tokens.md` carry a new revision entry
       describing the token's cap→floor semantics change (ADR-0027:
       divergence is a defect).
@@ -130,19 +150,20 @@ min-h-0`) — a normal scrollable, width-driven document. Structurally
 ## Plan of work
 
 **M1 — Fluid compact art sizing (ADR-0038).** Replace the compact art's
-fixed `max-w-(--size-table-art-compact)` cap with real flex-driven
-sizing: the art's containing chain gains `flex-1`/`min-h-0` at compact
-(mirroring what already exists at `regular:`) so it can actually receive
-`table-scroll`'s available height; the art itself keeps `aspect-ratio: 1`
-with `width: auto` and a `max-width: 100%` ceiling so the browser's own
-layout resolves the height-vs-width tension with no JS or magic
-constant. `--size-table-art-compact` changes from a max-width cap to a
-`min-width`/`min-height` floor (158px, preserving the CAM-21 reference
-exactly). `table-scroll` becomes vertically centered so any leftover
-past the width ceiling reads as intentional margin. Card sizes, the room
-screen, and every `regular:`-scoped class are untouched. Full detail and
-exact classes are the frontend child plan's job — this milestone's
-constraint is ADR-0038's decision, not a specific diff.
+fixed `max-w-(--size-table-art-compact)` cap with real, container-query-
+driven sizing. **As shipped** (revised mid-implementation — a plain
+flex-grow + `aspect-square` + `max-width` attempt does not hold a square
+once the width ceiling binds, confirmed live, see ADR-0038 and this
+doc's Surprises): the art splits into an outer flex-grown frame
+(`container-type: size`) and an inner square sized as
+`width: min(100%, 100cqh)`, so the browser resolves the height-vs-width
+tension with no JS or magic constant. `--size-table-art-compact` changes
+from a max-width cap to a `min-width`/`min-height` floor (158px,
+preserving the CAM-21 reference as a lower bound — no longer an exact
+value guaranteed AT 640px, see the amended clause 1). The frame
+vertically centers the square so any leftover past the width ceiling
+reads as intentional margin. Card sizes, the room screen, and every
+`regular:`-scoped class are untouched.
 
 **M2 — Structural test coverage.** Add a compact-scoped fluid-sizing
 assertion mirroring the existing regular "fluid table (CAM-20 M5)" test
@@ -179,7 +200,39 @@ ADR-0038 and the ADR index are consistent; run the full gate.
 
 ## Progress
 
-- [ ] 2026-09-07 — plan drafted and approved.
+- [x] 2026-09-07 — plan drafted and approved.
+- [x] 2026-09-07 14:20 — M1 implemented: token role change (styles.css),
+      `table-scroll` real flex column, `TableSurface` root claims compact
+      height, art frame/square split with container-query sizing (revised
+      mechanism, see Surprises). Compile checkpoint green (existing 250
+      web + 25 ui tests unaffected).
+- [x] 2026-09-07 14:45 — M2 implemented: 4 new structural tests in
+      `game-screen.test.tsx` (root flex item, `table-scroll` flex column,
+      art frame as query container, art square sizing/regular restore),
+      plus a no-transform-sweep test for the new frame/square pair. Full
+      suite: 91/91 in the two touched test files, 255 web + 25 ui overall.
+- [x] 2026-09-07 15:10 — M3 rendered verification, live dev server
+      (Postgres + api + web, a real 2-player game): 360×640 (293.5×293.5
+      square, was 158×158, zero page scroll — clause 1 amended, see
+      Decision Log), 1280×900 (607.125×607.125, byte-identical to
+      pre-change code via a stashed A/B comparison), 360×770 and 421×770
+      (328×328 and 389×389, symmetric ~47.7px/~17.3px margins, zero page
+      scroll — the reported bug's dead space is gone), 360×1400 stress
+      case (328×328, symmetric ~362.75px margins). All five: zero
+      page-level scroll (`document.documentElement.scrollHeight ===
+window.innerHeight`).
+- [x] 2026-09-07 15:20 — M4: design-system canon update
+      (`table-surface.md` r7, `tokens.md`), ADR-0038 rewritten to reflect
+      the corrected mechanism. Full gate green:
+      `pnpm turbo build typecheck lint test`, 9/9 tasks, exit 0.
+- [x] 2026-09-08 — Review fix cycle: both findings from the 2026-09-08
+      review resolved (see Outcomes & Retrospective for detail). Fresh
+      (forced, non-cached) verification: `apps/web/test/game-screen.test.tsx` + `table-geometry.test.ts` re-run bare after the rename, 91/91;
+      full `pnpm turbo build typecheck lint test --force`, 25/25 tasks,
+      0 cached, exit 0 (this run also exercised the Postgres-backed
+      `@cambio/api` integration suites fresh, 121/121 — unaffected by
+      this task's diff but confirmed green as part of the same forced
+      run).
 
 ## Decision log
 
@@ -200,11 +253,49 @@ ADR-0038 and the ADR index are consistent; run the full gate.
   (user sign-off, CAM-27 interview r3): meets the ADR bar (new pattern,
   real alternatives considered and rejected, deviates from the
   documented fixed-token convention).
+
+  > **Amended (implementation + review, 2026-09-08):** this entry
+  > describes the ORIGINAL, planning-time decision — superseded by the
+  > mechanism correction entry below ("Corrected the sizing
+  > mechanism..."). Two things about this entry's own wording turned out
+  > wrong once measured live, not just superseded: (1) the
+  > flex/aspect-ratio layout named here does not actually hold a square
+  > (see Surprises, Mechanism failure #1); (2) centering never lived on
+  > `table-scroll` at any point — it lives on the art's own frame
+  > (`data-region="table-art-frame"`), both before and after the
+  > mechanism correction. Kept verbatim above as historical record; do
+  > not cite this entry for current mechanism behavior.
+
 - 2026-09-07 — No arbitrary upper height cutoff — user call (CAM-27
   interview r1): the mechanism itself must scale correctly at any
   compact height, not just up to a chosen device ceiling (CAM-21's own
   360×640 pin was a validated floor, not a design constraint to keep
   reproducing at a new number).
+- 2026-09-07 (implementation, rendered verification) — Clause 1 amended:
+  the art is not pinned to exactly 158px at 360×640 — the live rendered
+  pass measured it at ~293px there, because the reference height itself
+  already had ~53–70px of the same unclaimed-slack bug (CAM-20's own
+  investigation, "accepted flex residue" at the one height CAM-21 ever
+  tested) which clauses 2–4 require closing too, same as any other
+  compact height. The original clause 1 wording ("renders at 158px, no
+  regression") was a planning-time assumption that conflicted with
+  clauses 2–4 once actually measured — jsdom couldn't catch this (no
+  real layout), only the rendered pass could. User call (implementation
+  interview): let the art grow at 640px too rather than special-casing
+  that one height to hold the old (buggy) 158px rendering; 158px is now
+  purely a floor, never an exact value this task guarantees.
+- 2026-09-07 (implementation) — Corrected the sizing mechanism from a
+  single flex-grow/`aspect-square`/`max-width` element to a two-element
+  frame+square split using CSS container query size units
+  (`container-type: size`, `width: min(100%, 100cqh)`) — user sign-off
+  (implementation interview): the first mechanism does not hold a square
+  once the width ceiling binds (confirmed live, not theoretical).
+  ADR-0038 rewritten to describe the corrected mechanism as the actual
+  decision, including a real engine quirk found along the way
+  (`container-type: size` + Tailwind's `flex-1`, a _percentage_
+  flex-basis, nested two flex-grow levels deep, resolves `cqh` to 0 in
+  descendants — fixed by using a literal `0px` basis, `grow basis-[0px]`,
+  instead).
 
 ## Surprises & discoveries
 
@@ -221,7 +312,131 @@ ADR-0038 and the ADR index are consistent; run the full gate.
   but not for pathological aspect ratios (e.g. 360×3000); the
   width-ceiling/vertical-centering fallback (clause 4, ADR-0038) is the
   agreed answer for that edge, not a gap in the fix.
+- **Mechanism failure #1 (caught live, not by jsdom):** the originally
+  planned single-element `flex-1` + `aspect-square` + `w-auto` +
+  `max-w-full` did not hold a square once the width ceiling bound.
+  Measured at 360×770: 328×423.5px, a visibly stretched rectangle, even
+  though `getComputedStyle` confirmed every individual class was
+  correctly applied (`aspect-ratio: 1 / 1`, `max-width: 100%`). The
+  browser resolves a flex item's `flex-grow` main size independently of
+  a later cross-axis `max-width` clamp and never re-derives the main
+  size backward through `aspect-ratio` once that clamp binds. No plain
+  CSS primitive expresses "grow to the smaller of available width or
+  height, then stay square" without container query size units — this
+  became the corrected mechanism (user sign-off), documented as the
+  actual decision in ADR-0038 (the original single-element approach is
+  now listed there as a rejected alternative, with evidence).
+- **Mechanism failure #2 (caught live, root-caused by isolated
+  reproduction):** after splitting into an outer frame
+  (`container-type: size`) and an inner square
+  (`width: min(100%, 100cqh)`), the square still collapsed to its
+  158px floor at 360×770 (should have been 328px). Root-caused by
+  building up isolated test cases directly in the browser: a
+  `container-type: size` element sized via Tailwind's `flex-1`
+  (`flex: 1 1 0%`, a _percentage_ basis) resolves `cqh` queries in its
+  descendants to `0` when that element is ITSELF nested inside another
+  flex-grow layer (exactly this task's structure — the frame sits inside
+  `TableSurface`'s root, itself flex-grown from `table-scroll`) — even
+  though the frame's own `getBoundingClientRect()` reports the correct
+  height throughout. Reproduced with a synthetic two-level flex-grow
+  chain outside this component tree, confirming a genuine, reproducible
+  engine behavior rather than a mistake in this file's classes. Fixed by
+  using a literal `0px` flex-basis (`grow basis-[0px]`) instead of
+  Tailwind's `flex-1` on the frame only — numerically identical, but the
+  container then reports its real size to `cqh` queries correctly.
+  Neither `table-scroll` nor the `TableSurface` root needed this
+  change, since neither of them is itself a `container-type: size`
+  element.
 
 ## Outcomes & retrospective
 
-_(filled by `/review`)_
+**Verdict: fix-then-ship** (2026-09-08 review) → **ship** (2026-09-08,
+after the fix cycle below closed both findings).
+
+**What passed:** both the contract and architecture reviewers independently
+confirmed the shipped mechanism (frame + container-query square) is
+functionally correct and internally consistent — all 9 functional-contract
+clauses satisfied (clause 1 graded against its amended wording). Architecture
+review: clean — no import-boundary, projection-renderer, layering, or ADR-
+process violations; the one judgment call (arbitrary-value CSS for a layout
+mechanism vs. a design-system token) resolves correctly by existing
+precedent in the same file. Gate re-run fresh (forced, not cached) by the
+orchestrator: `pnpm turbo test --filter @cambio/web --filter @cambio/ui
+--force`, 0 cached of 3 tasks, 255 web tests + 25 ui tests green, exit 0;
+`lint --force` independently re-run by the architecture reviewer, exit 0.
+No hidden-information surface (pure CSS/layout, N/A). No scope creep.
+
+**Findings (all documentation/comment staleness — no functional defects,
+nothing here changed behavior):**
+
+1. **RESOLVED (fix cycle, 2026-09-08) — Clause 8 / coverage-table wording
+   overstated "zero diff."** Root plan clause 8 said "zero diff to
+   `room-screen.tsx` or the default `TableSurface` rendering path"; the
+   frontend plan's coverage table row 8 said "the TableSurface
+   internal-path branches are absent from the final changeset." Both were
+   imprecise: `table-surface.tsx`'s new `data-region="table-art-frame"`
+   wrapper div is rendered **unconditionally** for both `viewerSeat`
+   branches (`"internal"` just gets `className="contents"` instead of the
+   real flex/container-query classes) — the room screen's shared code path
+   DOES gain one new DOM node with two new `data-region` attributes it
+   didn't have before. `display: contents` makes this genuinely zero
+   VISUAL/layout impact (confirmed: `room-screen.test.tsx` uses
+   `.closest()`, depth-independent, so nothing broke), and ADR-0038's own
+   Consequences section already disclosed this exact tradeoff accurately —
+   only the root plan's clause 8 and the frontend plan's coverage row 8
+   overstated it as literally "zero diff." **Branch taken: claim amended**
+   (the claim itself was wrong, not a test-coverage gap) — both instances
+   now say "visually and functionally unaffected... zero diff to
+   `room-screen.tsx` itself," with an explicit note that the shared
+   `TableSurface` JSX gains one new always-present, `display:contents`
+   wrapper node, pointing at ADR-0038's Consequences for detail.
+2. **RESOLVED (fix cycle, 2026-09-08) — Stale mechanism description (5
+   instances)** — the REJECTED first mechanism (single-element
+   `flex-1`/`aspect-square`/`w-auto`/`max-w-full`) was still described as
+   the shipped answer in places the mid-implementation correction's sweep
+   missed:
+   - `packages/ui/src/styles.css:103-104` — a comment in the shipped source
+     file itself: _"The art block now sizes fluidly via real flexbox layout
+     (`flex-1`, `aspect-square`, `w-auto`, `max-w-full` — table-surface.tsx)"_.
+     **Fixed:** rewritten to describe the frame+square/container-query
+     mechanism.
+   - `apps/web/test/game-screen.test.tsx:2160-2162` — the block comment above
+     `describe("fluid compact table (CAM-27 M2)"`: _"the table art now grows
+     via flex/aspect-ratio instead of a fixed max-width cap"_. **Fixed:**
+     rewritten.
+   - `apps/web/test/game-screen.test.tsx:2268` — the test's own title:
+     _"...now that it sizes via flex/aspect-ratio (ADR-0035)"_. **Fixed:**
+     renamed to "...now that it sizes via container query units
+     (ADR-0035)" — a pure rename, zero behavior change, re-verified green
+     (91/91 in the two touched test files after the rename).
+   - `docs/plans/root/CAM-27.md` Decision Log (the original 2026-09-07
+     entry describing the pre-correction decision) — _"Compact table art
+     sizes via native flex/aspect-ratio layout... and `table-scroll`
+     vertically centering to absorb any residual past the width ceiling"_ —
+     doubly stale: wrong mechanism, AND centering actually lives on the art
+     frame, never on `table-scroll`. **Fixed via inline amendment**, not a
+     rewrite (Decision Log entries are historical record): the original
+     sentence is kept verbatim, followed by a blockquoted "Amended
+     (implementation + review, 2026-09-08)" note naming both inaccuracies
+     and pointing at the later correction entries and the Surprises
+     section.
+   - `docs/plans/frontend/CAM-27.md` coverage table row 6 ("Test" column) —
+     quoted the stale test title verbatim. **Fixed:** citation updated to
+     the renamed test title.
+
+   Sweep re-run after fixing (not just the 5 listed instances — the same
+   grep patterns across every touched doc and source file) confirmed no
+   further live instances remain; the only remaining matches are inside
+   this retrospective's own quotes of the original stale text and inside
+   the Decision Log entry's preserved-verbatim historical sentence, both
+   intentional.
+
+Both findings were direct instances of the "divergence is a defect" rule
+(AGENTS.md/ADR-0027) already governing this task's own token-comment
+discipline. Neither blocked the mechanism's correctness. Post-fix
+verification: `apps/web/test/game-screen.test.tsx` + `table-geometry.test.ts`
+bare re-run, 91/91; full `pnpm turbo build typecheck lint test --force`,
+25/25 tasks, 0 cached, exit 0 (including a fresh, Postgres-backed
+`@cambio/api` run, 121/121, unaffected by this task's diff).
+
+**Verdict flipped to ship** (2026-09-08, post-fix-cycle re-review).

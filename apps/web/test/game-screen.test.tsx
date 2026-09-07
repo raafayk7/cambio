@@ -2157,6 +2157,135 @@ describe("fluid regular table (CAM-20 M5)", () => {
   })
 })
 
+// ---- CAM-27/ADR-0038: the fluid COMPACT table (clauses 1-4), the same
+// scoping pins as the regular table above but one breakpoint over — the
+// table art now grows via a flex-grown frame (container-type: size)
+// wrapping a container-query-sized square, instead of a fixed max-width
+// cap (a single element combining flex-grow with aspect-ratio/max-width
+// does not hold a square once the width ceiling binds — confirmed live,
+// ADR-0038). Real pixel/fit claims are rendered-path evidence (ADR-0030 —
+// jsdom computes no layout); these are the structural pins that would
+// catch a REGRESSION even though they can't themselves prove the
+// rendered outcome — see docs/plans/frontend/CAM-27.md's Progress for
+// the measured numbers. -----------------------------------------------
+
+describe("fluid compact table (CAM-27 M2)", () => {
+  it("makes TableSurface's root a real flex item, at compact (flex-1, min-h-0)", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const opponentSeatWrapper = screen.getByText(FRIEND.name).closest("[data-seat-index]")
+    const tableSurfaceRoot = opponentSeatWrapper?.closest("[data-state]")
+    expect(tableSurfaceRoot).not.toBeNull()
+    const className = tableSurfaceRoot?.className ?? ""
+    expect(className).toMatch(/(^|\s)flex-1(\s|$)/)
+    expect(className).toMatch(/(^|\s)min-h-0(\s|$)/)
+    // The root never has its own leftover space to redistribute (the art
+    // frame's `grow` always consumes exactly what it leaves) — centering
+    // the square once ITS width ceiling binds is the frame's job, not the
+    // root's (see the "frames the table art" test below).
+    expect(className).not.toMatch(/(^|\s)justify-center(\s|$)/)
+  })
+
+  it("makes table-scroll a real flex column, so the root above can claim its height (CAM-27 — was a plain block box)", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const tableScroll = document.querySelector('[data-region="table-scroll"]')
+    expect(tableScroll).not.toBeNull()
+    const className = tableScroll?.className ?? ""
+    expect(className).toMatch(/(^|\s)flex(\s|$)/)
+    expect(className).toContain("flex-col")
+    expect(className).toContain("regular:contents")
+  })
+
+  it("frames the table art as a size query container at compact, dissolved everywhere else (CAM-27, revised)", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const frame = document.querySelector('[data-region="table-art-frame"]')
+    expect(frame).not.toBeNull()
+    const className = frame?.className ?? ""
+    // A single flex-1/aspect-ratio/max-width element does not stay square
+    // once the width ceiling binds (confirmed live — see the plan's
+    // Surprises); the frame instead becomes a real flex item AND a size
+    // query container so the square below can read its resolved box.
+    // `grow basis-[0px]`, NOT `flex-1` (`flex: 1 1 0%`) — a percentage
+    // flex-basis on a `container-type: size` element nested two flex-grow
+    // levels deep resolves `cqh` queries to 0 in this browser (confirmed
+    // live); a literal `0px` basis does not have this problem.
+    expect(className).toMatch(/(^|\s)grow(\s|$)/)
+    expect(className).toContain("basis-[0px]")
+    expect(className).not.toMatch(/(^|\s)flex-1(\s|$)/)
+    expect(className).toMatch(/(^|\s)min-h-0(\s|$)/)
+    expect(className).toContain("[container-type:size]")
+    expect(className).toContain("regular:contents")
+    // The frame centers the square once its own width ceiling binds and
+    // it renders shorter than the frame's full flex-grown height — a
+    // plain block child would otherwise sit top-aligned, leaving the
+    // leftover as one gap below it instead of symmetric margin (clause 4).
+    expect(className).toMatch(/(^|\s)flex(\s|$)/)
+    expect(className).toContain("items-center")
+    expect(className).toMatch(/(^|\s)justify-center(\s|$)/)
+  })
+
+  it("grows the table art to the biggest square that fits its frame, via container query units, floored (not capped) at the token, and restores today's w-3/4 sizing at regular", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const tableArt = document.querySelector('[data-region="table-art"]')
+    expect(tableArt).not.toBeNull()
+    const className = tableArt?.className ?? ""
+    // The old fixed cap is gone; the token is now a floor, not a cap.
+    expect(className).not.toContain("max-w-(--size-table-art-compact)")
+    expect(className).toContain("min-w-(--size-table-art-compact)")
+    expect(className).toContain("min-h-(--size-table-art-compact)")
+    // Real CSS sizing via container query units, not a magic clamp() or
+    // JS/ResizeObserver measurement — width is the min of the frame's own
+    // width and its resolved height (`100cqh`), aspect-ratio derives
+    // height from that, so the square holds regardless of which
+    // dimension binds (unlike a plain flex-grow + aspect-ratio + max-
+    // width attempt on one element, which does NOT self-correct).
+    expect(className).toContain("aspect-square")
+    expect(className).toContain("w-[min(100%,100cqh)]")
+    // Regular restores the pre-CAM-27 width-driven sizing byte-for-byte —
+    // the load-bearing companion edit this task's own plan flagged: this
+    // element's `w-3/4` had no existing `regular:w-*` twin before this
+    // change, so regular silently depended on the same unprefixed value
+    // this task had to repurpose for compact.
+    expect(className).toContain("regular:w-3/4")
+    expect(className).toContain("regular:aspect-auto")
+  })
+
+  it("still carries no scale-or-rotate transform above the table art now that it sizes via container query units (ADR-0035)", async () => {
+    const fake = setupFake()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    const tableArt = document.querySelector('[data-region="table-art"]')
+    expect(tableArt).not.toBeNull()
+    for (let node: Element | null = tableArt; node !== null; node = node.parentElement) {
+      expect(node.className).not.toMatch(/(^|\s|:)-?(scale|rotate)-/)
+      expect(node.className).not.toMatch(/transform-\[/)
+      expect((node as HTMLElement).style.transform ?? "").toBe("")
+    }
+  })
+})
+
 // ---- CAM-20 design-gate fix cycle: the Judge's accidental findings at the
 // regular (1280×900) and compact (360×640) reference viewports. Real pixel
 // claims are rendered-path evidence (ADR-0030 — jsdom computes no layout);
