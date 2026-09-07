@@ -130,9 +130,13 @@ After this task, `node .agents/scripts/fill-coverage-row.mjs <plan.md> <CLAUSE> 
       fills correctly.
 - [x] `pnpm turbo build typecheck lint test` passes — 19/19 tasks green,
       including the repo-wide `//:format:check` (prettier) leg.
-- [ ] Close-out: merge-down `main` → `development` → `release-v0` completed,
-      and a fresh session on `release-v0` can run the script against a
-      3-column table without corruption (ADR-0028 close-out requirement).
+- [x] Close-out: merge-down `main` → `development` → `release-v0` completed
+      (`development` fast-forwarded to `main` @ 53d29d4; `release-v0` merged
+      `development` in at 511b91f, no conflicts — the file was untouched on
+      the release side, consistent with the guard-rail check), and a fresh
+      checkout of `release-v0` ran `fill-coverage-row.test.mjs`
+      (`✓ ALL PASS — 14 passed, 0 failed`) plus a manual 3-column repro with
+      no corruption (ADR-0028 close-out requirement).
 
 ## Plan of work
 
@@ -245,6 +249,21 @@ timestamp each entry)_
 - [x] 2026-09-07 06:39 — Re-ran the full gate fresh:
       `pnpm turbo build typecheck lint test --force` → 19/19 tasks green, 0
       cached.
+- [x] 2026-09-07 11:38 — **`/ship` close-out:** merge-down performed.
+      `development` fast-forwarded to `main`@53d29d4 (`git merge origin/main
+--ff-only`, clean — `development` had no commits `main` lacked), then
+      `release-v0` merged `development` in as a real merge commit (511b91f
+      — `release-v0` has substantial task-work history `development`
+      lacks, so this wasn't a fast-forward; no conflicts, since the merged
+      files were untouched on the release side). Both pushed. Fresh-session
+      smoke test on the resulting `release-v0` checkout: `node
+.agents/scripts/fill-coverage-row.test.mjs` → `✓ ALL PASS — 14 passed,
+0 failed`; manual repro against a real 3-column table on `release-v0`
+      produced a correct 3-cell row, no corruption. Related-issue sweep
+      (CAM-3/4/5/6/8/10/14/20, all "related to" CAM-28): all already
+      Development Done; no stale forward-looking briefs found — they
+      reference the pre-fix script only as historical context, not as a
+      premise this task's fix contradicts.
 
 ## Decision log
 
