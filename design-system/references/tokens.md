@@ -124,13 +124,19 @@ as digital, not print.
   the M5 rendered pass for fold budget, then CAM-20's design-gate pass
   raised it back to `158px`, a newly re-measured value rather than a
   revert, once `128px` was found to leave the deck+discard pair
-  effectively flush against the tabletop disc — see table-surface.md r6):
-  the compact-only max-width cap on the table art — square asset, so it's
-  also the height cap. The cap (like the surface's tightened root gap)
-  belongs to the game screen's DOCKED composition only
-  (`viewerSeat="external"`, table-surface.md r4 as amended at review) —
-  the room screen's default path keeps the uncapped `w-3/4` art and
-  `gap-4`.
+  effectively flush against the tabletop disc — see table-surface.md r6.
+  **CAM-27/ADR-0038 (r7): the value's role changed from a max-width CAP
+  to a `min-width`/`min-height` FLOOR** — the number itself is
+  untouched, but the table art now sizes fluidly via container-query
+  units (`width: min(100%, 100cqh)` on a `container-type: size` frame,
+  table-surface.md r7) and never renders smaller than this floor,
+  growing with available height at every taller compact viewport
+  instead of staying pinned): the compact-only minimum size of the table
+  art — square asset, so it's also the height floor. It (like the
+  surface's tightened root gap) belongs to the game screen's DOCKED
+  composition only (`viewerSeat="external"`, table-surface.md r4 as
+  amended at review) — the room screen's default path keeps the
+  uncapped `w-3/4` art and `gap-4`.
 - `card-frame` (the shared card/slot footprint utility — `playing-card.md`,
   `hand.md`): `width: --card-width`, `aspect-ratio: 5 / 7` — the playing-card
   proportion — plus `radius.card`. `card-frame-rotated` (CAM-20,

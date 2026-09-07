@@ -5,7 +5,7 @@ import tableArt from "../../assets/table-top.webp"
 import { benchAssignment, type Bench, TABLE_DISC_FRACTION } from "./table-geometry.js"
 
 /**
- * TableSurface — design-system/components/core/table-surface.md (r6).
+ * TableSurface — design-system/components/core/table-surface.md (r7).
  * Class: Game object.
  *
  * The top-down khoka table: the moodboard's own painted asset (a
@@ -169,23 +169,32 @@ export function TableSurface({
         // absolutely-positions every child, so flow gap never applies there.
         viewerSeat === "external" ? "gap-2" : "gap-4",
         "regular:mx-auto regular:aspect-square",
-        // Fluid table (ADR-0036 decision 6, clause 9), scoped to the
+        // Fluid table (ADR-0036 decision 6, clause 9 at regular; CAM-27/
+        // ADR-0038 extends the same idea to COMPACT), scoped to the
         // DOCKED composition only — the room screen's default `"internal"`
         // path keeps the pre-CAM-20 WIDTH-driven sizing (`w-full` inherited
         // from the unprefixed class above, capped `max-w-2xl`) byte-for-
         // byte (the CAM-21 review-F1 scope-guard lesson). `"external"`
-        // instead makes the square a flex item of its parent (`table-root`,
-        // game-screen.tsx) and lets HEIGHT drive it: `flex-1 min-h-0`
-        // claims whatever vertical space the bounded stage leaves after
-        // the pinned chrome/dock, `w-auto` cancels the unprefixed `w-full`
-        // so `aspect-square` computes width FROM that height instead of
-        // the other way around, and `max-w-4xl` (an enumerated scale step,
-        // not a new token) caps it — CSS transfers the clamp back through
+        // instead makes this root a flex item of its parent (`table-scroll`,
+        // game-screen.tsx, itself a real flex column since CAM-27) and lets
+        // HEIGHT drive it: unprefixed `flex-1 min-h-0` claims whatever
+        // vertical space the bounded stage leaves after the pinned
+        // chrome/dock at COMPACT too (was regular-only before CAM-27) —
+        // the art FRAME below (not this root) is what actually turns the
+        // remainder, after the in-flow opponent row above it, into a
+        // square; this root has no leftover space of its own to
+        // redistribute (the frame's `grow` always consumes exactly what's
+        // left), so it carries no `justify-center` of its own — that job
+        // belongs to the frame, which centers the square within ITS OWN
+        // box once the square's width ceiling binds (ADR-0038 clause 4).
+        // At REGULAR, `w-auto`/`max-w-4xl` (an enumerated scale step, not
+        // a new token) still do the same job `flex-1`/`min-h-0` do at
+        // compact, one level up: CSS transfers the clamp back through
         // `aspect-ratio` when it binds, so the square respects whichever
         // axis is smaller. No `transform: scale` enters the chain
         // (ADR-0035); this is real CSS sizing only.
         viewerSeat === "external"
-          ? "regular:w-auto regular:flex-1 regular:min-h-0 regular:max-w-4xl"
+          ? "flex-1 min-h-0 regular:w-auto regular:flex-1 regular:min-h-0 regular:max-w-4xl"
           : "regular:block regular:max-w-2xl",
         className,
       )}
@@ -208,37 +217,110 @@ export function TableSurface({
       </div>
 
       {/* The painted table + benches (shadows baked into the asset);
-          center content and scrim overlay the tabletop disc only. */}
+          center content and scrim overlay the tabletop disc only.
+          CAM-27/ADR-0038 (revised mid-implementation — see the plan's
+          Decision Log and Surprises): split into an OUTER frame + an
+          INNER square. A single element carrying `flex-1` (main-axis
+          growth) AND `aspect-square`/`max-width` (cross-axis cap) does
+          NOT stay square once the width ceiling binds — confirmed live
+          (360×770 rendered 328×423.5px, visibly stretched) — because
+          flex-grow resolves the main size independently and is never
+          corrected back down by a later cross-axis clamp. Plain CSS has
+          no "grow to the smaller of available width or height" primitive
+          without container query SIZE units, so the OUTER frame becomes
+          a size query container and the INNER square reads its resolved
+          box back via `cqh` — real declarative CSS, still no JS
+          measurement, still no clamp() magic number. */}
       <div
-        // CAM-21: the DOCKED composition caps the art at a token max-width
-        // at compact (the asset is square, so this is also the height cap —
-        // root plan fold budget); regular cancels the cap and keeps today's
-        // w-3/4-of-aspect-square sizing untouched (clause 10). The default
-        // (room screen) path takes no cap at all (review F1 — clause 9).
-        className={cn(
-          "relative w-3/4 regular:absolute regular:top-1/2 regular:left-1/2 regular:-translate-x-1/2 regular:-translate-y-1/2",
-          viewerSeat === "external" && "max-w-(--size-table-art-compact) regular:max-w-none",
-        )}
+        data-region="table-art-frame"
+        // OUTER: at compact/external, a real flex item that claims
+        // table-root's available height and full available width,
+        // marked `[container-type:size]` so the INNER square below can
+        // query it. `display:contents` everywhere else (internal always;
+        // external at regular) dissolves this wrapper entirely — zero
+        // DOM/layout impact, matching `table-scroll`'s own
+        // `regular:contents` idiom. Must NOT default to `contents` for
+        // the external/compact case — that would remove it from
+        // flex-item participation and defeat the growth — so the two
+        // branches are fully separate class lists, not a shared base
+        // plus an override.
+        //
+        // `grow basis-[0px]` (NOT Tailwind's `flex-1`, which is
+        // `flex: 1 1 0%`) — a real, reproducible engine quirk (confirmed
+        // live, CAM-27 rendered pass): a `container-type: size` element
+        // whose own size comes from a PERCENTAGE (`0%`) flex-basis,
+        // nested two flex-grow levels deep (this frame inside
+        // TableSurface's root, itself flex-grown from `table-scroll`),
+        // resolves `cqh` queries in its descendants to 0 — even though
+        // the frame's own `getBoundingClientRect()` reports the correct,
+        // fully-resolved height. Swapping the basis from `0%` to a
+        // literal `0px` (identical numeric result, different value type)
+        // makes the container correctly report its real size to `cqh`
+        // queries. Scoped to this ONE element — `table-scroll` and the
+        // `TableSurface` root above keep the ordinary `flex-1`/`min-h-0`
+        // idiom unchanged, since neither of them is itself a
+        // `container-type: size` element.
+        //
+        // `flex items-center justify-center`: the frame itself, not its
+        // parent, is what centers the square once the square's OWN width
+        // ceiling binds and it renders smaller than the frame's full
+        // height (ADR-0038 clause 4) — the square is a plain block child
+        // here, and `table-scroll`/the `TableSurface` root above never
+        // have any leftover space of their own to redistribute (the
+        // frame's `grow` always consumes exactly what they leave), so
+        // centering has to live on the one element that actually ends up
+        // taller than its own content.
+        className={
+          viewerSeat === "external"
+            ? "flex grow basis-[0px] min-h-0 w-full items-center justify-center [container-type:size] regular:contents"
+            : "contents"
+        }
       >
-        <img src={tableArt} alt="" aria-hidden className="block h-auto w-full" />
         <div
-          className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
-          // TABLE_DISC_PCT is spec-carried geometry from table-geometry.ts
-          // (measured from the asset's alpha channel), not an arbitrary
-          // value — a genuinely dynamic-looking style, documented per the
-          // CAM-17 inline-style advisory.
-          style={{ width: TABLE_DISC_PCT, aspectRatio: "1" }}
+          data-region="table-art"
+          // INNER: the actual square. At compact/external,
+          // `w-[min(100%,100cqh)]` is the true "biggest square that fits
+          // the OUTER frame" — 100% never exceeds the frame's own width,
+          // 100cqh never exceeds its resolved height (read via container
+          // query units off the OUTER frame), and `aspect-square` derives
+          // height from whichever of the two `min()` picked — a plain
+          // width-then-aspect-ratio derivation, no flex-grow involved, so
+          // the square holds regardless of which dimension binds.
+          // `min-w`/`min-h` at the token floor preserve the CAM-21
+          // 360×640 reference (158px — now a floor, not a cap, and no
+          // longer a value this task guarantees exactly AT 640px, see the
+          // root plan's amended clause 1). Regular restores today's
+          // `w-3/4`-of-square-root sizing byte-for-byte (clause 7). The
+          // default (room screen, `"internal"`) path takes no cap or
+          // fluid sizing at all (review F1 — clause 9), keeping its
+          // unconditional `w-3/4`.
+          className={cn(
+            "relative regular:absolute regular:top-1/2 regular:left-1/2 regular:-translate-x-1/2 regular:-translate-y-1/2",
+            viewerSeat === "external"
+              ? "aspect-square w-[min(100%,100cqh)] min-w-(--size-table-art-compact) min-h-(--size-table-art-compact) regular:aspect-auto regular:w-3/4 regular:min-w-0 regular:min-h-auto"
+              : "w-3/4",
+          )}
         >
-          {center}
-        </div>
-        {state === "game-over" ? (
+          <img src={tableArt} alt="" aria-hidden className="block h-auto w-full" />
           <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-(--green-deep)/55"
-            // Same spec-carried disc size as the center overlay above —
-            // the scrim covers exactly the tabletop, not the whole asset.
+            className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center"
+            // TABLE_DISC_PCT is spec-carried geometry from table-geometry.ts
+            // (measured from the asset's alpha channel), not an arbitrary
+            // value — a genuinely dynamic-looking style, documented per the
+            // CAM-17 inline-style advisory.
             style={{ width: TABLE_DISC_PCT, aspectRatio: "1" }}
-          />
-        ) : null}
+          >
+            {center}
+          </div>
+          {state === "game-over" ? (
+            <div
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-(--green-deep)/55"
+              // Same spec-carried disc size as the center overlay above —
+              // the scrim covers exactly the tabletop, not the whole asset.
+              style={{ width: TABLE_DISC_PCT, aspectRatio: "1" }}
+            />
+          ) : null}
+        </div>
       </div>
 
       {seats.length > 0 && viewerSeat === "internal" ? seatWrapper(viewerSeatIndex) : null}

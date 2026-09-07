@@ -1,6 +1,6 @@
 name: table-surface
 status: draft
-version: 6
+version: 7
 extends: none
 
 The play surface — the top-down khoka table. Class: **Game object**.
@@ -25,13 +25,16 @@ The play surface — the top-down khoka table. Class: **Game object**.
   output.
 - The viewer's own seat is always at the bottom bench; the bench
   assignment rotates per viewer, never the table art itself.
-- Compact art cap (CAM-21, docked composition only): under
-  `viewerSeat="external"` the painted table asset's width is capped at a
-  token max-width (`--size-table-art-compact`, tokens.md) so the whole
-  composition fits the 360×640 fold — square asset, so the cap is also the
-  height cap. Regular is unaffected (the cap is cancelled there), and the
-  default `"internal"` path (the room screen) takes no cap at all (review
-  F1).
+- Compact art sizing (CAM-21, revised r7/ADR-0038, docked composition
+  only): under `viewerSeat="external"` the painted table asset sizes
+  fluidly via container-query units — never smaller than a token
+  minimum (`--size-table-art-compact`, tokens.md), the 360×640 fold
+  reference — and grows with available height at any taller compact
+  viewport, capped only by the column's own width (square asset, so
+  the floor and the width ceiling both apply to both dimensions
+  equally). Regular is unaffected (fluid sizing is cancelled there),
+  and the default `"internal"` path (the room screen) takes no floor or
+  fluid sizing at all (review F1).
 
 ## States
 
@@ -170,3 +173,28 @@ None.
   documentation, not this file's own anatomy) — noted here only because
   it was a direct consequence of (1)'s undersized disc; regular is
   unaffected by any of the three.
+- r7 (CAM-27, ADR-0038, 2026-09-07): the docked composition's art
+  (`viewerSeat="external"` only) sizes fluidly instead of a fixed
+  max-width cap. At any compact height above the CAM-21 360×640
+  reference, `table-scroll`'s flex box was growing past the fixed
+  158px art, leaving a growing dead band above the own-hand dock
+  (CAM-27) — the same mechanism CAM-20's investigation had already
+  found a smaller (~53–70px) instance of at 640px itself, tolerated as
+  "accepted flex residue." The art now splits into two elements: a flex
+  item wrapping frame (`container-type: size`) and an inner square
+  (`width: min(100%, 100cqh)`, a container-query expression of "the
+  smaller of the frame's available width or height") — `--size-table-
+art-compact` (158px) becomes a `min-width`/`min-height` FLOOR on the
+  square rather than a cap (tokens.md). The frame centers the square
+  once its width ceiling binds and it renders shorter than the frame's
+  full flex-grown height, turning any leftover into symmetric margin
+  instead of a gap pinned above the dock. Card sizes and the room
+  screen's default (`"internal"`) path are unaffected. Measured live:
+  360×640 now renders the art at 293.5×293.5px (up from 158×158px,
+  since the pre-existing baseline residue closes too) with zero
+  page-level scroll; 1280×900 regular is byte-identical to pre-change
+  code (confirmed via a stashed A/B comparison); 360×770 and 421×770
+  (CAM-27's reported bug) render 328×328px and 389×389px respectively
+  with symmetric margins and zero page-level scroll; a 360×1400 stress
+  case renders 328×328px (the width ceiling) with symmetric ~362.75px
+  margins, still zero page-level scroll.
