@@ -1,0 +1,123 @@
+# 0038 — Compact table art sizes fluidly via flex layout, not a fixed pixel token
+
+- **Status:** proposed
+- **Date:** 2026-09-07
+- **Task:** CAM-27
+
+## Context
+
+CAM-21 fit the compact (<720px) game screen to one validated viewport
+(360×640) by giving the middle table region a flex chain
+(`table-root` → `table-scroll`, both `flex-1 min-h-0`) and capping the
+painted table art's box at a fixed pixel token,
+`--size-table-art-compact: 158px` (`packages/ui/src/styles.css`),
+hand-tuned against that one height's fold budget (deck+discard
+clearance around the disc, opponent wrap, own-hand dock).
+
+That fixed cap does not grow with the viewport. At any compact height
+above 640px, `table-scroll`'s `flex-1` box keeps growing to fill the
+screen wrapper's `max-h-dvh` bound, but the art inside it stays pinned
+at 158px — the surplus renders as a non-scrolling, visually dead band
+between the table and the own-hand dock, scaling roughly 1:1 with
+excess height (CAM-27; first observed as a CAM-20 investigation
+byproduct, confirmed byte-identical to `release-v0`, not a regression).
+
+ADR-0035 already established the governing philosophy for this region
+("real CSS sizes driven by tokens", `transform: scale()` prohibited on
+any ancestor of the flight-measurement root) and confirmed that a real
+(non-transform) size change to an element inside `tableRoot` introduces
+no FLIP-math hazard — `getBoundingClientRect` reports the new true box
+correctly regardless of what pixel value it currently holds. What 0035
+left unresolved is _how_ a token-driven size should behave across the
+open-ended range of compact heights above 640px; a single fixed pixel
+value cannot.
+
+A repo-wide sweep (CAM-27 exploration) found no existing precedent for
+continuous, non-breakpoint-stepped real-CSS sizing anywhere in this
+codebase: no `clamp()`/`min()`/`max()` used as a sizing function, no
+container queries, no `ResizeObserver`- or `useLayoutEffect`-based
+measurement hooks. `card-lg`/`card-md`/`card-sm` and every other
+compact/regular size in this area are a flat two-step jump at the
+`regular` breakpoint, not a continuous function of height.
+
+## Decision
+
+The compact table art's box size is computed by native flexbox layout,
+not a fixed token or a hand-tuned `clamp()` expression:
+
+- The art's containing block fills whatever height `table-scroll`
+  actually has available (a real flex-grown box, not a capped one).
+- The art itself keeps `aspect-ratio: 1` (the asset is square) with
+  `width: auto` and `max-width: 100%` of its column — the browser's own
+  layout algorithm resolves the tension between "grow to fill height"
+  and "never exceed the viewport's width" without any JS measurement or
+  magic constant.
+- `--size-table-art-compact`'s value becomes a **floor** (`min-width`/
+  `min-height: 158px`), not a cap — preserving CAM-21's one validated
+  reference (360×640) exactly, while removing the upper bound that
+  caused the bug.
+- `table-scroll` centers its content vertically (was top-aligned by
+  default block flow). Because the art is square, height growth is
+  capped by the viewport's width once the two converge — on an unusually
+  tall, narrow viewport there can still be leftover vertical space past
+  that point. Centering turns that leftover into balanced margin above
+  and below the table rather than one dead gap sitting just above the
+  dock.
+- Card sizes (`card-lg`/`card-md`/`card-sm`, and therefore `DrawDeck`/
+  `DiscardPile`/`HeldCard`/`Hand`) are explicitly **not** part of this
+  mechanism and stay pinned at their existing fixed compact values — only
+  the table art (and the disc/center-overlay that already sizes itself
+  as a percentage of the art's own rendered box, `TABLE_DISC_PCT`) grows.
+  User call (CAM-27 interview): simpler, no new fluid card-size token
+  work, and mirrors that a bigger table doesn't make physical playing
+  cards bigger.
+- Scope: the game screen's docked composition (`viewerSeat="external"`)
+  only. The room screen's pre-game table (`viewerSeat="internal"`) is
+  not inside any height-bounded flex chain — it is a normal scrollable,
+  width-driven document — and is structurally incapable of this bug, so
+  it is explicitly left untouched (user call, CAM-27 interview).
+
+Alternatives considered:
+
+- **CSS `clamp()` interpolating between a min and max px value** —
+  rejected: requires a hand-tuned magic maximum, which either
+  reintroduces a cap (contradicting the "any height, no cutoff" bar this
+  task was given) or has to be set implausibly high; also duplicates
+  work flexbox already does for free from the real available space.
+- **JS/`ResizeObserver`-measured sizing** — rejected: no precedent
+  anywhere in this codebase; adds real indirection for something
+  declarative flex layout already solves. `game-screen.tsx`'s own
+  Call-Cambio-dock-offset comment already ruled out this approach for a
+  similarly-shaped problem, citing the same "no measurement hook exists,
+  `window.matchMedia` isn't polyfilled in jsdom" reasoning.
+- **Bump the fixed token to a larger fixed pixel value** — rejected:
+  does not scale continuously; only moves the height threshold at which
+  the exact same bug reappears.
+- **Let the middle region scroll instead of filling** — rejected: 0035
+  already rejected scrolling as the compact game screen's default-state
+  answer (it survives only as below-floor overflow degradation); reusing
+  it here would trade a visible dead gap for an invisible one behind a
+  non-obvious scroll affordance — the same symptom, better hidden.
+
+## Consequences
+
+- Easier: any future compact-height edge case in this region is handled
+  by the same flex/aspect-ratio mechanism with zero new magic constants;
+  the 158px token's only remaining job is documenting and enforcing the
+  CAM-21 floor, which is easier to reason about than a cap that silently
+  stops being correct past one height.
+- Harder: this is the first continuous (non-breakpoint-stepped) real-size
+  mechanism in the codebase — the next person to reach for `clamp()` or
+  a similar technique elsewhere should know this precedent and its
+  reasoning exist here first.
+- Committed to: the disc/deck/discard/hand proportions look different at
+  very tall compact viewports than at 640px (a visibly larger table
+  against fixed-size cards) — an accepted, deliberate tradeoff, not a
+  latent bug; the width-ceiling/centering behavior described above is
+  the intended fallback for viewports where the art can't grow further.
+- Revisit if: card sizes are ever asked to scale in tandem with the
+  table art (would need a new fluid card-size mechanism, none exists
+  today), or if the room screen's compact table is ever reported as
+  having its own space-distribution problem (it uses a fundamentally
+  different, non-height-bounded layout and was explicitly out of this
+  decision's scope).
