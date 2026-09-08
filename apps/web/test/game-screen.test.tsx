@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ROW_WIDTH } from "../src/components/game/hand.js"
+import { POWERS_TABLE } from "../src/components/help/how-to-play-copy.js"
 import { BENCH_ANCHOR_CLASS, BENCH_POSITION_CLASS } from "../src/components/game/table-surface.js"
 import { setRealtimeClientForTests } from "../src/services/realtime.js"
 import { FakeRealtimeClient } from "./support/fake-realtime.js"
@@ -572,6 +573,11 @@ describe("how-to-play guide (F1/F2)", () => {
         /matching is by rank, not score, so a jack never matches a queen despite scoring the same/,
       ),
     ).toBeInTheDocument()
+    // J/Q swaps may pair two of the same player's cards (F2.2 enumerated
+    // fact, SKILL.md §1.4 — added in the review fix cycle).
+    expect(
+      within(dialog).getByText(/including two belonging to the same player/),
+    ).toBeInTheDocument()
   })
 
   it("never offers or implies a card-tracking aid, and opening it makes no new requests (F2.3)", async () => {
@@ -586,6 +592,10 @@ describe("how-to-play guide (F1/F2)", () => {
     await user.click(screen.getByRole("button", { name: "How to play" }))
     const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
     expect(within(dialog).getByText(/Remembering what you saw is the game/)).toBeInTheDocument()
+    // Negative sweep for the title's "never offers or implies" claim: no
+    // tracking vocabulary anywhere in the rendered guide (memory-faithful,
+    // voice.md — copy may reference events, never a tracking aid).
+    expect(dialog.textContent).not.toMatch(/track|history|cards you know/i)
 
     expect(new Set(calls)).toEqual(callsBefore)
   })
@@ -606,7 +616,10 @@ describe("how-to-play guide (F1/F2)", () => {
     const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
     expect(dialog).toHaveAttribute("open")
     // The slam timer keeps rendering — the guide never pauses the window.
+    // Both the indicator's slam copy AND the live SlamTimer itself (the
+    // progressbar): the copy alone would still pass if the timer unmounted.
     expect(screen.getByText(/Slam window open/)).toBeInTheDocument()
+    expect(screen.getByRole("progressbar", { name: "Slam window" })).toBeInTheDocument()
   })
 
   it("survives a phase-change refetch instead of being force-closed (F1.3)", async () => {
@@ -1224,10 +1237,13 @@ describe("power hints + indicator copy (F3/F4)", () => {
       "other-turn",
     )
     // No F3 hint string leaks to a non-holder, and the copy never names the
-    // rank — the fixture's non-holder phase carries no card field to name
-    // it from (F4.3), the same structural guarantee as F3.4. Scoped to the
-    // chrome band: the how-to-play guide's powers table carries the same
-    // strings unconditionally and would otherwise false-positive this away.
+    // rank (F4.3). Stronger than the wire guarantee: this fixture DOES put
+    // a card field on the phase, and the client still refuses to derive a
+    // hint from it — `affordancesFor` discards `card` on every non-holder
+    // branch (the real non-holder payload omits the field entirely, pinned
+    // by ViewFor.test.ts + affordances.test.ts). Scoped to the chrome band:
+    // the how-to-play guide's powers table carries the same strings
+    // unconditionally and would otherwise false-positive this away.
     expect(within(chromeBand()).queryByText(/Peek at|Blind-swap/)).not.toBeInTheDocument()
   })
 
@@ -1250,6 +1266,26 @@ describe("power hints + indicator copy (F3/F4)", () => {
     await screen.findByText(ME.name)
 
     expect(screen.getByText(`${FRIEND.name} is playing a power card`)).toBeInTheDocument()
+    // F4.2: the power-card copy rides the existing other-turn state in this
+    // phase too — no fifth indicator state exists.
+    expect(document.querySelector('[role="status"][data-state]')).toHaveAttribute(
+      "data-state",
+      "other-turn",
+    )
+  })
+
+  // The guide's powers table and the in-game hint record are two
+  // independent literal sets whose docblocks promise they "never drift
+  // apart" (how-to-play-copy.ts, game-screen.tsx). Pin the promise: these
+  // are the same four F3.1 spec strings the parameterized holder tests
+  // assert in the chrome band, so a drift in either source now fails a test.
+  it("the guide's powers table carries exactly the F3.1 hint strings (no-drift pin)", () => {
+    expect(POWERS_TABLE.map((row) => row.power)).toEqual([
+      "Peek at one of your own cards",
+      "Peek at one of another player's cards",
+      "Blind-swap any two held cards",
+      "Peek at any card, then blind-swap any two held cards",
+    ])
   })
 })
 

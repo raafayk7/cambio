@@ -6,7 +6,7 @@ import { Alert } from "./alert.js"
 import { Button } from "./button.js"
 
 /**
- * AppShell — design-system/components/core/app-shell.md (r5).
+ * AppShell — design-system/components/core/app-shell.md (r6).
  * Class: Layout.
  *
  * The screen frame: slim header on surface.page (wordmark in the display

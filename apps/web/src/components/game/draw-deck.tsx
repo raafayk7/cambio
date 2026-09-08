@@ -3,7 +3,7 @@ import * as React from "react"
 import { cn } from "@cambio/ui"
 
 /**
- * DrawDeck — design-system/components/core/draw-deck.md (r5, CAM-31).
+ * DrawDeck — design-system/components/core/draw-deck.md (r6).
  * Class: Game object.
  *
  * The face-down stock: a 2–3 offset stack of card backs. Deck count is

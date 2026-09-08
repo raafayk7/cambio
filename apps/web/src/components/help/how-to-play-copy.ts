@@ -74,15 +74,15 @@ export const TURN_SECTION: GuideSection = {
   paragraphs: [
     "On your turn, do exactly one of the following.",
     "Call Cambio — the game ends immediately. No final round, no bonus or penalty for calling.",
-    "Take the top discard — only if it isn't a power card. You must swap it into one of your own slots; the displaced card goes face up onto the discard pile. You can't discard it straight back.",
-    "Draw from the deck — a non-power card can be blind-swapped into a slot or discarded directly. A power card obligates you to play it: you can't decline, keep, or discard a drawn power card unused.",
+    "Take the top discard — only if it isn't a power card. You must swap it into one of your own slots; the displaced card goes face up onto the discard pile. You can't discard it straight back. (With no cards in hand, you keep it instead — see rare situations.)",
+    "Draw from the deck — a non-power card can be blind-swapped into one of your own slots, sending the displaced card face up onto the discard pile, or discarded directly. A power card obligates you to play it: you can't decline, keep, or discard a drawn power card unused.",
   ],
 }
 
 export const POWERS_SECTION: GuideSection = {
   heading: "Power cards",
   paragraphs: [
-    "Power cards trigger only when drawn from the deck — one sitting on the discard pile is inert (though still slam-eligible). Swaps are visible as slot movements, never values, so knowledge follows the card, not the slot.",
+    "Power cards trigger only when drawn from the deck — one sitting on the discard pile is inert, though you can still slam against it. A blind-swap may pair any two player-held cards, including two belonging to the same player. Swaps are visible as slot movements, never values, so knowledge follows the card, not the slot.",
     "Peeks are brief and shown once — the guide won't remember a value for you. Remembering what you saw is the game.",
   ],
 }
@@ -122,9 +122,9 @@ export const SLAM_TABLE: ReadonlyArray<SlamOutcomeRow> = [
 export const RARE_SITUATIONS_SECTION: GuideSection = {
   heading: "Rare situations",
   paragraphs: [
-    "A zero-card player still takes turns — draw, then keep (hand becomes 1) or discard. Reaching zero cards is not a win.",
+    "A zero-card player still takes turns — draw, then keep (hand becomes 1) or discard. They may also take the top discard (if it isn't a power card) as a keep into their lowest free slot, with nothing displaced. Reaching zero cards is not a win.",
     "A zero-card player who slams an opponent's card correctly draws the deck's top card and gives it unseen, since there's no slot to give from.",
-    "A blind-swap or the queen's swap needs two distinct occupied slots — an obligatory power with no valid target fizzles to the discard pile as a no-op.",
+    "A blind-swap or the queen's swap needs two distinct occupied slots — an obligatory power with no valid target fizzles to the discard pile.",
     "An empty discard pile opens no slam window, and it can't be taken from.",
     "When the draw deck empties, the discard pile reshuffles into a new draw deck immediately, keeping the current top card as the new top discard.",
   ],

@@ -1,6 +1,6 @@
 name: app-shell
 status: draft
-version: 4
+version: 6
 extends: none
 
 The screen frame. Class: **Layout**.
@@ -9,9 +9,9 @@ The screen frame. Class: **Layout**.
 
 - Header: slim bar on `surface.page` — wordmark in `display` face (small),
   a small decorative suit cluster (♠ ♥ ♣ ♦, `text-sm`, `aria-hidden`)
-  immediately beside it, right side: help icon-button, settings
-  icon-button, connection dot. No nav tabs; this app is lobby → room →
-  game, a corridor, not a site.
+  immediately beside it, right side: connection dot, help icon-button,
+  settings icon-button (in that order). No nav tabs; this app is lobby →
+  room → game, a corridor, not a site.
 - The suit cluster's color split matches `divider.md`'s `ornament`
   variant: hearts/diamonds in `accent.suit-red`, spades/clubs in
   `ink.primary` (tokens.md's "suit red is quarantined" rule) — but the

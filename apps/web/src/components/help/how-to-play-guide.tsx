@@ -17,7 +17,7 @@ import {
 
 /**
  * HowToPlayGuide — design-system/components/extensions/how-to-play-guide.md
- * (r1, root plan F2.1/F5.4). Class: Overlay, hosted entirely in the canon
+ * (r3, root plan F2.1/F5.4). Class: Overlay, hosted entirely in the canon
  * `Modal` at its default width (root plan Decision Log D6).
  *
  * Presentational only: every word comes from `how-to-play-copy.ts`, which

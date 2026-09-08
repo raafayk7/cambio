@@ -1,6 +1,6 @@
 name: how-to-play-guide
 status: draft
-version: 2
+version: 3
 extends: modal
 
 The complete rules, always one tap away. Class: **Overlay** (hosted
@@ -21,11 +21,12 @@ primitive).
   what the game is, lowest score wins — before any rule detail), setup,
   scoring, taking a turn, power cards, slamming, rare situations (zero
   cards, fizzles, empty discard, reshuffle), how the game ends.
-- **r2:** the scoring and powers tables' Card column colors hearts/diamonds
-  glyphs in `accent.suit-red` (never the whole cell) — the same
-  quarantined-red rule `playing-card.tsx` already applies to a card's suit
-  pip, so "King ♥, King ♦" reads with its red pips exactly as a real card
-  would, not as plain ink.
+- **r2 (corrected r3):** the scoring table's Card column colors
+  hearts/diamonds glyphs in `accent.suit-red` (never the whole cell) —
+  the same quarantined-red rule `playing-card.tsx` already applies to a
+  card's suit pip, so "King ♥, King ♦" reads with its red pips exactly as
+  a real card would, not as plain ink. The powers table's Card column
+  carries no suit glyphs and renders plain.
 - No footer — the ✕/Esc/scrim escapes the canon `Modal` already provides
   are enough; a "Close" button would add a primary action with nothing to
   say.
@@ -59,7 +60,11 @@ primitive).
   peek, blind-swap, slam window, draw deck/discard pile, slot, fizzle —
   never "special card"/"reveal"/"trade"), true minus sign on scores
   (`−1`, `−2`), sentence case throughout, card names spelled out in
-  running copy.
+  running copy. **One carve-out (r3):** "reveal" may describe the
+  _public_ momentary or terminal showing of cards — a slammed card's
+  flash, the endgame's all-hands showdown — which is a distinct concept
+  from a peek; canon itself says "publicly reveals" (HANDOFF §1.5).
+  "Reveal" must never be used where "peek" is meant.
 
 ## Revisions
 
@@ -68,3 +73,9 @@ primitive).
   section ahead of setup; colored hearts/diamonds glyphs in the scoring
   table's Card column with `accent.suit-red`, matching `playing-card.tsx`'s
   own suit-pip color rule.
+- r3 (CAM-30 review fix): corrected the r2 Anatomy line — suit coloring
+  applies to the scoring table only, matching the code and the r2 entry
+  above (the "and powers" overstatement licensed behavior the code never
+  had); documented the "reveal" carve-out in the voice rule (public
+  momentary/terminal reveals are a distinct concept from peeks and use
+  canon's own word).
