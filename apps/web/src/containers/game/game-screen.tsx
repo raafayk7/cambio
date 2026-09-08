@@ -668,23 +668,26 @@ function GameTable({
           on each restores today's exact stage sequence. */}
       <div
         data-region="chrome"
-        // pr-8 (user-directed fix): reserves the width of AppShell's
-        // floating connection-dot + help-button column (measured live at
-        // compact: ~56px content + the shell's own 8px inset = 64px from
-        // the true edge) so a wide indicator/timer message centered in
-        // this band can never grow into that top-right corner — the
-        // collision the "slam window open — match the …" copy produced.
-        // `spacing-8` (64px) is this design system's largest enumerated
-        // step (tokens.md's ordinal scale caps at 8, not Tailwind's
-        // default open-ended scale) — an exact fit, verified live against
-        // the rendered icon column rather than guessed. `regular:contents`
-        // below dissolves this div's own box at regular, so the padding
-        // is already inert there (nothing to fix at that breakpoint).
-        className="flex shrink-0 flex-col items-center gap-4 pr-8 regular:contents"
+        className="flex shrink-0 flex-col items-center gap-4 regular:contents"
       >
-        <TurnIndicator state={indicatorState}>
-          {turnStatusCopy(status, playerName(status.activePlayerId))}
-        </TurnIndicator>
+        {/* pr-8 on this wrapper only, gated to the one message that can
+            actually reach AppShell's floating connection-dot + help-button
+            corner: "Slam window open — match the …" (measured live at
+            compact: icons occupy the rightmost ~64px, `spacing-8` — this
+            design system's largest enumerated step, tokens.md's ordinal
+            scale, not Tailwind's default open-ended one). Scoping the
+            reserve to just this wrapper (not the whole band) keeps every
+            OTHER message — "Your turn", the power hint, the timer — truly
+            centered by default instead of permanently shifted for a
+            collision only the slam message risks (user-directed fix: an
+            earlier band-wide pr-8 visibly de-centered "Ron's turn" too).
+            `regular:contents` makes the wrapper (and its padding) inert at
+            regular, matching the band's own pattern. */}
+        <div className={cn("regular:contents", status.state === "slam-window" && "pr-8")}>
+          <TurnIndicator state={indicatorState}>
+            {turnStatusCopy(status, playerName(status.activePlayerId))}
+          </TurnIndicator>
+        </div>
         {/* F3 (user-directed relocation): the holder's power-resolution hint
             used to render under the held card, on the table felt — olive
             ink.muted against green/paving is nearly unreadable there. This

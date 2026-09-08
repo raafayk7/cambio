@@ -419,15 +419,28 @@ guide` sections; added `onHelp` to the app-shell gallery demo for
     (`ink.primary`/semibold), retiring `HeldCard`'s `hint` prop entirely
     (held-card.md r2 → r3). Root D5's placement call is superseded by this
     live-play finding.
-  - The chrome band's indicator/timer could grow wide enough (a long
-    "Slam window open — match the …" message) to collide with AppShell's
+  - The chrome band's indicator could grow wide enough (a long "Slam
+    window open — match the …" message) to collide with AppShell's
     floating connection-dot + help-button column — measured live: a 13px
-    overlap at 375px width. Fixed with `pr-8` reserving that corner.
-    First attempt used `pr-20`, which silently generated no CSS at all —
-    this design system caps its spacing scale at `spacing-8` (64px, tokens.md's
-    ordinal scale), not Tailwind's default open-ended one; an
-    out-of-range step is a no-op, not an error, and only showed up as a
-    missing rule in the served `styles.css`.
+    overlap at 375px width. First fix applied `pr-8` to the whole band,
+    which silently de-centered every OTHER message too ("Ron's turn"
+    measured 32px off true-center) since `items-center` centers each
+    message independently and the reserved space shifts all of them,
+    not just the wide one. User caught it from a live screenshot;
+    corrected to scope the reservation to a wrapper around only
+    `TurnIndicator`, gated on `status.state === "slam-window"` — every
+    other message (turn copy, the power hint, the timer) stays truly
+    centered by default, re-verified live (both the normal case at true
+    center and the worst-case "match the 10" message still clearing the
+    icon corner by 16px). Also en route: the first attempt used `pr-20`,
+    which silently generated no CSS at all — this design system caps its
+    spacing scale at `spacing-8` (64px, tokens.md's ordinal scale), not
+    Tailwind's default open-ended one; an out-of-range step is a no-op,
+    not an error, and only showed up as a missing rule in the served
+    `styles.css`. No hardcoded pixel values anywhere in these fixes —
+    `pr-8`/`pt-2` are token steps this project's own tokens.md already
+    defines in px (`4 8 12 16 24 32 48 64`, CAM-13), not something this
+    task introduced or an arbitrary-value utility.
   - An opponent seat's `active-turn` outline (3px, offset 2px) was
     clipped at the top by the compact opponents row's scroll container
     (`overflow-y-auto`, zero top padding, seat flush against it) —
