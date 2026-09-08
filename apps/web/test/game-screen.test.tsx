@@ -1106,10 +1106,13 @@ describe("powers + peeks (T3/T4)", () => {
 })
 
 /**
- * Power hints + indicator copy (root plan F3/F4): the holder's hint under
- * the held card, keyed off the affordance's `targeting` alone (D7), and
- * the non-active indicator's power-card copy (F4.1), with the existing
- * 4-state `TurnIndicator` union untouched (F4.2).
+ * Power hints + indicator copy (root plan F3/F4): the holder's hint, keyed
+ * off the affordance's `targeting` alone (D7), and the non-active
+ * indicator's power-card copy (F4.1), with the existing 4-state
+ * `TurnIndicator` union untouched (F4.2). The hint itself lives in the
+ * chrome band, not under the held card (user-directed relocation,
+ * held-card.md r3 — the table-felt background made `ink.muted` text there
+ * nearly unreadable).
  */
 describe("power hints + indicator copy (F3/F4)", () => {
   const resolvingPowerView = (card: string, holderId: string = ME.userId) =>
@@ -1121,11 +1124,11 @@ describe("power hints + indicator copy (F3/F4)", () => {
       phase: { _tag: "ResolvingPower", playerId: holderId, card },
     })
 
-  /** The held-card spot, scoped so hint assertions never collide with the
+  /** The chrome band, scoped so hint assertions never collide with the
    * always-mounted how-to-play guide's powers table (same strings). */
-  function heldCardRegion(): HTMLElement {
-    const region = document.querySelector<HTMLElement>('[data-flight-anchor="held"]')
-    if (region === null) throw new Error("no held-card spot rendered")
+  function chromeBand(): HTMLElement {
+    const region = document.querySelector<HTMLElement>('[data-region="chrome"]')
+    if (region === null) throw new Error("no chrome band rendered")
     return region
   }
 
@@ -1136,7 +1139,7 @@ describe("power hints + indicator copy (F3/F4)", () => {
     ["TH", "Peek at one of another player's cards"],
     ["JH", "Blind-swap any two held cards"],
     ["QH", "Peek at any card, then blind-swap any two held cards"],
-  ])("holder sees the %s hint under the held card (F3.1)", async (card, hint) => {
+  ])("holder sees the %s hint in the chrome band (F3.1)", async (card, hint) => {
     setupFake()
     stubApi({
       "GET /me": json(200, ME),
@@ -1145,7 +1148,7 @@ describe("power hints + indicator copy (F3/F4)", () => {
     renderGameApp(GAME_ID)
     await screen.findByText(ME.name)
 
-    expect(within(heldCardRegion()).getByText(hint)).toBeInTheDocument()
+    expect(within(chromeBand()).getByText(hint)).toBeInTheDocument()
     // The holder's own indicator still reads a plain turn, never the
     // power-card copy — that copy is for non-active viewers only.
     expect(screen.getByText("Your turn")).toBeInTheDocument()
@@ -1169,9 +1172,7 @@ describe("power hints + indicator copy (F3/F4)", () => {
     renderGameApp(GAME_ID)
     await screen.findByText(ME.name)
 
-    expect(
-      within(heldCardRegion()).getByText("Now blind-swap any two held cards"),
-    ).toBeInTheDocument()
+    expect(within(chromeBand()).getByText("Now blind-swap any two held cards")).toBeInTheDocument()
     expect(screen.getByText("Your turn")).toBeInTheDocument()
   })
 
@@ -1184,7 +1185,7 @@ describe("power hints + indicator copy (F3/F4)", () => {
     renderGameApp(GAME_ID)
     await screen.findByText(ME.name)
     const { room } = await channelsReady(fake)
-    expect(within(heldCardRegion()).getByText("Peek at one of your own cards")).toBeInTheDocument()
+    expect(within(chromeBand()).getByText("Peek at one of your own cards")).toBeInTheDocument()
 
     handlers[GET_VIEW] = json(
       200,
@@ -1203,8 +1204,9 @@ describe("power hints + indicator copy (F3/F4)", () => {
     await waitFor(() => {
       expect(screen.getByText(`${FRIEND.name}'s turn`)).toBeInTheDocument()
     })
-    // AwaitingDraw carries no held-card spot at all — the hint's host is gone.
-    expect(document.querySelector('[data-flight-anchor="held"]')).toBeNull()
+    expect(
+      within(chromeBand()).queryByText("Peek at one of your own cards"),
+    ).not.toBeInTheDocument()
   })
 
   it("non-holder renders no hint and the indicator reads the power-card copy (F4.1, F4.3)", async () => {
@@ -1224,9 +1226,9 @@ describe("power hints + indicator copy (F3/F4)", () => {
     // No F3 hint string leaks to a non-holder, and the copy never names the
     // rank — the fixture's non-holder phase carries no card field to name
     // it from (F4.3), the same structural guarantee as F3.4. Scoped to the
-    // held-card spot: the how-to-play guide's powers table carries the same
+    // chrome band: the how-to-play guide's powers table carries the same
     // strings unconditionally and would otherwise false-positive this away.
-    expect(within(heldCardRegion()).queryByText(/Peek at|Blind-swap/)).not.toBeInTheDocument()
+    expect(within(chromeBand()).queryByText(/Peek at|Blind-swap/)).not.toBeInTheDocument()
   })
 
   it("the non-active copy for ResolvingQueenSwap reads the same power-card line (F4.1)", async () => {

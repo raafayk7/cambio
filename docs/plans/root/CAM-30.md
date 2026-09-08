@@ -409,6 +409,40 @@ guide` sections; added `onHelp` to the app-shell gallery demo for
   alongside settings" documentation. Not in the root/frontend plan's
   enumerated file list; a small completeness fix, flagged here per the
   doc-reconciliation discipline.
+- **A second user-directed follow-up round found four live-play bugs**,
+  diagnosed and fixed against a real 2-player game (two separate origins —
+  `localhost:3100` direct and the ngrok tunnel — for two independent
+  session cookies, driven via `javascript_tool` since `computer` clicks
+  timed out with no display attached):
+  - The F3 power hint (`ink.muted` under the held card, on the table felt)
+    was near-invisible in real play — relocated to the chrome band
+    (`ink.primary`/semibold), retiring `HeldCard`'s `hint` prop entirely
+    (held-card.md r2 → r3). Root D5's placement call is superseded by this
+    live-play finding.
+  - The chrome band's indicator/timer could grow wide enough (a long
+    "Slam window open — match the …" message) to collide with AppShell's
+    floating connection-dot + help-button column — measured live: a 13px
+    overlap at 375px width. Fixed with `pr-8` reserving that corner.
+    First attempt used `pr-20`, which silently generated no CSS at all —
+    this design system caps its spacing scale at `spacing-8` (64px, tokens.md's
+    ordinal scale), not Tailwind's default open-ended one; an
+    out-of-range step is a no-op, not an error, and only showed up as a
+    missing rule in the served `styles.css`.
+  - An opponent seat's `active-turn` outline (3px, offset 2px) was
+    clipped at the top by the compact opponents row's scroll container
+    (`overflow-y-auto`, zero top padding, seat flush against it) —
+    confirmed live (seat top === scroll container top, exactly zero
+    clearance) and fixed with `pt-2` on `table-scroll`.
+  - The draw deck's slam-window alarm frame sat flush with the stack's
+    UNtranslated back layer instead of the visually topmost card — the
+    populated branch offsets its front layer(s) by `translate-x/y-1` or
+    `-2` to paint the offset-stack illusion, but the frame's `inset-0` was
+    relative to the outer `w-fit` wrapper, which sizes to the untranslated
+    footprint. A real, pre-existing, device-independent bug (not
+    introduced this session) — found by reading `draw-deck.tsx` after the
+    `PlayingCard` hand-card layer check came back pixel-perfect, and
+    confirmed live (frame rect === topmost layer rect only after the fix).
+    draw-deck.md r6.
 
 ## Outcomes & retrospective
 

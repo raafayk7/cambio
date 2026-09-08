@@ -86,5 +86,36 @@ describe("DrawDeck", () => {
       rerender(<DrawDeck count={20} state="reshuffling" slamWindow />)
       expect(container.firstChild).toHaveAttribute("data-state", "reshuffling")
     })
+
+    /** r6 (user-directed bug fix, live-measured): the alarm frame tracks
+     * the visually topmost offset card-back layer instead of the
+     * untranslated back one — the frame used to sit up-left of the card a
+     * player actually looks at. `layers = min(3, max(1, count))` decides
+     * how many back-layers render; the frame's own translate must match
+     * whichever one is topmost. */
+    it("translates the alarm frame to match the topmost stacked layer at every layer count", () => {
+      const { container, rerender } = render(<DrawDeck count={0} slamWindow />)
+      const alarmFrame = () => container.querySelector(".border-accent-alarm")
+
+      // count=0 (and count=1: layers=1): no stacking, no translate.
+      expect(alarmFrame()?.className).not.toContain("translate-x-1")
+      expect(alarmFrame()?.className).not.toContain("translate-x-2")
+
+      rerender(<DrawDeck count={1} slamWindow />)
+      expect(alarmFrame()?.className).not.toContain("translate-x-1")
+      expect(alarmFrame()?.className).not.toContain("translate-x-2")
+
+      // count=2: layers=2, topmost is layer 1 (translate-x/y-1).
+      rerender(<DrawDeck count={2} slamWindow />)
+      expect(alarmFrame()?.className).toContain("translate-x-1")
+      expect(alarmFrame()?.className).toContain("translate-y-1")
+      expect(alarmFrame()?.className).not.toContain("translate-x-2")
+
+      // count>=3: layers capped at 3, topmost is layer 2 (translate-x/y-2).
+      rerender(<DrawDeck count={20} slamWindow />)
+      expect(alarmFrame()?.className).toContain("translate-x-2")
+      expect(alarmFrame()?.className).toContain("translate-y-2")
+      expect(alarmFrame()?.className).not.toContain("translate-x-1")
+    })
   })
 })

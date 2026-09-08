@@ -668,11 +668,34 @@ function GameTable({
           on each restores today's exact stage sequence. */}
       <div
         data-region="chrome"
-        className="flex shrink-0 flex-col items-center gap-4 regular:contents"
+        // pr-8 (user-directed fix): reserves the width of AppShell's
+        // floating connection-dot + help-button column (measured live at
+        // compact: ~56px content + the shell's own 8px inset = 64px from
+        // the true edge) so a wide indicator/timer message centered in
+        // this band can never grow into that top-right corner — the
+        // collision the "slam window open — match the …" copy produced.
+        // `spacing-8` (64px) is this design system's largest enumerated
+        // step (tokens.md's ordinal scale caps at 8, not Tailwind's
+        // default open-ended scale) — an exact fit, verified live against
+        // the rendered icon column rather than guessed. `regular:contents`
+        // below dissolves this div's own box at regular, so the padding
+        // is already inert there (nothing to fix at that breakpoint).
+        className="flex shrink-0 flex-col items-center gap-4 pr-8 regular:contents"
       >
         <TurnIndicator state={indicatorState}>
           {turnStatusCopy(status, playerName(status.activePlayerId))}
         </TurnIndicator>
+        {/* F3 (user-directed relocation): the holder's power-resolution hint
+            used to render under the held card, on the table felt — olive
+            ink.muted against green/paving is nearly unreadable there. This
+            band sits on cream (surface.page) alongside every other
+            transient instruction, so it moves here instead; HeldCard's
+            hint prop is retired (held-card.md r3). */}
+        {!ended && heldCardHint !== undefined ? (
+          <p className="font-ui text-sm font-semibold text-ink-primary regular:order-1">
+            {heldCardHint}
+          </p>
+        ) : null}
         {slamPhase !== undefined ? (
           // SL1/SL2: pairs with the indicator above, never replaces it
           // (turn-indicator.md) — `resolving` pauses the drain visually while
@@ -682,7 +705,7 @@ function GameTable({
             window={{ closesAt: slamPhase.closesAt, durationMs: view.config.slamWindowMs }}
             resolving={slamReveal !== null}
             onExpire={onSlamExpire}
-            className="regular:order-1"
+            className="regular:order-2"
           />
         ) : null}
         {/* E3: slam/peek/turn ephemera are ignored once the game has ended —
@@ -743,7 +766,17 @@ function GameTable({
           // parent has no effect. `regular:contents` already dissolves
           // this element's own box (and therefore its `display` value)
           // entirely at regular, so this addition is inert there.
-          className="flex w-full flex-1 min-h-0 flex-col overflow-y-auto regular:contents"
+          //
+          // pt-2 (user-directed fix): an opponent seat in `active-turn`
+          // state paints a 3px `outline` at a 2px offset (5px total)
+          // beyond its own border box — decorative, so it never affects
+          // layout, but this element's own top edge sits flush against
+          // the compact opponents row above (measured live: 0px gap), and
+          // `overflow-y-auto` clips anything painted outside its box. The
+          // ring's top arc was getting cut off there. 8px (`spacing-2`,
+          // this design system's smallest step past the ring's own
+          // ~5px need) clears it with margin.
+          className="flex w-full flex-1 min-h-0 flex-col overflow-y-auto pt-2 regular:contents"
         >
           <TableSurface
             state={ended ? "game-over" : "in-game"}
@@ -795,7 +828,6 @@ function GameTable({
                   <HeldCard
                     {...(heldPhase.card !== undefined ? { card: heldPhase.card } : {})}
                     label={heldCardLabel(heldIsHolder, playerName(heldPhase.playerId))}
-                    {...(heldCardHint !== undefined ? { hint: heldCardHint } : {})}
                   />
                 ) : null}
               </div>
