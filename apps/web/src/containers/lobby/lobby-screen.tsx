@@ -162,16 +162,18 @@ export function LobbyScreen() {
 
   return (
     <AppShell scene="courtyard" connection={connection} onHelp={() => setHelpOpen(true)}>
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 p-5">
-        {content}
+      <div className="p-3 text-center">
         <Link
           href="https://github.com/raafayk7/cambio/tree/development"
           target="_blank"
           rel="noreferrer noopener"
-          className="text-center text-sm"
+          className="text-sm"
         >
           Source code and feedback on GitHub
         </Link>
+      </div>
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 p-5">
+        {content}
       </div>
       <HowToPlayGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
     </AppShell>

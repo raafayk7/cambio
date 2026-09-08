@@ -73,10 +73,11 @@ create/join panels).
    and authenticated (create-room/join-room panels) — i.e. it sits outside
    the state-branching `content` variable, not duplicated inside each
    branch.
-3. The link lives inside the existing centered content column
-   (`mx-auto max-w-md` div in `LobbyScreen`), as a sibling below `{content}`
-   — not inside `AppShell`, and `AppShell` itself gains no new prop, slot,
-   or footer region.
+3. The link renders centered, immediately below the `AppShell` header (i.e.
+   as the first child inside `AppShell`'s content, before the centered
+   `mx-auto max-w-md` column) — not inside `AppShell` itself, and `AppShell`
+   gains no new prop, slot, or header region. (Revised mid-implementation
+   from "below the panels" — see Decision Log.)
 4. No new design-system component, token, or icon is introduced. The line
    uses the existing `Link` component unmodified and ordinary Tailwind
    utility classes already in use elsewhere (e.g. `text-sm`, `text-center`)
@@ -163,6 +164,36 @@ typecheck lint test` — 25/25 tasks, 284/284 web tests, `packages/ui`
   rationale: WCAG SC 3.2.5 (notifying users of new windows) is AAA, not the
   AA baseline the `hard-checks` skill enforces; skipped as out of scope for
   this task's quality bar.
+- 2026-09-09 — The link sits directly on the courtyard scene backdrop, not
+  inside a `Panel` wash surface (unlike every heading/form on this screen,
+  per panel.md r2's "never on bare artwork" convention). Verified rather
+  than assumed: `.agents/scripts/design-gate/hardcheck.js` against a live
+  render reports PASS (0 constraint fails) with one advisory — "text over
+  image — contrast not statically verifiable" — and a visual check shows
+  the rendered color (`rgb(54, 99, 74)`, the Link component's own default)
+  against the courtyard's light pavement is clearly legible with a wide
+  margin. — rationale: wrapping one small unobtrusive line in a wash panel
+  would add visual weight out of proportion to the task ("tiny task by
+  design") and there's no existing pattern for a bare-text-on-wash treatment
+  this small; flagged here rather than silently deviating from the
+  panel-wash convention, since the convention exists for exactly this kind
+  of contrast risk. Worth a second look at `/review` if the courtyard art
+  changes.
+- 2026-09-09 — Mid-implementation revision (user feedback after seeing the
+  first render): moved the link from below the create/join panels to
+  centered, immediately below the header/wordmark — same courtyard-scene
+  legibility question, re-verified with the same hard-check tooling (still
+  PASS, same single contrast advisory). Kept the canonical green underlined
+  `Link` styling rather than introducing a "quiet" bold-black variant —
+  user's explicit choice between the two, offered because the
+  bold-black/no-underline look they initially asked for (matching the
+  mid-game power-hint text at
+  [game-screen.tsx:698](../../../apps/web/src/containers/game/game-screen.tsx))
+  would have been an unregistered `Link` appearance (link.md: "underline
+  always on... Variants: None"), which the creation gate requires stopping
+  for. Surfaced instead of silently applied; user chose to keep the
+  registered look and fix placement instead. Functional contract clause 3
+  updated to match.
 
 ## Surprises & discoveries
 
