@@ -50,9 +50,6 @@ export const rulePublicSlugs = (events: ReadonlyArray<GameEvent>): ReadonlySet<s
   const publicSlugs = new Set<string>()
   for (const event of events) {
     switch (event._tag) {
-      case "GameStarted":
-        publicSlugs.add(event.firstDiscard)
-        break
       case "DiscardTaken":
       case "HeldDiscarded":
       case "PowerDiscarded":

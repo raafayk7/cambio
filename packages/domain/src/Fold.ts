@@ -61,7 +61,7 @@ const initialState = (started: GameStarted): Either.Either<GameState, Inconsiste
   return Either.right({
     players: started.players.map((id, seat) => ({ id, hand: started.hands[seat]! })),
     deck: started.deck,
-    discard: [started.firstDiscard],
+    discard: [],
     prng: started.prng,
     phase: { _tag: "AwaitingDraw", playerId: started.players[0]! },
     config: started.config,

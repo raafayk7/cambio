@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Either } from "effect"
-import { isPowerRank, rank } from "../../src/Card.js"
 import { dealGame } from "../../src/Deal.js"
 import { applyCommand } from "../../src/Engine.js"
 import { decodeGameConfig } from "../../src/GameConfig.js"
@@ -73,7 +72,7 @@ describe("driver rng (C1.1, ADR-0013)", () => {
 })
 
 describe("candidate enumeration (C1.2)", () => {
-  it("fresh deal: exactly the active player's turn actions", () => {
+  it("fresh deal: exactly the active player's turn actions — draw-or-call only, empty discard (ADR-0039)", () => {
     const [initial] = Either.getOrThrow(dealGame(players3, 42, config, ts(0)))
     const candidates = legalCandidates(initial, ts(1))
     for (const c of candidates) {
@@ -81,11 +80,8 @@ describe("candidate enumeration (C1.2)", () => {
         throw new Error("close is a clock action, never a candidate")
       expect(c.playerId).toBe(uid(0))
     }
-    const top = initial.discard[0]!
-    const expected = isPowerRank(rank(top))
-      ? ["CallCambio", "DrawFromDeck"]
-      : ["CallCambio", "TakeDiscard", "DrawFromDeck"]
-    expect(candidates.map((c) => c._tag)).toStrictEqual(expected)
+    expect(initial.discard).toStrictEqual([])
+    expect(candidates.map((c) => c._tag)).toStrictEqual(["CallCambio", "DrawFromDeck"])
   })
 
   it("holding a deck card with a non-empty hand: one SwapHeld per slot, plus DiscardHeld", () => {

@@ -36,9 +36,13 @@ export const testSigner = makeSessionSigner(Redacted.make(TEST_SESSION_SECRET))
 /**
  * Fixed seed (decision 15): the e2e suite replays `dealGame` in-test — the
  * domain is pure — to know full truth and pick legal commands, while
- * asserting the HTTP replies reveal none of it.
+ * asserting the HTTP replies reveal none of it. Re-surveyed under CAM-31's
+ * empty-discard deal (ADR-0039), which shifted the deck cut by one card and
+ * invalidated the old value's offline seed survey (SlamWindow.test.ts:
+ * "TEST_SEED's FIRST window has a rank-matching card in Bob's hand") —
+ * 424_243 restores that property.
  */
-export const TEST_SEED = 424_242
+export const TEST_SEED = 424_243
 
 export type PublishedEntry =
   | {

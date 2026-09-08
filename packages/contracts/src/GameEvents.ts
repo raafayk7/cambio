@@ -39,12 +39,13 @@ import { LobbyView } from "./GameView.js"
 /**
  * The deal, stripped for everyone (C3.3): there is no opening peek (§1.1), so
  * not even a hand's owner learns dealt values. `hands`, `deck`, `prng`, and
- * `seed` from the domain event do not exist on the wire.
+ * `seed` from the domain event do not exist on the wire. The discard pile
+ * starts empty (ADR-0039) — there is no card value to strip in the first
+ * place.
  */
 export const GameStarted = Schema.TaggedStruct("GameStarted", {
   /** Seat order (§4.3). */
   players: Schema.Array(Uuid),
-  firstDiscard: CardSlug,
   deckCount: Schema.Int.pipe(Schema.nonNegative()),
   config: WireGameConfig,
 })

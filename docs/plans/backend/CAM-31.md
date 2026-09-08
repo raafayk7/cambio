@@ -359,27 +359,63 @@ written by `/implement` when the test actually lands. A plan-time row that
 invents a test title and assertion is an overclaim waiting to become a
 review finding.)_
 
-| Clause                                                                                                                                                                             | Test (file + name) | What is asserted |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------- |
-| 1 — planned: rewrite the Deal.test.ts deal-shape and determinism tests for `discard: []`, deck `52 − 4n`, event without the field, partition intact (M1)                           |                    |                  |
-| 2 — planned: opening-state case over the **dealt** state — `TakeDiscard` → `EmptyDiscard`, `legalCommandKinds` = draw-or-call (M1, extends the ADR-0012 pins)                      |                    |                  |
-| 3 — planned: projection test reshaped to assert no card value in the room `GameStarted`; both leak-sweep allowlists shed their `GameStarted` case (type-level proof) (M2)          |                    |                  |
-| 4 — planned: Fold.test.ts verbatim-deal test asserts folded `discard: []`; fold-equals-dealt-state property unchanged (M1)                                                         |                    |                  |
-| 5 — planned: new GameRepository integration test — save a freshly dealt game, load deep-equals with empty `discard_pile` (M4)                                                      |                    |                  |
-| 6 — planned: reframed C6.1 test — last-card draw emits `CardDrawn` then `DeckReshuffled`, retained top is the whole discard (M3)                                                   |                    |                  |
-| 7 — planned: reframed Slam penalty test — order `SlamFailed`, `PenaltyDrawn`, `DeckReshuffled` on a last-card penalty draw (M3)                                                    |                    |                  |
-| 8 — planned: existing zero-card-give test kept verbatim as the regression anchor; new case for a give-draw that empties the deck (`DeckReshuffled` after `CardGivenFromDeck`) (M3) |                    |                  |
-| 9 — planned: new discard-landing trigger tests — representative sites through `openWindowOrAdvance` plus the two non-drawing slam returns; window rank = retained top (M3)         |                    |                  |
-| 10 — planned: existing ADR-0011 skip test and `NoCardToDraw` test kept verbatim — their states satisfy the resting invariant (M3)                                                  |                    |                  |
-| 11 — planned: new resting-invariant checker in `stepViolations`, unit-tested in Invariants.test.ts, asserted per step across the seeded batch by the driver (M3)                   |                    |                  |
-| 12 — planned: existing Fold transcription + harness fold-equals-live tests over eager-positioned events (M3); RoundTrip fold-vs-load-vs-live equality (M4)                         |                    |                  |
-| 17 (backend share) — planned: not a test — HANDOFF §1.1/§1.7 + cambio-rules amendment blockquotes landed and dev data wiped, recorded in Progress (M6)                             |                    |                  |
+| Clause                                                                                                                                                                             | Test (file + name)                                                                                                                                                                                                                                                                                                                                                                                                                            | What is asserted                                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 — planned: rewrite the Deal.test.ts deal-shape and determinism tests for `discard: []`, deck `52 − 4n`, event without the field, partition intact (M1)                           | packages/domain/test/Deal.test.ts "deals 4 cards to slots 0–3 per player, empty discard, rest as deck (C1.2, §1.1, ADR-0039)", "is deterministic and the GameStarted event matches the state (C1.3, C8.1)", "partitions all 52 slugs with no duplicates (C1.4, §4.5)"                                                                                                                                                                         | discard is [] and deck is 52-4n for each n; event carries no firstDiscard; 52-card partition still holds                                                                      |
+| 2 — planned: opening-state case over the **dealt** state — `TakeDiscard` → `EmptyDiscard`, `legalCommandKinds` = draw-or-call (M1, extends the ADR-0012 pins)                      | packages/domain/test/Deal.test.ts "opening state (empty discard, ADR-0039): TakeDiscard is illegal, only draw-or-call is legal (C2)"                                                                                                                                                                                                                                                                                                          | TakeDiscard on the dealt state fails EmptyDiscard; legalCommandKinds is exactly [CallCambio, DrawFromDeck]                                                                    |
+| 3 — planned: projection test reshaped to assert no card value in the room `GameStarted`; both leak-sweep allowlists shed their `GameStarted` case (type-level proof) (M2)          | packages/application/test/EventProjection.test.ts "GameStarted: players, deck count, config — no card value at all (ADR-0039: hands/deck/prng/seed/discard gone)"; packages/application/test/AdversarialProjection.test.ts publicSlugsOf (GameStarted case removed); apps/api/test/support/leaks.ts rulePublicSlugs (GameStarted case removed); apps/api/test/RealtimePublisher.test.ts "a GameStarted batch reaches the room value-stripped" | room GameStarted payload has no card slug (slugsIn === []); both leak-sweep allowlists compile with no GameStarted case, i.e. nothing about the deal is whitelisted as public |
+| 4 — planned: Fold.test.ts verbatim-deal test asserts folded `discard: []`; fold-equals-dealt-state property unchanged (M1)                                                         | packages/domain/test/Fold.test.ts "the folded deal carries GameStarted's payload verbatim — hands, deck, discard, prng"                                                                                                                                                                                                                                                                                                                       | foldEvents([GameStarted]) deep-equals the dealt state, discard: [] included                                                                                                   |
+| 5 — planned: new GameRepository integration test — save a freshly dealt game, load deep-equals with empty `discard_pile` (M4)                                                      |                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                               |
+| 6 — planned: reframed C6.1 test — last-card draw emits `CardDrawn` then `DeckReshuffled`, retained top is the whole discard (M3)                                                   |                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                               |
+| 7 — planned: reframed Slam penalty test — order `SlamFailed`, `PenaltyDrawn`, `DeckReshuffled` on a last-card penalty draw (M3)                                                    |                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                               |
+| 8 — planned: existing zero-card-give test kept verbatim as the regression anchor; new case for a give-draw that empties the deck (`DeckReshuffled` after `CardGivenFromDeck`) (M3) |                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                               |
+| 9 — planned: new discard-landing trigger tests — representative sites through `openWindowOrAdvance` plus the two non-drawing slam returns; window rank = retained top (M3)         |                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                               |
+| 10 — planned: existing ADR-0011 skip test and `NoCardToDraw` test kept verbatim — their states satisfy the resting invariant (M3)                                                  |                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                               |
+| 11 — planned: new resting-invariant checker in `stepViolations`, unit-tested in Invariants.test.ts, asserted per step across the seeded batch by the driver (M3)                   |                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                               |
+| 12 — planned: existing Fold transcription + harness fold-equals-live tests over eager-positioned events (M3); RoundTrip fold-vs-load-vs-live equality (M4)                         |                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                               |
+| 17 (backend share) — planned: not a test — HANDOFF §1.1/§1.7 + cambio-rules amendment blockquotes landed and dev data wiped, recorded in Progress (M6)                             |                                                                                                                                                                                                                                                                                                                                                                                                                                               |                                                                                                                                                                               |
 
 ## Progress
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
-- [ ] YYYY-MM-DD HH:MM — step
+- [x] 2026-09-08 14:00 — M1 (domain, game start): `Deal.ts` seeds
+      `discard: []` and cuts the deck at `players.length * 4` (52 − 4n,
+      one more card than before); `GameStarted` sheds `firstDiscard`
+      (`GameEvent.ts`); `Fold.ts`'s `initialState` seeds `discard: []`.
+      Deal.test.ts rewritten test-first (deal-shape, determinism, new
+      opening-state case for clause 2). `pnpm turbo test --filter
+@cambio/domain` green except two pieces of fallout (below), both fixed
+      within M1: `sim/Driver.test.ts`'s "fresh deal" candidate-enumeration
+      test assumed a discard top (rewritten for draw-or-call-only), and
+      `sim/Simulation.test.ts`'s C5.2 rare-case-reachability test lost the
+      9/T fizzle at the old default seed (deck cut shift). Domain suite:
+      197/197 green.
+- [x] 2026-09-08 14:10 — M2 (contracts freeze + projection + leak sweeps):
+      removed wire `firstDiscard` from `packages/contracts/src/GameEvents.ts`;
+      fixed `EventProjection.ts`'s `GameStarted` case; deleted the
+      `GameStarted` case from both leak-sweep allowlists
+      (`AdversarialProjection.test.ts`'s `publicSlugsOf`,
+      `apps/api/test/support/leaks.ts`'s `rulePublicSlugs`) — both are now
+      strictly stronger (nothing about the deal is whitelisted). Fixed
+      fixtures: `EventProjection.test.ts` (asserts `slugsIn(out.room) ===
+[]`), `RealtimePublisher.test.ts`. `apps/web` typecheck stayed green
+      untouched, confirming the plan's zero-production-readers claim.
+      **First repo-wide green gate**: `pnpm turbo build typecheck lint
+test` — 25/25 tasks green (contract wire frozen; frontend M5 unblocked).
+- [x] 2026-09-08 14:20 — M2 fallout found only by the full gate (not
+      caught by `@cambio/domain`'s own suite): `apps/api/test/SlamWindow.test.ts`
+      failed 3/9 (own/correct, opponent/correct-with-give, and the CAM-26
+      GET-poke case) — its documented "offline seed survey" ("TEST_SEED's
+      FIRST window has a rank-matching card in Bob's hand") no longer held
+      under the shifted deck cut. Re-surveyed locally (scratch domain-level
+      script replicating the file's `choose`/`driveToWindow` policy, not
+      committed) and bumped `TEST_SEED` 424_242 → 424_243 in
+      `apps/api/test/support/http.ts` (comment records why). Verified this
+      doesn't disturb `GameCommands.test.ts` / `EndToEndGame.test.ts`,
+      which use `TEST_SEED` only for local-replay-vs-server consistency,
+      never hardcoded card literals. Full gate re-run green, 121/121 api
+      tests.
 
 ## Surprises & notes for the root plan
 
@@ -387,11 +423,31 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
   compile-green intermediate ordering; M1's checkpoint is domain-scoped
   and the first full green gate is M2's. Called out in Context so the
   reviewer doesn't read the transient red as a process violation.
+  **Confirmed as designed**: M1 alone left `EventProjection.ts` and both
+  leak sweeps red; M2 closed it in the same session.
 - (plan-time) `EndToEnd.test.ts`'s scripted seed-42 game will see a
   different card sequence (the deck cut moves by one card) — the script is
   policy-adaptive but its "covers every required mechanic in one game"
   checklist may require a seed hunt or re-script. Budget for it in M1/M3;
   log the outcome here.
+  **Resolved, no action needed**: `EndToEnd.test.ts` passed unchanged (its
+  checklist is adaptive, as predicted) — the seed-hunt need landed
+  elsewhere instead (below).
+- (M1) `sim/Simulation.test.ts`'s C5.2 default-batch rare-case-reachability
+  test needed a reseed the plan anticipated only in the abstract: the deck
+  cut shift left the 9/T fizzle unreached at the old default
+  (`BASE_SEED=20260831`). Re-surveyed (250-game batches at several
+  candidate seeds); `20260908` reaches all six rare cases and is recorded
+  in the file's own comment (chosen for being this task's planning date,
+  not for any other property). **Flag for M3**: eager reshuffle changes
+  card sequences again from the first reshuffle onward — re-verify this
+  seed still reaches all six rare cases once M3 lands; reseed again if not.
+- (M2) A second, unplanned seed-survey casualty: `apps/api/test/SlamWindow.test.ts`'s
+  fixed `TEST_SEED` (`apps/api/test/support/http.ts`) pins a specific
+  "Bob holds a rank-matching card at the first window" structural property
+  the deck-cut shift broke. Reseeded 424_242 → 424_243 (see Progress).
+  Same M3 flag applies: eager reshuffle may perturb reachable windows
+  again — re-verify at M3/M6 if `SlamWindow.test.ts` regresses.
 - (plan-time) The driver checks `stepViolations` on **initial** states
   too, so the new resting invariant will reject any constructed sim
   scenario (Coverage/Fuzz) that starts from deck-empty-with-fat-discard.

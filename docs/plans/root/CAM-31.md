@@ -220,6 +220,18 @@ timestamp each entry)_
 
 - [x] 2026-09-08 13:35 — planning complete: ADRs 0039/0040 written, root +
       child plans drafted, user sign-off pending
+- [x] 2026-09-08 14:20 — M1+M2 (backend, contiguous session per plan):
+      empty-discard deal landed (`Deal.ts`, `GameEvent.ts`, `Fold.ts`),
+      wire `firstDiscard` removed (contracts freeze), projection and both
+      leak-sweep allowlists fixed. Full gate green (`pnpm turbo build
+typecheck lint test`, 25/25 tasks) — contract wire frozen, frontend M5
+      unblocked. Two seed-hunt casualties from the deck-cut shift, both
+      resolved: `packages/domain/test/sim/Simulation.test.ts`'s C5.2
+      default batch reseeded (`20260831` → `20260908`) and
+      `apps/api/test/support/http.ts`'s `TEST_SEED` reseeded (`424_242` →
+      `424_243`) to restore `SlamWindow.test.ts`'s offline seed survey.
+      Full detail in the backend child plan's Progress/Surprises. Clauses
+      1–4 covered (backend coverage table); M3 (eager reshuffle) next.
 
 ## Decision log
 
