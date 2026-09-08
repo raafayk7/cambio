@@ -23,6 +23,7 @@
     "SLAM_WINDOW_MS",
     "REALTIME_URL",
     "REALTIME_JWT_SECRET",
+    "REALTIME_SECRET_KEY",
     "TOPIC_SECRET"
   ],
   "tasks": {

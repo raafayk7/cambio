@@ -1,6 +1,6 @@
 import { projectEvents, lobbyView, RealtimePublisherPort } from "@cambio/application"
 import type { LobbyUpdated } from "@cambio/contracts"
-import { Effect, Layer, Redacted } from "effect"
+import { Effect, Layer, Option, Redacted } from "effect"
 
 import { AppConfig } from "../config.js"
 import { signRealtimeJwt } from "./realtime-jwt.js"
@@ -38,16 +38,32 @@ export type BroadcastTransport = (
 export const makeFetchTransport = (options: {
   readonly realtimeUrl: string
   readonly jwtSecret: string
+  /**
+   * Supabase cloud secret key (`sb_secret_…`, CAM-32 C9). Presence switches
+   * the auth headers to cloud mode: `apikey: <key>` + `authorization:
+   * Bearer <key>`, no JWT minted. Absent (local containers) the request is
+   * byte-identical to the pre-CAM-32 shape: self-signed HS256 bearer, no
+   * `apikey`. Adapter-internal — the port never sees this.
+   */
+  readonly secretKey?: string | undefined
 }): BroadcastTransport => {
   return (messages) =>
     Effect.tryPromise({
       try: async () => {
+        const headers: Record<string, string> =
+          options.secretKey === undefined
+            ? {
+                "content-type": "application/json",
+                authorization: `Bearer ${signRealtimeJwt(options.jwtSecret)}`,
+              }
+            : {
+                "content-type": "application/json",
+                apikey: options.secretKey,
+                authorization: `Bearer ${options.secretKey}`,
+              }
         const response = await fetch(`${options.realtimeUrl}/api/broadcast`, {
           method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${signRealtimeJwt(options.jwtSecret)}`,
-          },
+          headers,
           body: JSON.stringify({ messages }),
         })
         if (!response.ok) {
@@ -115,6 +131,7 @@ export const RealtimePublisherLive = Layer.effect(
       makeFetchTransport({
         realtimeUrl: config.realtimeUrl,
         jwtSecret: Redacted.value(config.realtimeJwtSecret),
+        secretKey: Option.getOrUndefined(Option.map(config.realtimeSecretKey, Redacted.value)),
       }),
     ),
   ),
