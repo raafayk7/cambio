@@ -334,3 +334,80 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 ## Outcomes & retrospective
 
 _(filled at the end, typically by `/review`)_
+
+**Review 2026-09-08 — verdict: fix-then-ship.** Four reviewers (contract +
+architecture per side) over `git diff release-v0...HEAD` plus the main-lane
+files; independent verification: api suite forced fresh vs live containers
+(4/4, 0 cached), web forced fresh (2/2), full gate 25/25, static-build
+block green (shell + asset closure + 200 serve + hydration script). No
+timing/concurrency claims in the diff, so no probe was owed.
+
+**What passed cleanly:** all import boundaries; `RealtimePublisherPort`
+and `packages/` untouched; migrations untouched; secret-never-reaches-
+client/log traced end to end (incl. `loadEnv("")`/Vite `envPrefix`
+analysis and a built-`dist/` grep); workflows match ADR-0042 on compose-
+verbatim, bare gate, needs-ordering, concurrency, and secret isolation
+(gate gets no secrets); vercel.json matches ADR-0041/0043 on every
+sub-point; SPA option shape verified against the installed plugin schema;
+C10 rename sweep clean; C1/C2/C3/C5/C8-partial live proofs internally
+consistent.
+
+**Findings (fix cycle):**
+
+1. **F1 HIGH (code)** — `.env.example` ships `REALTIME_SECRET_KEY=`
+   (blank assignment): `cp .env.example .env` yields `Some("")` from
+   `Config.option`, flipping local dev into cloud mode with an empty key;
+   the local container rejects broadcasts and the transport swallows it
+   as warnings — local realtime silently dead. Contradicts the adjacent
+   "Leave unset locally" comment and C9's byte-identical claim. Two
+   reviewers proved the mechanism empirically. Fix: comment the line out
+   AND treat blank-as-absent in `config.ts`; add empty-string cases to
+   `Config.test.ts`/`RealtimeTransport.test.ts`.
+2. **F2 MEDIUM (code)** — `nodeEnv` is `Config.string`
+   (`apps/api/src/config.ts`), violating effect-domain-modeling's
+   closed-sets-are-literal-unions rule; any typo (`Production`, trailing
+   space) bypasses the C12 guard vacuously — fail-open in the guard that
+   exists to catch config mistakes. Fix: `Config.literal("development",
+"test", "production")` + a typo test.
+3. **F3 MEDIUM (test gap)** — C10's code-side read is unpinned: reverting
+   `realtime.ts` to `VITE_REALTIME_ANON_JWT` passes the gate (the guard
+   test trips on the URL term first; its message assertion omits the var
+   name). Fix: strengthen `realtime.test.ts` — valid URL + blank apikey,
+   assert the message contains `VITE_REALTIME_APIKEY`.
+4. **F4 MEDIUM (false doc claim)** — the C4 acceptance box is checked
+   "captured in Progress" but the evidence entry does not exist (a
+   patch-script no-op; the `4a999b7` commit message also overclaims).
+   The run itself happened: 34249417948 job 102174350020,
+   `no pending migrations (1 applied)`. Fix: write the entry; close by
+   sweep across all C4 phrasings.
+5. **F5 MEDIUM (false doc claim, 2 known instances)** — the C11
+   failure-mechanism claim ("fails through the decode/ApiError path") is
+   wrong: the SPA catch-all serves `_shell.html` HTTP 200, so
+   `response.json()` throws a raw SyntaxError and the ApiError branch
+   never runs. Instances: `apps/web/src/services/api.ts` comment;
+   `docs/plans/frontend/CAM-32.md` F3 rationale. Fix: correct the claim
+   everywhere (sweep), optionally add a named `import.meta.env.PROD`
+   guard mirroring `realtime.ts`.
+6. **F6 LOW (ADR drift)** — ADR-0042's Decision says "One workflow, two
+   triggers"; shipped is `gate.yml` + `deploy.yml` via a reusable
+   workflow (the stronger shape for the "byte-identical gate" property).
+   Amend the proposed ADR's wording.
+7. **F7 LOW (doc hygiene batch)** — backend coverage rows C1–C6/C8/C13
+   still read "planned:" with empty columns; frontend C5 row phrased as
+   pending though proven; compose-form note missing from the backend
+   plan's own Surprises (its instruction at B1); `.env.example`
+   `WEB_ORIGIN` lacks its prod flavor; stale SSR-rationale comments in
+   `apps/web/src/services/realtime.ts` and `apps/web/src/router.tsx`
+   justify the per-call QueryClient invariant with a deployment model
+   this task removed.
+
+**Advisory (recorded, no action owed this cycle):** `deploy-api` green
+proves hook acceptance, not a live Render deploy (observability gap);
+`ignoreCommand` silently skips manual/CLI deploys where
+`VERCEL_GIT_COMMIT_REF` is unset; `api.test.ts` afterEach lacks
+`vi.resetModules()` (trap for future cases); `gate.yml` could take
+`permissions: {}` and a PR-scoped concurrency group (free hardening);
+the cloud broadcast header set stays advisory until release day (already
+a carry-forward); `test/support/harness.tsx` sits in the web build's
+hash inputs (pre-existing). Skill staleness sweep: nothing in skills or
+commands contradicted by this code; AGENTS.md was already updated in M5.
