@@ -36,33 +36,44 @@ the drawn card is projected to the holder only
 `packages/application/test/ViewFor.test.ts` "ResolvingPower: value for
 the holder only" / "ResolvingQueenSwap: value for the holder only").
 
-Current state of the code this touches:
+State of the code this touched, **as of plan time (pre-implementation)**
+— see Progress/Outcomes below for what shipped; anchors here are
+corrected post-implementation to their nearest current equivalent, per
+the CAM-4/CAM-7 line-rot lesson, even though the prose describes the
+before-picture:
 
-- **No help UI exists anywhere** (grep-verified across `apps/web/src`,
-  `packages/ui/src`, `design-system/`). Routes are index/room/game only.
-- **AppShell** (`packages/ui/src/components/app-shell.tsx:59-66`) already
-  renders a top-right icon-button — but hard-coded to settings via an
-  `onSettings` prop that no production screen supplies. The slot exists
-  on default chrome and on the game screen's collapsed chrome.
+- **No help UI existed anywhere** (grep-verified across `apps/web/src`,
+  `packages/ui/src`, `design-system/`). Routes were index/room/game only.
+- **AppShell** (`packages/ui/src/components/app-shell.tsx:63-70`, now the
+  `SettingsButton`/`HelpButton` pair) rendered a top-right icon-button —
+  but hard-coded to settings via an `onSettings` prop that no production
+  screen supplied. The slot existed on default chrome and on the game
+  screen's collapsed chrome. **Now implemented**: `onHelp` mirrors it
+  (`:78-85`).
 - **Modal** (`packages/ui/src/components/modal.tsx`) is a native
   `<dialog>` with pinned header/footer and a scrolling body
   (`min-h-0 overflow-y-auto`); the gallery's "House rules" overflow demo
   proves long content works. Width is fixed `max-w-md` (28rem),
   spec-carried in `design-system/components/core/modal.md`.
-- **Marks** (`packages/ui/src/lib/marks.tsx`) contains only
-  `MarkX`/`MarkCheck`/`MarkSettings` — no `?` mark exists.
-- **Turn status** (`apps/web/src/containers/game/game-screen.tsx:96-111`,
-  copy at `:124-145`) collapses `AwaitingDraw`/`HoldingCard`/
+- **Marks** (`packages/ui/src/lib/marks.tsx`) contained only
+  `MarkX`/`MarkCheck`/`MarkSettings` — no `?` mark existed. **Now
+  implemented**: `MarkHelp`.
+- **Turn status** (`apps/web/src/containers/game/game-screen.tsx:104-124`,
+  copy at `:137-160`) collapsed `AwaitingDraw`/`HoldingCard`/
   `ResolvingPower`/`ResolvingQueenSwap` into `your-turn`/`other-turn`
-  before copy is chosen; `TurnIndicator`'s `state` prop is a closed
-  4-value union (`apps/web/src/components/game/turn-indicator.tsx:16-20`).
-- **Held card** (`game-screen.tsx:739-750`, label helper `:164-166`)
-  shows "You drew" / "⟨Name⟩ is holding" under the card via
+  before copy was chosen; `TurnIndicator`'s `state` prop is a closed
+  4-value union (`apps/web/src/components/game/turn-indicator.tsx:16-20`,
+  unchanged by this task). **Now implemented**: `TurnStatus` carries an
+  additional `resolvingPower` flag through to `turnStatusCopy`'s
+  `other-turn` arm — the union itself is untouched (F4.2).
+- **Held card** (`game-screen.tsx:788-800`, label helper `:178-180`)
+  showed "You drew" / "⟨Name⟩ is holding" under the card via
   `HeldCard`'s single `label` prop
-  (`apps/web/src/components/game/held-card.tsx:30-40`).
+  (`apps/web/src/components/game/held-card.tsx:19-35`). **Now
+  implemented**: an optional second `hint` prop (held-card.md r2).
 - **Power semantics are already derived client-side**:
-  `apps/web/src/containers/game/affordances.ts:79-99`
-  (`targetingForRank`: 7/8 → `peek-own`, 9/10 → `peek-other`, J →
+  `apps/web/src/containers/game/affordances.ts:79-99` (unchanged by this
+  task; `targetingForRank`: 7/8 → `peek-own`, 9/10 → `peek-other`, J →
   `swap-two`, Q → `queen-peek`). The `ResolvingPower` holder affordance
   carries `card` + `targeting`; the `ResolvingQueenSwap` holder
   affordance carries `targeting` only, deliberately no `card`.
@@ -214,18 +225,19 @@ viewerId`, the indicator copy reads "⟨Name⟩ is playing a power card"
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes (run bare, never
+- [x] `pnpm turbo build typecheck lint test` passes (run bare, never
       piped).
-- [ ] Component tests pin every F1–F4 clause per the frontend child
+- [x] Component tests pin every F1–F4 clause per the frontend child
       plan's contract coverage table (filled as tests land).
 - [ ] The guide's rule copy is reviewed line-by-line against the
       `cambio-rules` skill + ADRs 0009–0012/0036/0039/0040 (this is the
-      `/review` copy-fidelity pass the issue mandates).
-- [ ] The existing hidden-information sweep tests in
+      `/review` copy-fidelity pass the issue mandates — left for `/review`,
+      not self-certified here).
+- [x] The existing hidden-information sweep tests in
       `apps/web/test/game-screen.test.tsx` still pass unchanged.
-- [ ] Design-system docs (F5) land in the same milestone as the code they
+- [x] Design-system docs (F5) land in the same milestone as the code they
       canonize; the rendered design gate / `ai-tells` audit runs on the
-      new surfaces (advisory).
+      new surfaces (advisory — audit came back clean, see Outcomes).
 
 ## Plan of work
 
@@ -284,6 +296,38 @@ timestamp each entry)_
 
 - [x] 2026-09-08 10:30 — plan written; interview rounds 1–2 complete;
       explorer report folded in.
+- [x] 2026-09-08 — M1 canon landed: modal.md r2 (slam-rule amendment),
+      app-shell.md r5 (help slot + `MarkHelp`), new
+      `components/extensions/how-to-play-guide.md` + extensions-index
+      line. Commit `03ba123`.
+- [x] 2026-09-08 — M2 landed: `MarkHelp` in `marks.tsx`, `onHelp` +
+      `HelpButton` on `AppShell` in both chrome states, test-first in
+      `packages/ui/test/app-shell.test.tsx`. `pnpm turbo test --filter
+@cambio/ui` green. Commit `9bd8b68`.
+- [x] 2026-09-08 — M3 landed: rules copy module + `HowToPlayGuide`
+      component, wired into lobby/room/game via `onHelp`, gallery entry.
+      Tests cover entry-point presence, open/close, copy spot-pins,
+      memory-faithful sweep, slam-window availability — dialog queries on
+      the game screen needed `name:` disambiguation once two `Modal`s are
+      always mounted there. `pnpm turbo test --filter @cambio/web --filter
+@cambio/ui` green (269 tests). Commit `4fa6ab6`, formatting fix `e7f0ae4`.
+- [x] 2026-09-08 — M4 landed: `turnStatus`'s `resolvingPower` flag reaches
+      `turnStatusCopy`; `HeldCard` gains an optional `hint` prop
+      (held-card.md r2) derived from the holder affordance's `targeting`.
+      Hint assertions scoped to the held-card spot to avoid colliding with
+      the always-mounted guide's powers table (same strings). 281 tests
+      green. Commit `19a91f9`.
+- [x] 2026-09-08 — M5 close-out: full gate green
+      (`build typecheck lint test`, 25/25 tasks); dev-server walkthrough
+      (freshness-checked — `WEB_PORT=3100` overrides the launch.json
+      default, caught before it produced a phantom finding) confirmed the
+      guide on lobby, room, and the gallery's `app-shell`/`how-to-play-
+guide` sections; added `onHelp` to the app-shell gallery demo for
+      parity with app-shell.md r5 (commit `2fcd542`); advisory `ai-tells`
+      audit of the four new surfaces came back clean (see Outcomes); added
+      an F2.1 section-heading sweep to close a coverage gap; contract
+      coverage table filled; stale `:<digits>` anchors in both plan docs
+      corrected post-implementation (CAM-4/CAM-7 lesson).
 
 ## Decision log
 
@@ -337,9 +381,34 @@ timestamp each entry)_
 - `ViewFor.ts:57` **does** project `card` to the holder during
   `ResolvingQueenSwap`, while a client comment claims it is always absent
   and `affordances.ts:186-189` drops it. Not load-bearing for this task
-  (D7), but the comment at `game-screen.tsx:150-152` is unverified
-  against the domain — flagged for some future cleanup, do not rely on
-  it either way.
+  (D7), but the comment (now at `game-screen.tsx:165-167` post-
+  implementation — this task's M4 additions shifted it down from :150-152)
+  is unverified against the domain — flagged for some future cleanup, do
+  not rely on it either way. Step 13 deliberately never reads that field.
+- **The game screen always mounts two `Modal`s** (the Call Cambio confirm
+  plus the new how-to-play guide), both rendered unconditionally per
+  modal.md's native-`<dialog>`-inertness pattern. `screen.getByRole("dialog",
+{ hidden: true })` became ambiguous everywhere on that screen — every
+  such query (5 new + 1 pre-existing) needed `name:` disambiguation
+  against the dialog's title. Lobby and room screens mount only the guide
+  and stayed unambiguous.
+- **ADR-0033's version guard bit twice** while writing refetch-driven
+  tests: a replacement `viewResponse` fixture that omits `version` gets
+  the harness default (3), same as the bootstrap — the refetch is then
+  silently discarded as non-newer and the test hangs on a `waitFor` until
+  timeout. Every M3/M4 test that reassigns `handlers[GET_VIEW]` after
+  bootstrap sets `version: 4` explicitly.
+- **`WEB_PORT=3100`** in `.env` overrides `launch.json`'s port-3000
+  default for the web dev server — the M5 freshness-check's first grep
+  came back empty (matching AGENTS.md's warning almost exactly) until the
+  server logs revealed the real port; the fix was navigating there, not
+  restarting anything.
+- **The app-shell gallery section** (`generic.tsx`'s `AppShellSection`)
+  demoed only `onSettings`, not the new `onHelp` — added it to the default
+  and game-chrome states for parity with app-shell.md r5's "help renders
+  alongside settings" documentation. Not in the root/frontend plan's
+  enumerated file list; a small completeness fix, flagged here per the
+  doc-reconciliation discipline.
 
 ## Outcomes & retrospective
 

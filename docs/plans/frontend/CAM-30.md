@@ -36,55 +36,64 @@ Cite tests by file + test name, never line number; line-number citations
 below are for `src/` anchors only (verified 2026-09-08 on `release-v0`;
 re-verify before editing — anchors rot).
 
-Current state of everything this side touches:
+State of everything this side touched, **as of plan time
+(pre-implementation)** — anchors below are corrected post-implementation
+to their nearest current equivalent (CAM-4/CAM-7 line-rot lesson); see
+Progress and the root plan's Outcomes for what actually shipped:
 
-- **Marks** — `packages/ui/src/lib/marks.tsx` holds exactly
+- **Marks** — `packages/ui/src/lib/marks.tsx` held exactly
   `MarkX`/`MarkCheck`/`MarkSettings`: tiny inline SVGs in the material
   language (2px `currentColor` strokes on a 16×16 viewBox, `aria-hidden`,
-  shared `base` props object). No `?` mark exists.
+  shared `base` props object). No `?` mark existed. **Now implemented**:
+  `MarkHelp`.
 - **AppShell** — `packages/ui/src/components/app-shell.tsx`. The settings
-  icon-button (`SettingsButton`, :59-66) renders **only when `onSettings`
-  is supplied** (CAM-17 gate finding: an inert-looking control is worse
-  than its absence) — and no production screen supplies it, so today no
-  icon-button renders anywhere. Two chrome states share the header slot:
-  default chrome's header row (:103-109, wordmark + dot + settings) and
-  the game state's floating icon pair (:90-94, inside the absolute
-  controls column). Both must gain the help button (F1.1).
+  icon-button (`SettingsButton`, now :63-70) renders **only when
+  `onSettings` is supplied** (CAM-17 gate finding: an inert-looking
+  control is worse than its absence) — and no production screen supplied
+  it, so no icon-button rendered anywhere. Two chrome states share the
+  header slot: default chrome's header row (now :124-136, wordmark + dot
+  - help + settings) and the game state's floating icon pair (now
+    :109-121, inside the absolute controls column). **Now implemented**:
+    both gained the help button (F1.1), `HelpButton` at :78-85.
 - **Modal** — `packages/ui/src/components/modal.tsx`: native `<dialog>`,
   props `open, onClose, title, titleFace ("ui" | "display"), variant ("default" | "confirm"), footer, children, className`.
   Esc/scrim/✕ all dismiss (non-confirm); body is `min-h-0 overflow-y-auto`
   with pinned header/footer — long content is proven by the gallery's
   "House rules" overflow demo
-  (`apps/web/src/components/gallery/generic.tsx:328-344`). Width is fixed
-  `max-w-md` (28rem, spec-carried) — root Decision Log D6 keeps it; no
-  Modal code change is expected in this task.
-- **Containers** — all three own their `AppShell` and currently pass no
-  `onSettings`: `apps/web/src/containers/lobby/lobby-screen.tsx:153`
-  (`scene="courtyard"`), `room/room-screen.tsx:284` (`scene="paving"`),
-  `game/game-screen.tsx:1069` (`scene="paving" state="game"`). The game
-  screen already hosts one player-opened modal (the Call Cambio confirm,
-  `game-screen.tsx:949-974`, state `confirmCambioOpen` at :334) — the
-  precedent for trivial open/close `useState` living in the
-  container/component that renders the modal.
-- **Turn status** — `game-screen.tsx`: `turnStatus` (:96-111) collapses
-  `AwaitingDraw`/`HoldingCard`/`ResolvingPower`/`ResolvingQueenSwap` into
-  `your-turn`/`other-turn` **before** copy is chosen, so the phase tag
-  never reaches `turnStatusCopy` (:124-145) — the F4.1 change point.
-  `TurnIndicator` (`apps/web/src/components/game/turn-indicator.tsx:16-20`)
-  has the closed 4-value `state` union that F4.2 pins unchanged.
-- **Held card** — rendered in the table center at `game-screen.tsx:739-750`
-  with a single `label` string from `heldCardLabel` (:164-166).
-  `HeldCard` (`apps/web/src/components/game/held-card.tsx:19-40`) renders
-  card + one muted label line; canon is
-  `design-system/components/core/held-card.md` (r1). The F3 hint is a
-  second line here (root D5) — a canonical component change, see step 10.
-- **Affordances** — `apps/web/src/containers/game/affordances.ts`:
-  `targetingForRank` (:79-99) already maps 7/8 → `peek-own`, 9/T →
-  `peek-other`, J → `swap-two`, Q → `queen-peek`; the holder affordance
-  shapes (:112-134) carry `targeting` for `ResolvingPower` and a
-  `swap-two`-only `targeting` (deliberately **no `card`**) for
-  `ResolvingQueenSwap`. F3's hint derives from `targeting` alone (root
-  D7); no affordances change is expected.
+  (`apps/web/src/components/gallery/generic.tsx:328-344`, unchanged by
+  this task). Width is fixed `max-w-md` (28rem, spec-carried) — root
+  Decision Log D6 keeps it; no Modal code change happened.
+- **Containers** — all three own their `AppShell` and passed no
+  `onSettings`: `apps/web/src/containers/lobby/lobby-screen.tsx:155`
+  (`scene="courtyard"`), `room/room-screen.tsx:286` (`scene="paving"`),
+  `game/game-screen.tsx:1120` (`scene="paving" state="game"`) — all three
+  now also pass `onHelp`. The game screen already hosted one
+  player-opened modal (the Call Cambio confirm, `game-screen.tsx:999-1024`
+  post-implementation, state `confirmCambioOpen` at :379) — the precedent
+  for trivial open/close `useState` living in the container/component
+  that renders the modal, reused for `helpOpen`.
+- **Turn status** — `game-screen.tsx`: `turnStatus` (now :104-124)
+  collapsed `AwaitingDraw`/`HoldingCard`/`ResolvingPower`/
+  `ResolvingQueenSwap` into `your-turn`/`other-turn` **before** copy was
+  chosen, so the phase tag never reached `turnStatusCopy` (now :137-160)
+  — the F4.1 change point. **Now implemented**: `TurnStatus` carries an
+  additional `resolvingPower` flag through to the `other-turn` copy arm.
+  `TurnIndicator` (`apps/web/src/components/game/turn-indicator.tsx:16-20`,
+  unchanged) has the closed 4-value `state` union that F4.2 pins
+  unchanged.
+- **Held card** — rendered in the table center at `game-screen.tsx:788-800`
+  post-implementation, with a single `label` string from `heldCardLabel`
+  (now :178-180). `HeldCard` (`apps/web/src/components/game/held-card.tsx:19-35`)
+  rendered card + one muted label line; canon is
+  `design-system/components/core/held-card.md` (r1 then, r2 now). **Now
+  implemented**: an optional second `hint` line (root D5), step 13 below.
+- **Affordances** — `apps/web/src/containers/game/affordances.ts`
+  (untouched by this task): `targetingForRank` (:79-99) already maps 7/8
+  → `peek-own`, 9/T → `peek-other`, J → `swap-two`, Q → `queen-peek`; the
+  holder affordance shapes (:112-134) carry `targeting` for
+  `ResolvingPower` and a `swap-two`-only `targeting` (deliberately **no
+  `card`**) for `ResolvingQueenSwap`. F3's hint derives from `targeting`
+  alone (root D7); confirmed no affordances change was needed.
 - **Wire truth (no backend change)** — non-holder views carry only the
   phase `_tag` + `playerId` for both power phases; `card` is optional and
   projected to the holder only (`packages/contracts/src/GameView.ts:50-58`,
@@ -107,12 +116,21 @@ Current state of everything this side touches:
   (T3/T4)". **jsdom quirks:** dialogs are queried with
   `getByRole("dialog", { hidden: true })`; the turn indicator is queried
   with `document.querySelector('[role="status"][data-state]')` because
-  AppShell's connection dot is also `role="status"`.
+  AppShell's connection dot is also `role="status"`. **New quirk from this
+  task (M3):** the game screen now always mounts two `Modal`s (the Call
+  Cambio confirm plus the how-to-play guide), so `getByRole("dialog", ...)`
+  needs `name:` disambiguation there (e.g. `{ hidden: true, name: "How to
+play" }`) — lobby/room screens mount only the guide and stay unambiguous.
+  Two module-scope prop mismatches also surfaced: refetched fixtures in
+  M3/M4 tests must set `version` strictly above the bootstrap default (3,
+  ADR-0033's version guard) or the applied-view assertions silently never
+  update.
 - **Design-system files touched** — `design-system/design-system.md`
-  (creation-gate procedure + the empty extensions index),
-  `components/core/modal.md` (the slam rule to amend, in Rules),
-  `components/core/app-shell.md` (r4 today), `components/core/held-card.md`
-  (r1 today), `components/extensions/` (directory exists, empty),
+  (creation-gate procedure + the empty extensions index, now populated),
+  `components/core/modal.md` (the slam rule amended, r1 → r2),
+  `components/core/app-shell.md` (r4 → r5), `components/core/held-card.md`
+  (r1 → r2), `components/extensions/` (directory existed, empty — now
+  holds `how-to-play-guide.md`),
   `references/voice.md` (register map, terminology table, memory-faithful
   copy rule, numbers/card-name rules). The user's creation-gate approvals
   are already recorded in the root Decision Log (D2 mark+slot, D3 modal
@@ -214,7 +232,7 @@ _Checkpoint:_ `pnpm turbo test --filter @cambio/ui` green; repo compiles.
 `apps/web/src/components/help/how-to-play-copy.ts`.** A new `help/`
 sibling to `components/game/` and `components/identity/`. Module-scope
 exported constants (scaling the `DENIAL_COPY` keyed-record precedent,
-`room-screen.tsx:33-54`): structured section data — heading + paragraphs
+`room-screen.tsx:34-54`): structured section data — heading + paragraphs
 per section, plus row arrays for the three tables (scoring, powers, slam
 outcomes). Sections per F2.1: setup, scoring, taking a turn, power cards,
 slamming, rare situations (zero cards, fizzles, empty discard, reshuffle),
@@ -258,12 +276,13 @@ rendered unconditionally beside the shell's children — **never gated or
 force-closed by game state** (F1.3): no phase check may touch `helpOpen`.
 Placement justification (logic-in-hooks discipline): this is a single
 boolean of pure UI state with no derivation and no side effects — the
-`confirmCambioOpen` precedent (`game-screen.tsx:334`) already keeps such
-state as a bare `useState` where the modal renders; a custom hook would be
-ceremony without logic to hold. It lives in the **container** (not the
-route) because containers own state for their surface. On the game screen
-the state lives in `GameScreen` (the shell owner at :1069), not
-`GameTable`. Modal.md's one-modal rule needs no code: the native
+`confirmCambioOpen` precedent (`game-screen.tsx:379` post-implementation,
+was :334) already keeps such state as a bare `useState` where the modal
+renders; a custom hook would be ceremony without logic to hold. It lives
+in the **container** (not the route) because containers own state for
+their surface. On the game screen the state lives in `GameScreen` (the
+shell owner, now at :1120), not `GameTable`. Modal.md's one-modal rule
+needs no code: the native
 `<dialog>` makes the page inert while open, so the guide and the Cambio
 confirm cannot stack by construction.
 
@@ -325,7 +344,8 @@ affordance deliberately carries none. Render it as a second line in the
 `HeldCard` label region: add an optional `hint?: string` prop to
 `apps/web/src/components/game/held-card.tsx` (rendered as a second muted
 line under `label`, only when present), passed from the held-card render
-site (:739-750) only when the derivation produced one — absent in
+site (:788-800 post-implementation, was :739-750) only when the
+derivation produced one — absent in
 `HoldingCard`, absent for non-holders, gone the instant the phase leaves
 (F3.3: it derives from the current view's affordances and persists
 nowhere). **Canon bookkeeping:** this is a change to a canonical
@@ -403,26 +423,26 @@ file, name, and assertion phrase are written by `/implement` when the test
 actually lands. A plan-time row that invents a test title and assertion is
 an overclaim waiting to become a review finding.)_
 
-| Clause | Test (file + name)                                                                                                                                                                                                                                              | What is asserted       |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| F1.1   | _planned: `packages/ui/test/app-shell.test.tsx` — help button in both chrome states, label "How to play", render-only-with-handler; names at implement time_                                                                                                    | _filled by /implement_ |
-| F1.2   | _planned: entry-point presence in each of `apps/web/test/{lobby,room,game}-screen.test.tsx`_                                                                                                                                                                    | _filled by /implement_ |
-| F1.3   | _planned: `apps/web/test/game-screen.test.tsx` — guide opens during `SlamWindow`; open guide survives a phase-change refetch_                                                                                                                                   | _filled by /implement_ |
-| F2.1   | _planned: guide-open test asserting the Modal dialog + presence of every F2.1 section heading_                                                                                                                                                                  | _filled by /implement_ |
-| F2.2   | _planned: copy spot-pins inside the open dialog — king scores (suit-split, true minus), no-opening-peek, obligatory power, rank-not-score slam; plus the `/review` line-by-line fidelity diff for full breadth_                                                 | _filled by /implement_ |
-| F2.3   | _planned: memory-faithful sweep — rendered guide text offers no tracking aid; opening the guide adds no requests beyond the recorded set_                                                                                                                       | _filled by /implement_ |
-| F2.4   | _planned: voice compliance is primarily the `/review` copy pass; the F2.2 spot-pins hold exact canonical phrasing (terminology + minus sign) mechanically_                                                                                                      | _filled by /implement_ |
-| F3.1   | _planned: `game-screen.test.tsx` — holder hint per targeting kind (7/8, 9/T, J, Q), exact F3.1 strings; component-level `hint` render in `held-card.test.tsx`_                                                                                                  | _filled by /implement_ |
-| F3.2   | _planned: `ResolvingQueenSwap` holder shows the swap-step hint, derived with no card field in the fixture_                                                                                                                                                      | _filled by /implement_ |
-| F3.3   | _planned: hint disappears when the phase leaves `ResolvingPower` (broadcast + reassigned view handler)_                                                                                                                                                         | _filled by /implement_ |
-| F3.4   | _planned: non-holder power view renders no hint; existing hidden-info sweeps pass unchanged; already co-pinned by `affordances.test.ts` "non-holder: nothing (no card field — pinned by ViewFor.test.ts)" and `ViewFor.test.ts` (both pre-existing, untouched)_ | _filled by /implement_ |
-| F4.1   | _planned: non-active viewer sees "⟨Name⟩ is playing a power card" for both power phases; active viewer still sees "Your turn"_                                                                                                                                  | _filled by /implement_ |
-| F4.2   | _planned: same tests assert `data-state="other-turn"` on the indicator (no new state value); `TurnIndicator` union unchanged is held by typecheck + review_                                                                                                     | _filled by /implement_ |
-| F4.3   | _planned: asserted structurally with F4.1 — the fixture's non-holder phase carries no card field, and the copy string names no rank_                                                                                                                            | _filled by /implement_ |
-| F5.1   | verified by review, no test — `MarkHelp` canonized in app-shell.md r5 (M1 step 2); doc-vs-code check in `/review`                                                                                                                                               | doc review             |
-| F5.2   | verified by review, no test — app-shell.md r5 help-slot revision (M1 step 2)                                                                                                                                                                                    | doc review             |
-| F5.3   | verified by review, no test — modal.md r2 slam-rule amendment (M1 step 1); its behavioral consequence is pinned by the F1.3 tests                                                                                                                               | doc review             |
-| F5.4   | verified by review, no test — extension doc + extensions-index line (M1 step 3)                                                                                                                                                                                 | doc review             |
+| Clause | Test (file + name)                                                                                                                                                                                                                                                                                                                                                                                                | What is asserted                                                                                                                                                                       |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F1.1   | packages/ui/test/app-shell.test.tsx — "renders the help button in default chrome when onHelp is supplied, and fires it on click", "renders the help button inside the game state's floating controls column", "does not render the help control when no handler is supplied (never an inert affordance)"                                                                                                          | help icon-button renders in both chrome states only with a handler, accessible label "How to play", fires the callback on click                                                        |
+| F1.2   | apps/web/test/lobby-screen.test.tsx "opens the guide from the lobby's help icon-button and closes it", apps/web/test/room-screen.test.tsx "opens the guide from the room's help icon-button and closes it", apps/web/test/game-screen.test.tsx "opens the guide from the game screen's help icon-button and closes it"                                                                                            | the "How to play" button renders on the production render of each of the three screens                                                                                                 |
+| F1.3   | apps/web/test/game-screen.test.tsx — "stays open during the slam window and never blocks the timer (F1.3, modal.md r2)", "survives a phase-change refetch instead of being force-closed (F1.3)"                                                                                                                                                                                                                   | guide opens and stays open during a SlamWindow phase alongside the live timer, and survives a refetched phase change instead of being force-closed                                     |
+| F2.1   | apps/web/test/game-screen.test.tsx — "opens the guide from the game screen's help icon-button and closes it"                                                                                                                                                                                                                                                                                                      | Modal dialog opens titled "How to play"; all seven F2.1 section headings (Setup, Scoring, Taking a turn, Power cards, Slamming, Rare situations, How the game ends) render inside it   |
+| F2.2   | apps/web/test/game-screen.test.tsx — "the guide's rules copy matches canon on the load-bearing spot-pins (F2.2)"; full-breadth fidelity verified by /review's line-by-line diff against cambio-rules + the cited ADRs                                                                                                                                                                                             | no-opening-peek statement, suit-split king scores with the true minus sign, the obligatory-power statement, and rank-not-score slam wording all render verbatim inside the open dialog |
+| F2.3   | apps/web/test/game-screen.test.tsx — "never offers or implies a card-tracking aid, and opening it makes no new requests (F2.3)"                                                                                                                                                                                                                                                                                   | the rendered guide states remembering is the game; opening it adds no HTTP requests beyond the harness's recorded bootstrap set                                                        |
+| F2.4   | voice compliance verified by /review's copy pass; the F2.2 spot-pins mechanically hold exact canonical phrasing and the true minus sign                                                                                                                                                                                                                                                                           | terminology and minus-sign correctness mechanically pinned by F2.2; full sentence-case/register compliance is a /review line-by-line finding                                           |
+| F3.1   | apps/web/test/game-screen.test.tsx — "holder sees the %s hint under the held card (F3.1)" (parameterized: 7H, 8H, 9H, TH, JH, QH); apps/web/test/held-card.test.tsx — "renders the hint as a second line beneath the label when supplied"                                                                                                                                                                         | each targeting kind renders its exact F3.1 spec string under the held card, scoped to the held-card spot; the component renders an arbitrary hint as a second muted line               |
+| F3.2   | apps/web/test/game-screen.test.tsx — "ResolvingQueenSwap holder sees the swap-step hint (F3.2)"                                                                                                                                                                                                                                                                                                                   | a ResolvingQueenSwap holder sees "Now blind-swap any two held cards", derived from a fixture carrying no card field                                                                    |
+| F3.3   | apps/web/test/game-screen.test.tsx — "the hint disappears once the phase leaves ResolvingPower (F3.3)"                                                                                                                                                                                                                                                                                                            | the held-card spot itself disappears once a broadcast + refetch move the phase to AwaitingDraw — the hint has no host left to persist in                                               |
+| F3.4   | apps/web/test/game-screen.test.tsx — "non-holder renders no hint and the indicator reads the power-card copy (F4.1, F4.3)"; pre-existing and untouched: apps/web/test/affordances.test.ts "non-holder: nothing (no card field — pinned by ViewFor.test.ts)" and packages/application/test/ViewFor.test.ts; the "hidden information (C5, structural sweep)" describe in game-screen.test.tsx passes byte-unchanged | the held-card region carries no F3 hint string for a non-holder; every existing hidden-info structural pin still holds                                                                 |
+| F4.1   | apps/web/test/game-screen.test.tsx — "non-holder renders no hint and the indicator reads the power-card copy (F4.1, F4.3)", "the non-active copy for ResolvingQueenSwap reads the same power-card line (F4.1)"; the parameterized F3.1 holder tests additionally assert the holder still sees "Your turn"                                                                                                         | non-active viewers see "<Name> is playing a power card" for both ResolvingPower and ResolvingQueenSwap; the active holder still sees "Your turn"                                       |
+| F4.2   | same F4.1 tests assert data-state="other-turn" on the indicator via document.querySelector('[role="status"][data-state]'); TurnIndicatorProps's 4-value union is unchanged, held by typecheck + this review                                                                                                                                                                                                       | no new indicator state value exists; the power-card copy rides the existing other-turn state                                                                                           |
+| F4.3   | asserted structurally alongside F4.1 — apps/web/test/game-screen.test.tsx "non-holder renders no hint and the indicator reads the power-card copy (F4.1, F4.3)" scopes a negative assertion for any F3 hint string, and the fixture's non-holder phase carries no card field to name a rank from                                                                                                                  | the non-active copy names no rank and no power — structurally guaranteed by the missing card field, not by string-matching                                                             |
+| F5.1   | verified by review, no test — `MarkHelp` canonized in app-shell.md r5 (M1 step 2); doc-vs-code check in `/review`                                                                                                                                                                                                                                                                                                 | doc review                                                                                                                                                                             |
+| F5.2   | verified by review, no test — app-shell.md r5 help-slot revision (M1 step 2)                                                                                                                                                                                                                                                                                                                                      | doc review                                                                                                                                                                             |
+| F5.3   | verified by review, no test — modal.md r2 slam-rule amendment (M1 step 1); its behavioral consequence is pinned by the F1.3 tests                                                                                                                                                                                                                                                                                 | doc review                                                                                                                                                                             |
+| F5.4   | verified by review, no test — extension doc + extensions-index line (M1 step 3)                                                                                                                                                                                                                                                                                                                                   | doc review                                                                                                                                                                             |
 
 ## Progress
 
@@ -430,6 +450,10 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [x] 2026-09-08 11:05 — frontend child plan written (all cited anchors
       verified against `release-v0`); implementation not started.
+- [x] 2026-09-08 — M1–M5 implemented in full (see root plan Progress for
+      the milestone-by-milestone log and commit hashes); full gate green;
+      contract-coverage table filled with as-built test names; `:<digits>`
+      anchors in this doc and the root plan corrected post-implementation.
 
 ## Surprises & notes for the root plan
 
@@ -445,10 +469,11 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 - The marks have no doc file of their own; this plan resolves root F5.1's
   "and/or" to **app-shell.md alone** as the `MarkHelp` canon home
   (matching where the settings mark's rules already live).
-- `game-screen.tsx:150-152` carries the unverified comment root plan
-  Surprises already flagged (`ResolvingQueenSwap.card` "always absent by
-  server construction" vs `ViewFor.ts:57` projecting it to the holder).
-  Step 13 deliberately never reads that field (D7) — do not "fix" the
+- `game-screen.tsx:165-167` post-implementation (was :150-152 pre-task —
+  this task's M4 additions shifted it) carries the unverified comment root
+  plan Surprises already flagged (`ResolvingQueenSwap.card` "always absent
+  by server construction" vs `ViewFor.ts:57` projecting it to the holder).
+  Step 13 deliberately never reads that field (D7) — did not "fix" the
   comment in this task's diff.
 - The guide modal and the Cambio confirm cannot stack (native `<dialog>`
   inertness), so modal.md's one-modal rule needs no coordination code —

@@ -510,6 +510,18 @@ describe("how-to-play guide (F1/F2)", () => {
     await user.click(screen.getByRole("button", { name: "How to play" }))
     const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
     expect(within(dialog).getByText("How to play")).toBeInTheDocument()
+    // F2.1: every section the functional contract lists.
+    for (const heading of [
+      "Setup",
+      "Scoring",
+      "Taking a turn",
+      "Power cards",
+      "Slamming",
+      "Rare situations",
+      "How the game ends",
+    ]) {
+      expect(within(dialog).getByText(heading)).toBeInTheDocument()
+    }
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }))
     await waitFor(() => {
