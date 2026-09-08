@@ -44,9 +44,14 @@ create/join panels).
 - The design system already has a registered `Link` component
   ([packages/ui/src/components/link.tsx](../../../packages/ui/src/components/link.tsx),
   doc: [design-system/components/core/link.md](../../../design-system/components/core/link.md))
-  with **zero current call sites** anywhere in the app — this is its first
-  real usage. It renders a plain `<a>` (or a Radix `Slot` via `asChild`) and
-  forwards all anchor props, so `href`/`target`/`rel` pass straight through.
+  with **no prior production usage** — its only existing call sites are in
+  the dev-only component gallery
+  ([apps/web/src/components/gallery/generic.tsx:81,84](../../../apps/web/src/components/gallery/generic.tsx),
+  mounted at the `/dev/components` route, not a real screen; corrected at
+  `/review` — the planning-phase grep missed this directory). This is its
+  first usage in a screen players actually see. It renders a plain `<a>`
+  (or a Radix `Slot` via `asChild`) and forwards all anchor props, so
+  `href`/`target`/`rel` pass straight through.
   No new component, token, or icon is introduced by this task.
 - There is no existing external-link pattern in the codebase to follow (repo-wide
   search for `<a `, `target="_blank"`, `rel=` returned zero hits before this
@@ -201,4 +206,66 @@ _(none yet — filled during implementation)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+**Verdict: ship.**
+
+Reviewed via two independent read-only subagents (contract + architecture)
+plus direct verification: a forced, non-cached full gate run
+(`pnpm turbo build typecheck lint test --force`, 25/25 tasks — 284/284 web
+tests, 132/132 api tests including live Postgres/realtime integration
+suites) and a manual re-check of the false-claim finding below.
+
+**Contract review:** all 5 functional-contract clauses satisfied and all 4
+acceptance criteria demonstrably hold, verified against the current code
+(not just the plan's coverage table) — file:line evidence for each clause.
+The frontend plan's Contract coverage table's clause→test mapping was
+independently confirmed accurate (each cited test really does assert what
+the table claims). No scope creep: exactly one link, one wrapper, no extra
+props or hidden behavior.
+
+**Architecture review:** no import-boundary, layering, design-system, or
+hidden-information violations. `packages/ui/` has zero diff (confirmed
+directly via `git diff --stat`); `Link` and `AppShell` are consumed, not
+modified. `p-3` / `text-center` / `text-sm` are pre-existing, token-backed
+utilities already used elsewhere in this codebase, not novel values.
+`ai-tells` and `hidden-information` both confirmed not applicable (no new
+visual surface beyond one text line; no client-facing payload/contracts/
+realtime code touched) rather than silently skipped.
+
+**Finding (documentation accuracy, non-blocking — fixed in this cycle):**
+both plan docs claimed `Link` had no prior usage in the app:
+
+- root plan (this file, Context & orientation): "with **zero current call
+  sites** anywhere in the app — this is its first real usage."
+- [frontend/CAM-34.md](../frontend/CAM-34.md) (Context & orientation):
+  "This is the component's first real call site in the app."
+
+Both are false — `Link` is already used at
+[apps/web/src/components/gallery/generic.tsx:81,84](../../../apps/web/src/components/gallery/generic.tsx),
+mounted at the `/dev/components` gallery route
+([apps/web/src/routes/dev/components.tsx](../../../apps/web/src/routes/dev/components.tsx)).
+The original planning-phase Explore agent's grep apparently missed
+`apps/web/src/components/gallery/`. This didn't affect any decision made —
+the gallery route is a dev-only component showcase, not a competing
+production pattern, and no clause or Decision Log entry depended on the
+"first usage" framing being literally true — but it's a false claim in a
+living doc and is corrected below rather than left standing. (The adjacent,
+narrower claim — "no existing `target=\"_blank\"`/`rel=` external-link
+pattern in the codebase" — was re-verified and holds: the gallery's `Link`
+usages set neither attribute.)
+
+**Verified independently, not just asserted:**
+
+- `packages/ui/` zero-diff claim — confirmed via `git diff --stat` against
+  `release-v0`.
+- `development` is genuinely the production-deploying branch (Decision Log
+  entry citing ADR-0041/0042) — confirmed by reading
+  [ADR-0042](../../adr/0042-ci-github-actions-compose-gate-migrate-then-deploy.md),
+  which gates deploy on `push` to `development` specifically.
+- The contrast-advisory Decision Log entries (courtyard-scene legibility) —
+  re-ran `.agents/scripts/design-gate/hardcheck.js` against a fresh render
+  independently during review: still PASS, same single advisory, consistent
+  with what implementation logged.
+
+**Deferred / nothing else outstanding.** No ADRs were needed and none were
+skipped that should have been written. No skill or command text was found
+to contradict the shipped code (no staleness sweep action needed).

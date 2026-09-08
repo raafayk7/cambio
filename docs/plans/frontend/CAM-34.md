@@ -26,8 +26,11 @@
 - **Component to reuse:** `packages/ui/src/components/link.tsx` — the
   design-system `Link`, a plain `<a>` wrapper forwarding all anchor props
   (`href`, `target`, `rel`, etc.) straight through. Doc:
-  `design-system/components/core/link.md`. This is the component's first
-  real call site in the app — no variant, token, or color override is being
+  `design-system/components/core/link.md`. Its only prior call sites are in
+  the dev-only component gallery (`apps/web/src/components/gallery/generic.tsx:81,84`,
+  mounted at `/dev/components`, not a real screen; corrected at `/review` —
+  see root plan Outcomes & Retrospective) — this is its first usage in a
+  screen players actually see. No variant, token, or color override is being
   added; the wrapper element's own classes (if any) are spacing/sizing only.
 - **Test file:** `apps/web/test/lobby-screen.test.tsx` (210 lines),
   role/text-based Testing Library queries (`screen.findByRole`,
