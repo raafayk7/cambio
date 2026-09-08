@@ -31,9 +31,21 @@ Blocking dialog (confirm Cambio call, leave game, settings). Class:
 ## Rules
 
 - The game does not pause for anyone's modal — timers keep draining behind
-  the scrim; a modal must never be used during the slam window.
+  the scrim. No **game-action** modal (one that performs or confirms a
+  game action — Call Cambio's confirm is the canonical example) may be
+  required, opened by the system, or block input during the slam window.
+- An **opt-in reference overlay** (the how-to-play guide) is the one
+  exception: the player chose to open it, it performs no action, and it
+  stays available in every phase including the slam window. Missing a slam
+  while reading is the player's own cost, not the modal's — the original
+  intent (the game never waits on anyone's modal) still holds, since
+  nothing about the window pauses or resets while the overlay is open.
 - One modal at a time; no stacking.
 
 ## Revisions
 
 - r1: initial (CAM-13).
+- r2 (CAM-30): the slam-window rule is scoped to **game-action** modals —
+  it predates any player-openable reference modal. The how-to-play guide
+  is the first opt-in reference overlay and stays open through the slam
+  window by design (root plan Decision Log D3).

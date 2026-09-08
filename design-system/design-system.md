@@ -99,4 +99,5 @@ pagination, tooltip, textarea, radio, dropdown-menu.
 
 ## Extensions index
 
-(empty — nothing born yet)
+- `components/extensions/how-to-play-guide.md` — the complete rules,
+  hosted in `modal` (CAM-30).
