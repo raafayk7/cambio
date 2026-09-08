@@ -101,8 +101,8 @@ answers through the proxy from Render.
   unchanged.
 - **C11** A production web build with `VITE_API_URL` missing must **fail
   visibly** (build error or same-origin relative requests) — never
-  silently ship `http://localhost:3001` (today's fallback at
-  `apps/web/src/services/api.ts:39`).
+  silently ship `http://localhost:3001` (the pre-change fallback in
+  `apps/web/src/services/api.ts`, since edited by this task).
 - **C12** The api refuses to boot (or loudly logs, per child-plan
   decision) when `NODE_ENV=production` and `SESSION_COOKIE_SECURE` is not
   `true` — a forgotten Render env var must not silently issue insecure
@@ -114,12 +114,16 @@ answers through the proxy from Render.
 
 ### Acceptance criteria
 
-- [ ] `pnpm turbo build typecheck lint test` passes locally on the task
-      branch (run bare).
-- [ ] A test PR shows the gate check red on a deliberate failure and green
-      after revert (C1/C2 proven in anger, then the test PR closed).
-- [ ] The deploy workflow run for `development` shows gate → migrate →
-      deploy-hook ordering in its job graph (C3).
+- [x] `pnpm turbo build typecheck lint test` passes locally on the task
+      branch (run bare) — 25/25 tasks, both lanes.
+- [x] A test PR shows the gate check red on a deliberate failure and green
+      after revert (C1/C2 proven in anger, then the test PR closed) —
+      PR #25: red run 34248814457 (only the deliberate test failed;
+      RealtimeIntegration executed on the runner), green run 34249321407
+      (4m48s), closed unmerged, branch deleted.
+- [x] The deploy workflow run for `development` shows gate → migrate →
+      deploy-hook ordering in its job graph (C3) — run 34243991527: gate ✓,
+      migrate ✗ (pre-secrets, designed), deploy-api skipped.
 - [ ] Live smoke, **provable at deploy-now**: C5 curl output (`/api/health`
       through the proxy), C4 idempotent re-run, C3 job graph, C8's
       "applied migrations match the deployed branch" SQL — captured in
@@ -130,10 +134,11 @@ answers through the proxy from Render.
       page load, C8's `cron.job` check, C9/C10 end-to-end broadcast.
       These get local/CI proofs now (child plans) and live proofs on
       release day — the /release task's checklist must carry them forward.
-- [ ] Merge-down complete: `main` → `development` → `release-v0` carries
-      the workflows + `vercel.json` (ADR-0043 definition of done).
-- [ ] ADR index rows for 0024/0028/0032 annotated as amended (see
-      Plan of work M5).
+- [x] Merge-down complete: `main` → `development` → `release-v0` carries
+      the workflows + `vercel.json` (ADR-0043 definition of done) — and the
+      AGENTS.md/Release-History "once CI/CD exists" phrasing updated (M5).
+- [x] ADR index rows for 0024/0028/0032 annotated as amended (done in the
+      plan commit `bda7e02`).
 
 ## Plan of work
 
@@ -231,6 +236,16 @@ timestamp each entry)_
 - [x] 2026-09-08 16:20 — **M0 (partial)**: Supabase project `cambio` created (ref `vbrvdqywrehxymbjfbgb`, ap-south-1, free tier, $0 cost confirmed); Render service `cambio-api` created (`srv-dag2djdg1s2s738of660`, singapore, free, auto-deploy **off**, `https://cambio-api-g8uk.onrender.com`); Render env set: NODE_ENV, SESSION_COOKIE_SECURE=true, SESSION_COOKIE_SAMESITE=lax, LOG_LEVEL, SESSION_SECRET, TOPIC_SECRET, REALTIME_JWT_SECRET (throwaway), REALTIME_URL. Publishable key retrieved. Remaining M0 items need the user (see Surprises): Vercel project connect, DB password, sb_secret key, deploy-hook URL.
 - [x] 2026-09-08 16:22 — **M1 done**: `659dc3d` on `main` (gate.yml, deploy.yml, vercel.json with the real Render host), merged down `main` → `development` → `release-v0`; task branch fast-forwarded. First `deploy.yml` run [34243991527](https://github.com/raafayk7/cambio/actions/runs/34243991527): gate ✓ 1m30s (compose `--wait` worked on the scaffold), migrate ✗ (missing secret — the designed pre-wiring failure), deploy-api **skipped** — C3 ordering proven pre-secrets.
 - [x] 2026-09-08 17:05 — **M2 done**: backend lane `cb3d886` (C9 cloud transport + `REALTIME_SECRET_KEY`, C12 fail-at-boot guard, C13 `.env.example`), frontend lane `f87659d` (C7 SPA static build + local proof, C11 fallback hardening, C10 `VITE_REALTIME_APIKEY` rename). Full gate bare: 25/25 tasks, api 130/130 (RealtimeIntegration executing), web 282/282. Coverage rows filled in both child plans.
+- [x] 2026-09-08 17:40 — **C1/C2 proven in anger**: throwaway PR #25 —
+      red run 34248814457 (1 failed | 122 passed; `RealtimeIntegration ✓`
+      on the runner, so the compose `--wait` + one-shot `realtime-init`
+      path works in CI without the fallback form), green run 34249321407
+      after revert; PR closed unmerged, branch deleted.
+- [x] 2026-09-08 17:45 — **M5 done**: AGENTS.md branch-hierarchy line
+      updated on `main` (`83fc805`) + merged down; Linear Release History
+      doc phrasing updated; ADR index amendments were already in the plan
+      commit. Remaining: M3 wiring (4 user checklist items) + M4
+      deploy-now smoke.
 
 ## Decision log
 

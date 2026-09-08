@@ -39,7 +39,11 @@ gate is not in play. `hidden-information` is likewise untouched — no
 payload, channel, or projection changes; the realtime work is env-var
 naming and value shapes only.
 
-**Current state, probe-verified (re-verify before building on it):**
+**Current state, probe-verified (re-verify before building on it).**
+_Close-out note (2026-09-08): the `src/` line anchors below describe
+pre-change code as of plan commit `bda7e02` — F2/F3/F4 edited
+`vite.config.ts`, `api.ts`, and `realtime.ts`, so the as-built diff is the
+authority, not these numbers._
 
 - `apps/web/src/services/api.ts:39` is the single HTTP choke point:
   `const API_URL: string = TUNNEL_MODE ? "" : (import.meta.env.VITE_API_URL ?? "http://localhost:3001")`,
