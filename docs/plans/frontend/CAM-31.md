@@ -34,6 +34,13 @@ Current state of everything this side touches (all line refs verified
 2026-09-08 on `release-v0`; re-verify before editing — backend milestones
 may land first, and `src/` anchors rot):
 
+> **Superseded by implementation (close-out note):** every line number
+> below is a pre-diff (`release-v0`) snapshot, kept as planning history —
+> M5 touched `affordances.ts`, `use-game.ts`, `draw-deck.tsx`, and
+> `gallery/game.tsx`, so these offsets no longer match the as-built files.
+> For current locations, read the coverage table below or the files
+> themselves; do not navigate by these numbers.
+
 - **Affordance mirror** — `apps/web/src/containers/game/affordances.ts`.
   The `AwaitingDraw` holder branch (:150-156): `takeDiscard` (:152-153) is
   already undefined-safe over an empty `view.discard` (correct for game
@@ -42,7 +49,7 @@ may land first, and `src/` anchors rot):
   says it simplifies to `deckCount > 0` (the "tap the empty deck to
   reshuffle" affordance disappears; interview decision, root Decision Log).
   The old formula is repeated verbatim in the `DrawDeck` prop doc
-  (`apps/web/src/components/game/draw-deck.tsx:41-44`) and in canon
+  (`apps/web/src/components/game/draw-deck.tsx`) and in canon
   (`design-system/components/core/draw-deck.md`, Rules — the
   click-affordance line).
 - **Empty discard rendering** — already exists and is correct:
@@ -55,7 +62,7 @@ may land first, and `src/` anchors rot):
   and :728-738 (conditional `top` prop). **No structural change** for
   game-start-empty — only affordances, tests, and canon copy.
 - **DeckReshuffled today** —
-  `apps/web/src/containers/game/use-game.ts:653-666` enqueues one
+  `apps/web/src/containers/game/use-game.ts` enqueues one
   representative discard→deck flight (comment :655-659 carries the ADR-0033
   rationale). Batch flow: every broadcast runs `handleRoomEvent` then
   `scheduleRefetch` (:714-718); the refetch is a trailing 100ms debounce
@@ -76,7 +83,7 @@ may land first, and `src/` anchors rot):
   exclusive in time, which is what fixes it — verify, expect no code
   change there.
 - **The latent empty-branch bug, now the guaranteed path** —
-  `draw-deck.tsx:65-90`: the `count === 0` branch (:66-70) renders the
+  `draw-deck.tsx`: the `count === 0` branch (the empty branch) renders the
   dashed outline with **no** motion class; `animate-pulse-soft` rides only
   the populated branch (:73-76). During a re-arm reshuffle
   (discard-landing trigger, ADR-0040 case 2) the snapshot still says
@@ -92,9 +99,9 @@ may land first, and `src/` anchors rot):
   reads "a zero-card keep took the last card" — under ADR-0039 it is now
   also every game's opening state).
 - **Stale surfaces (clause 16)** — gallery label
-  `apps/web/src/components/gallery/game.tsx:239` "deck empty (reshuffle
+  `apps/web/src/components/gallery/game.tsx` "deck empty (reshuffle
   imminent)" (wrong under eager: a visible resting empty deck means
-  nothing is reshufflable); stale comment `use-game.ts:440-442` (claims
+  nothing is reshufflable); stale comment `use-game.ts` (claims
   reshuffle tags fall through to `default` — the `DeckReshuffled` case
   has existed since CAM-18's CH2); stale test fixture
   `apps/web/test/room-screen.test.tsx` `gameStartedPayload()` includes
@@ -139,7 +146,7 @@ Tests first (ADR-0030 suites; run via
   discard pile)") already covers no-window-over-empty; don't duplicate
   it.
 
-Then the change: `affordances.ts:154` becomes `view.deckCount > 0`, and
+Then the change: `affordances.ts` becomes `view.deckCount > 0`, and
 the surrounding comment sheds the lazy-era rationale. Update the repeated
 formula in the `DrawDeck` prop doc (`draw-deck.tsx:41-44`) in the same
 commit (comment-only; the canonical Rules line updates in step 3's
@@ -149,10 +156,10 @@ r-bump).
 
 - `apps/web/test/room-screen.test.tsx` — drop `firstDiscard: "KH"` from
   `gameStartedPayload()` so the fixture matches the frozen wire shape.
-- `use-game.ts:440-442` — rewrite the CH1 comment: reshuffle no longer
+- `use-game.ts` — rewrite the CH1 comment: reshuffle no longer
   falls through to `default` (and after step 4, point it at the
   sequencing gate instead).
-- `apps/web/src/components/gallery/game.tsx:239` — relabel the
+- `apps/web/src/components/gallery/game.tsx` — relabel the
   `count={0}` state card; under eager, a resting empty deck means nothing
   is reshufflable (e.g. "deck empty (nothing left to reshuffle)").
 
@@ -186,7 +193,7 @@ Then the component, test first:
   populated branch implicitly accepts).
 - `draw-deck.tsx` — apply the same
   `(state === "draw" || state === "reshuffling") && "animate-pulse-soft"`
-  treatment to the empty branch (:66-70) that the populated branch
+  treatment to the empty branch (the empty branch) that the populated branch
   already has (:73-76). Reuse only; no new tokens, no arbitrary values
   (ADR-0027).
 - Optionally add a gallery state card for empty + `reshuffling` so the
@@ -196,7 +203,7 @@ Then the component, test first:
 
 Interview decision (root Decision Log): the `DeckReshuffled` flight is
 **sequenced after its causing flight** via a deferral gate copying the
-existing `runAfterReveal` pattern (`use-game.ts:402-426`) — a second
+existing `runAfterReveal` pattern (`use-game.ts`) — a second
 instance of the same mechanism class, in `use-game.ts` beside it, not a
 new event-queue abstraction. Server batch ordering (root clauses 6–9):
 the causing event always precedes `DeckReshuffled` in its batch.

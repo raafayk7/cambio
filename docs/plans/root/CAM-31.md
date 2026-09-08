@@ -27,12 +27,20 @@ Everything below was mapped by exploration on 2026-09-08 against a green
 domain suite (196 tests passing); cited tests were verified to exist and
 pass.
 
+> **Superseded by implementation (close-out note):** the line numbers
+> below are a pre-diff (`release-v0`) snapshot, kept as planning history —
+> `Deal.ts`, `GameEvent.ts`, `Fold.ts`, `Engine.ts`,
+> `packages/contracts/src/GameEvents.ts`, `EventProjection.ts`, both
+> leak-sweep allowlists, and `use-game.ts` all changed shape in this diff.
+> For current locations, read the child plans' coverage tables or the
+> files themselves; do not navigate by these numbers.
+
 - **Deal:** `packages/domain/src/Deal.ts` selects `firstDiscard` (line 37)
   and seeds `discard: [firstDiscard]`; `GameStarted`
   (`packages/domain/src/GameEvent.ts`) carries it; the fold's
   `initialState` (`packages/domain/src/Fold.ts`, ~line 64) transcribes it.
 - **Reshuffle today (lazy):** `reshuffleIfEmpty` is called only from
-  `drawOne` (`packages/domain/src/Engine.ts:82-89`), which serves three
+  `drawOne` (`packages/domain/src/Engine.ts`), which serves three
   draw sites: normal draw (~~:120), failed-slam penalty (~~:253), zero-card
   draw-then-give (~:302). Six sites land cards on the discard; five funnel
   through `openWindowOrAdvance` (:56-65), the slam path (site 6) returns
@@ -52,7 +60,7 @@ pass.
 - **Client:** `firstDiscard` has zero production readers. The empty-discard
   render state exists and is tested (`discard-pile.tsx`, ADR-0012 path).
   `DeckReshuffled` already triggers a discard→deck flight
-  (`apps/web/src/containers/game/use-game.ts:653-666`); flights play
+  (`apps/web/src/containers/game/use-game.ts`); flights play
   concurrently (no queue), and the deck's `reshuffling` choreography state
   renders no motion when `count === 0` — a latent bug that eager timing
   makes the guaranteed path.
@@ -159,14 +167,14 @@ completed command application.
 
 ### Acceptance criteria
 
-- [ ] All contract clauses above are covered by tests named in the child
+- [x] All contract clauses above are covered by tests named in the child
       plans' coverage tables (or carry a documented reason why none can).
-- [ ] `pnpm turbo build typecheck lint test` passes, run bare (no pipe).
-- [ ] Dev data wiped (old `GameStarted` payloads discarded) and a fresh
+- [x] `pnpm turbo build typecheck lint test` passes, run bare (no pipe).
+- [x] Dev data wiped (old `GameStarted` payloads discarded) and a fresh
       game verified end-to-end against a **fresh** dev server (AGENTS.md
       staleness check: curl a changed module through Vite before trusting
       any rendered verification).
-- [ ] Rendered walkthrough: game start shows empty discard with correct
+- [x] Rendered walkthrough: game start shows empty discard with correct
       affordances; a deck-emptying draw shows draw flight → reshuffle
       flight in sequence with visible reshuffle motion.
 
@@ -256,6 +264,28 @@ typecheck lint test`, 25/25 tasks) — contract wire frozen, frontend M5
       characteristic of the flight layer, not a gate-logic change).
       Clauses 13–16 covered. M6 (docs, dev-data wipe, rendered walkthrough,
       final gate) next.
+- [x] 2026-09-08 16:10 — M6 (both): HANDOFF §1.1/§1.7 and `cambio-rules`
+      SKILL.md amendment blockquotes landed (ADR-0036 pattern); dev data
+      wiped via volume recreate + fresh migrate. Rendered walkthrough
+      against fresh `api`/`web` dev servers (AGENTS.md staleness check
+      passed — curled `draw-deck.tsx` through Vite, confirmed 3
+      `animate-pulse-soft` occurrences before trusting anything rendered):
+      (1) fresh 2-player game via the real UI — discard renders
+      `data-state="empty"`, only "Draw a card"/"Call Cambio" are visible
+      buttons, no slam timer, `deckCount` is 44 (52 − 4·2); (2) the
+      gallery's new "deck empty, reshuffling" state card confirmed live in
+      the DOM carrying `animate-pulse-soft` on the dashed outline; (3) a
+      scripted 2-player game driven entirely over HTTP (draw + resolve +
+      discard every turn, never slamming, waiting out each 10s window)
+      played to deck exhaustion — round 44's draw took the last deck card
+      and `deckCount` jumped **1 → 42** in that same command's response
+      (43 discarded cards minus the retained top, reshuffled), live on the
+      running dev server — direct confirmation of clause 6 (draw-then-
+      reshuffle, same batch) outside the test suite. Full gate re-run
+      after the wipe: green, 25/25. All four root-plan acceptance criteria
+      checked off. Backend/frontend implementation complete; only
+      close-out (plan reconciliation, commit, push, Linear comment)
+      remains.
 
 ## Decision log
 
@@ -312,7 +342,14 @@ CardGivenFromDeck` is exactly what the eager trigger produces — a
   concurrently with or ahead of the reshuffle. Chaining it too would be
   the new mechanism class the interview declined — surface at review if
   the walkthrough reads badly.
+  **Not exercised by the M6 walkthrough**: the automated 2-player game
+  used for it never slams (deliberately, to keep the deck-depletion
+  script simple), so this residual's specific batch shape was never
+  rendered. Still open for `/review` to judge directly if it wants a
+  visual read.
 
 ## Outcomes & retrospective
+
+_(filled at the end, typically by `/review`)_
 
 _(filled at the end, typically by `/review`)_

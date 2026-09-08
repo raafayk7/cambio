@@ -448,6 +448,16 @@ test` — 25/25 tasks green (contract wire frozen; frontend M5 unblocked).
       (HANDOFF/cambio-rules amendments, dev-data wipe) deferred to land
       alongside frontend M5's close-out per the root plan's milestone
       order.
+- [x] 2026-09-08 15:35 — M6 backend share: amendment blockquotes landed
+      under `docs/HANDOFF.md` §1.1 and §1.7 (pointing at ADR-0039/ADR-0040
+      respectively) and the matching two amendments in
+      `.agents/skills/cambio-rules/SKILL.md`, both in the existing
+      ADR-0036 blockquote pattern; `npx prettier --check` on both files
+      passes (no inline-code-span line-break trap). Dev data wiped via the
+      canonical volume-recreate path: `docker compose down -v` then
+      `up -d`, then `pnpm --filter @cambio/api migrate` (4 migrations
+      applied clean against the fresh `_cambio_migrations`). Full gate
+      re-run against the fresh database: green, 25/25.
 
 ## Surprises & notes for the root plan
 
