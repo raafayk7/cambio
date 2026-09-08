@@ -10,6 +10,7 @@
       "source": "/api/:path*",
       "destination": "https://cambio-api-g8uk.onrender.com/:path*"
     },
+    { "source": "/", "destination": "/_shell.html" },
     { "source": "/:path*", "destination": "/_shell.html" }
   ]
 }
