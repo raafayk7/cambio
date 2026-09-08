@@ -512,6 +512,7 @@ describe("how-to-play guide (F1/F2)", () => {
     expect(within(dialog).getByText("How to play")).toBeInTheDocument()
     // F2.1: every section the functional contract lists.
     for (const heading of [
+      "About Cambio",
       "Setup",
       "Scoring",
       "Taking a turn",
@@ -544,11 +545,23 @@ describe("how-to-play guide (F1/F2)", () => {
     expect(
       within(dialog).getByText(/does not look at any of them — there is no opening peek/),
     ).toBeInTheDocument()
-    // Suit-split king scores, true minus sign (scoring table).
+    // Suit-split king scores, true minus sign (scoring table). The red-king
+    // row's ♥/♦ glyphs render as separate colored spans (see CardLabel), so
+    // a plain string query won't match text split across elements — a
+    // custom matcher checks the cell's full text content instead (the RTL-
+    // documented pattern for this exact case).
     expect(within(dialog).getByText("King ♠, King ♣")).toBeInTheDocument()
-    expect(within(dialog).getByText("King ♥, King ♦")).toBeInTheDocument()
+    expect(
+      within(dialog).getByText(
+        (_content, node) => node?.tagName === "TD" && node.textContent === "King ♥, King ♦",
+      ),
+    ).toBeInTheDocument()
     expect(within(dialog).getByText("−1")).toBeInTheDocument()
     expect(within(dialog).getByText("−2")).toBeInTheDocument()
+    // The red king row's ♥ and ♦ glyphs carry the quarantined suit-red
+    // token (tokens.md); the black king row's suits stay plain ink.
+    expect(within(dialog).getByText("♥")).toHaveClass("text-accent-suit-red")
+    expect(within(dialog).getByText("♦")).toHaveClass("text-accent-suit-red")
     // Obligatory power (taking a turn).
     expect(
       within(dialog).getByText(/obligates you to play it: you can't decline, keep, or discard/),

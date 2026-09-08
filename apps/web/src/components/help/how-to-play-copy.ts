@@ -38,6 +38,14 @@ export interface SlamOutcomeRow {
   readonly result: string
 }
 
+export const INTRO_SECTION: GuideSection = {
+  heading: "About Cambio",
+  paragraphs: [
+    "Cambio is a memory game played with cards. Most of what's in play is a card you can't see — including in your own hand — so a peek is worth remembering, not just taking.",
+    "Play passes around the table one turn at a time; the game ends the moment someone calls Cambio, and the lowest score wins.",
+  ],
+}
+
 export const SETUP_SECTION: GuideSection = {
   heading: "Setup",
   paragraphs: [
@@ -131,6 +139,7 @@ export const ENDGAME_SECTION: GuideSection = {
 }
 
 export const HOW_TO_PLAY_SECTIONS: readonly GuideSection[] = [
+  INTRO_SECTION,
   SETUP_SECTION,
   SCORING_SECTION,
   TURN_SECTION,

@@ -56,6 +56,22 @@ function ConnectionDot({ connection }: { connection: "connected" | "reconnecting
   )
 }
 
+// Decorative suit cluster beside the wordmark — same color split as
+// divider.tsx's `ornament` variant (accent.suit-red on hearts/diamonds
+// only, tokens.md's "suit red is quarantined" rule), sized down to sit
+// quietly next to the display face rather than announce itself. Order is
+// its own (♠ ♥ ♣ ♦), not the divider's ♠ ♥ ♦ ♣ — app-shell.md r6.
+function WordmarkSuits() {
+  return (
+    <span aria-hidden className="flex items-center gap-1 text-sm leading-none">
+      <span className="text-ink-primary">♠</span>
+      <span className="text-accent-suit-red">♥</span>
+      <span className="text-ink-primary">♣</span>
+      <span className="text-accent-suit-red">♦</span>
+    </span>
+  )
+}
+
 // Rendered only when a handler exists — an interactive-looking control
 // that does nothing on activation is worse than its absence (gate
 // finding, CAM-17). The canon's settings icon-button appears as soon as
@@ -122,7 +138,10 @@ export function AppShell({
       ) : (
         <>
           <header className="flex items-center justify-between bg-surface-page px-4 py-2">
-            <span className="font-display text-lg">Cambio</span>
+            <div className="flex items-center gap-2">
+              <span className="font-display text-lg">Cambio</span>
+              <WordmarkSuits />
+            </div>
             <div className="flex items-center gap-3">
               <ConnectionDot connection={connection} />
               <HelpButton onHelp={onHelp} />

@@ -3,6 +3,7 @@ import { Modal, Table, TableCell, TableHeaderCell, TableRow } from "@cambio/ui"
 import {
   ENDGAME_SECTION,
   type GuideSection,
+  INTRO_SECTION,
   POWERS_SECTION,
   POWERS_TABLE,
   RARE_SITUATIONS_SECTION,
@@ -28,6 +29,32 @@ export interface HowToPlayGuideProps {
   onClose: () => void
 }
 
+// tokens.md: "suit red is quarantined" — accent.suit-red renders hearts
+// and diamonds pips only, mirroring playing-card.tsx's own suit-color
+// split (never a whole-word color, just the glyph itself). Rows with
+// neither glyph (most of them) render untouched, as one plain text node —
+// splitting only the rows that actually need it keeps the DOM shape (and
+// text-matching in tests) unchanged everywhere else.
+const RED_SUIT_PATTERN = /([♥♦])/
+const RED_SUIT_TEST = /[♥♦]/
+
+function CardLabel({ text }: { text: string }) {
+  if (!RED_SUIT_TEST.test(text)) return <>{text}</>
+  return (
+    <>
+      {text.split(RED_SUIT_PATTERN).map((segment, index) =>
+        segment === "♥" || segment === "♦" ? (
+          <span key={index} className="text-accent-suit-red">
+            {segment}
+          </span>
+        ) : (
+          segment
+        ),
+      )}
+    </>
+  )
+}
+
 function GuideParagraphs({ section }: { section: GuideSection }) {
   return (
     <section className="flex flex-col gap-2">
@@ -45,6 +72,8 @@ export function HowToPlayGuide({ open, onClose }: HowToPlayGuideProps) {
   return (
     <Modal open={open} onClose={onClose} title="How to play">
       <div className="flex flex-col gap-5">
+        <GuideParagraphs section={INTRO_SECTION} />
+
         <GuideParagraphs section={SETUP_SECTION} />
 
         <GuideParagraphs section={SCORING_SECTION} />
@@ -58,7 +87,9 @@ export function HowToPlayGuide({ open, onClose }: HowToPlayGuideProps) {
           <tbody>
             {SCORING_TABLE.map((row) => (
               <TableRow key={row.card}>
-                <TableCell>{row.card}</TableCell>
+                <TableCell>
+                  <CardLabel text={row.card} />
+                </TableCell>
                 <TableCell numeric>{row.score}</TableCell>
               </TableRow>
             ))}

@@ -164,3 +164,32 @@ describe("ConnectionDot shape redundancy (r3, S2)", () => {
     expect(dot.className).not.toContain("bg-accent-action")
   })
 })
+
+/**
+ * app-shell.md (r6) — the decorative suit cluster beside the wordmark in
+ * default chrome, in ♠ ♥ ♣ ♦ order with divider.md's color split.
+ */
+describe("AppShell wordmark suit cluster (r6)", () => {
+  it("renders all four suits in order beside the wordmark, hearts and diamonds in the suit-red token", () => {
+    const { container } = render(
+      <AppShell>
+        <div>screen</div>
+      </AppShell>,
+    )
+    const glyphs = Array.from(container.querySelectorAll("header span[aria-hidden] > span"))
+    expect(glyphs.map((glyph) => glyph.textContent)).toEqual(["♠", "♥", "♣", "♦"])
+    expect(glyphs[0]?.className).toContain("text-ink-primary")
+    expect(glyphs[1]?.className).toContain("text-accent-suit-red")
+    expect(glyphs[2]?.className).toContain("text-ink-primary")
+    expect(glyphs[3]?.className).toContain("text-accent-suit-red")
+  })
+
+  it("does not render the suit cluster in the collapsed game chrome (no wordmark there)", () => {
+    const { container } = render(
+      <AppShell state="game" scene="paving">
+        <div>table</div>
+      </AppShell>,
+    )
+    expect(container.querySelector("header")).toBeNull()
+  })
+})

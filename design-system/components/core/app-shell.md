@@ -8,8 +8,17 @@ The screen frame. Class: **Layout**.
 ## Anatomy
 
 - Header: slim bar on `surface.page` — wordmark in `display` face (small),
-  right side: help icon-button, settings icon-button, connection dot. No
-  nav tabs; this app is lobby → room → game, a corridor, not a site.
+  a small decorative suit cluster (♠ ♥ ♣ ♦, `text-sm`, `aria-hidden`)
+  immediately beside it, right side: help icon-button, settings
+  icon-button, connection dot. No nav tabs; this app is lobby → room →
+  game, a corridor, not a site.
+- The suit cluster's color split matches `divider.md`'s `ornament`
+  variant: hearts/diamonds in `accent.suit-red`, spades/clubs in
+  `ink.primary` (tokens.md's "suit red is quarantined" rule) — but the
+  **order is deliberately its own** (♠ ♥ ♣ ♦, not the divider's ♠ ♥ ♦ ♣),
+  a wordmark-specific choice, not a divider correction. Decorative only,
+  never a status signal — no `role`, `aria-hidden`. Default chrome only;
+  the collapsed `game` chrome has no wordmark to sit beside.
 - Content: the screen, on the scene ground its class requires (CAM-13
   scene map: lobby full-scene, game table+paving, forms plain cream with
   chrome).
@@ -93,3 +102,7 @@ None.
   its absence, CAM-17 gate finding), accessible label "How to play". All
   three screens (lobby, room, game) supply it, opening the how-to-play
   guide (`components/extensions/how-to-play-guide.md`).
+- r6 (CAM-30 follow-up, user-directed): a decorative ♠ ♥ ♣ ♦ suit cluster
+  renders beside the wordmark in default chrome, reusing `divider.md`'s
+  ornament color split. Default chrome only — the collapsed `game` chrome
+  never carried a wordmark to begin with, so nothing changes there.

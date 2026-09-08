@@ -1,6 +1,6 @@
 name: how-to-play-guide
 status: draft
-version: 1
+version: 2
 extends: modal
 
 The complete rules, always one tap away. Class: **Overlay** (hosted
@@ -17,9 +17,15 @@ primitive).
 - Body: typeset sections (heading + paragraphs) plus the `table` component
   for the scoring table, the powers table, and the slam-outcome table
   (root plan D9 — text and tables only, no card illustrations or new
-  art). Sections, in order: setup, scoring, taking a turn, power cards,
-  slamming, rare situations (zero cards, fizzles, empty discard, reshuffle),
-  how the game ends.
+  art). Sections, in order: **about Cambio** (r2, a short orienting intro —
+  what the game is, lowest score wins — before any rule detail), setup,
+  scoring, taking a turn, power cards, slamming, rare situations (zero
+  cards, fizzles, empty discard, reshuffle), how the game ends.
+- **r2:** the scoring and powers tables' Card column colors hearts/diamonds
+  glyphs in `accent.suit-red` (never the whole cell) — the same
+  quarantined-red rule `playing-card.tsx` already applies to a card's suit
+  pip, so "King ♥, King ♦" reads with its red pips exactly as a real card
+  would, not as plain ink.
 - No footer — the ✕/Esc/scrim escapes the canon `Modal` already provides
   are enough; a "Close" button would add a primary action with nothing to
   say.
@@ -58,3 +64,7 @@ primitive).
 ## Revisions
 
 - r1: initial (CAM-30).
+- r2 (CAM-30 follow-up, user-directed): added the "about Cambio" intro
+  section ahead of setup; colored hearts/diamonds glyphs in the scoring
+  table's Card column with `accent.suit-red`, matching `playing-card.tsx`'s
+  own suit-pip color rule.
