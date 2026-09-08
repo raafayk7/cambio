@@ -1,0 +1,15 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "corepack enable && pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm turbo run build --filter=@cambio/web...",
+  "outputDirectory": "apps/web/dist/client",
+  "ignoreCommand": "[ \"$VERCEL_GIT_COMMIT_REF\" != \"development\" ]",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://cambio-api-g8uk.onrender.com/:path*"
+    },
+    { "source": "/:path*", "destination": "/_shell.html" }
+  ]
+}
