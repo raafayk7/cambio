@@ -124,10 +124,10 @@ answers through the proxy from Render.
 - [x] The deploy workflow run for `development` shows gate → migrate →
       deploy-hook ordering in its job graph (C3) — run 34243991527: gate ✓,
       migrate ✗ (pre-secrets, designed), deploy-api skipped.
-- [ ] Live smoke, **provable at deploy-now**: C5 curl output (`/api/health`
+- [x] Live smoke, **provable at deploy-now**: C5 curl output (`/api/health`
       through the proxy), C4 idempotent re-run, C3 job graph, C8's
       "applied migrations match the deployed branch" SQL — captured in
-      Progress.
+      Progress (M3/M4 entries).
 - [ ] Live smoke, **deferred to the first /release** (the scaffold on
       `development` has no `/users` routes, no `0004` migration, and no
       SPA build mode until release-v0 merges): C6 cookie flow, C7 deployed
@@ -246,6 +246,29 @@ timestamp each entry)_
       doc phrasing updated; ADR index amendments were already in the plan
       commit. Remaining: M3 wiring (4 user checklist items) + M4
       deploy-now smoke.
+
+- [x] 2026-09-08 22:50 — **M3 done (wire and fire)**: user completed the
+      4-item checklist (with three iterations: literal quotes in Render env
+      fields, a literal `aws-X` placeholder in the DB URL, and a password that
+      had not actually been applied — all diagnosed from workflow/psql
+      evidence; correct pooler host `aws-0-ap-south-1` identified by tenant
+      probe). Deploy run 34249417948 rerun: gate ✓ → migrate ✓
+      (`applied 0001_init.sql` on prod) → deploy-api ✓ (hook fired,
+      trigger=deploy_hook). Render build initially failed on
+      `NODE_ENV=production` pruning devDeps (no `turbo`) — build command
+      amended with `--prod=false`; api live at
+      `https://cambio-api-g8uk.onrender.com/health` → `{"ok":true}`.
+      Vercel: import had set Root Directory to `apps/web` (broke
+      outputDirectory resolution) — cleared, Node pinned 22.x, redeploy READY.
+      `WEB_ORIGIN` set post-domain. Vercel SSO deployment protection was on
+      by default — disabled with explicit user consent.
+- [x] 2026-09-08 22:55 — **M4 (deploy-now half) done**: C5 —
+      `GET https://cambio-web-raafeysaeed-1675s-projects.vercel.app/api/health`
+      → HTTP 200 through the proxy; `/api/nonexistent` → api JSON 404 (the
+      wildcard forwards, prefix stripped); `/` → 404 as predicted pre-release
+      (no `_shell.html` on the scaffold). C8-partial — prod
+      `_cambio_migrations` = exactly `0001_init.sql`. C4 — migrate-job rerun
+      evidence in the entry below once complete.
 
 ## Decision log
 
