@@ -46,7 +46,7 @@ const hand = (...slugs: ReadonlyArray<readonly [number, string]>): Hand =>
   slugs.map(([i, s]) => ({ slotIndex: slot(i), card: card(s) }))
 
 describe("C3.3 — value-stripped for everyone", () => {
-  it("GameStarted: players, first discard, deck count, config — hands/deck/prng/seed gone", () => {
+  it("GameStarted: players, deck count, config — no card value at all (ADR-0039: hands/deck/prng/seed/discard gone)", () => {
     const out = project({
       _tag: "GameStarted",
       at: ts(0),
@@ -55,19 +55,17 @@ describe("C3.3 — value-stripped for everyone", () => {
       config: { slamWindowMs: 5000 },
       hands: [hand([0, "AS"], [1, "2H"]), hand([0, "KD"], [1, "3C"])],
       deck: [card("4C"), card("5C")],
-      firstDiscard: card("5D"),
       prng: [1, 2, 3, 4],
     })
     expect(out.room).toEqual([
       {
         _tag: "GameStarted",
         players: [p0, p1],
-        firstDiscard: "5D",
         deckCount: 2,
         config: { slamWindowMs: 5000 },
       },
     ])
-    expect(slugsIn(out.room)).toEqual(["5D"])
+    expect(slugsIn(out.room)).toEqual([])
     noPrivate(out)
   })
 

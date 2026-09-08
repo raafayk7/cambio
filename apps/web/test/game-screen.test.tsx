@@ -141,6 +141,37 @@ describe("bootstrap (C1)", () => {
     await channelsReady(fake)
   })
 
+  it("game start (ADR-0039): empty discard, Draw present, no Take, Call Cambio present", async () => {
+    const fake = setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1, 2, 3] },
+          ],
+          deckCount: 44,
+          discard: [],
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(
+      document.querySelector('[data-flight-anchor="discard"]')?.getAttribute("data-state"),
+    ).toBe("empty")
+    expect(
+      screen.getByRole("button", { name: "Draw a card", description: "44 cards in the draw deck" }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Take the top discard" })).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Call Cambio" })).toBeInTheDocument()
+
+    await channelsReady(fake)
+  })
+
   it("shows the first-load skeleton while bootstrap resolves (300ms no-flash)", async () => {
     setupFake()
     vi.stubGlobal(
@@ -1626,6 +1657,278 @@ describe("reshuffle choreography (CH2)", () => {
     })
     // Still the same retained top after the refetch too.
     expect(screen.getByText("K").closest('[data-face="up"]')).not.toBeNull()
+  })
+})
+
+describe("reshuffle sequencing gate (C14, ADR-0040)", () => {
+  // The default jsdom `getBoundingClientRect` is all-zero (degenerate),
+  // which auto-cancels every flight synchronously (flight-layer.test.tsx) —
+  // a zero-length deferral window. These two tests stub non-degenerate
+  // rects so a flight actually stays `active` across a tick, which is what
+  // the sequencing pin needs; the liveness test below then confirms nothing
+  // hangs when a batch runs under the DEFAULT (auto-cancelling) measure.
+  let restoreRect: () => void = () => undefined
+
+  afterEach(() => {
+    vi.useRealTimers()
+    restoreRect()
+  })
+
+  function stubNonDegenerateRects() {
+    const original = Element.prototype.getBoundingClientRect
+    let n = 0
+    Element.prototype.getBoundingClientRect = function (this: Element) {
+      n += 1
+      // Non-zero, non-identical rects — planFlight must never see a
+      // zero-width/height dimension (its only cancellation condition).
+      return {
+        top: n,
+        left: n,
+        right: n + 100,
+        bottom: n + 100,
+        width: 100,
+        height: 100,
+        x: n,
+        y: n,
+        toJSON: () => ({}),
+      } as DOMRect
+    }
+    restoreRect = () => {
+      Element.prototype.getBoundingClientRect = original
+    }
+  }
+
+  const deckState = () =>
+    document.querySelector('[data-flight-anchor="deck"]')?.getAttribute("data-state")
+
+  // The C9 re-arm case (a discard landing, not a draw): chosen over a plain
+  // CardDrawn+DeckReshuffled batch because CardDrawn's destination anchor is
+  // `held`, which only mounts once the (pre-refetch) snapshot itself shows a
+  // `HoldingCard` phase — under the still-`AwaitingDraw` bootstrap snapshot
+  // a draw flight cancels on a missing anchor regardless of rect stubbing.
+  // `HeldSwapped`'s second flight (slot → discard) has no such dependency:
+  // both anchors exist in every phase, so its lifetime is governed only by
+  // the (stubbed, non-degenerate) measure — exactly what this pin needs.
+  it("defers the reshuffle flight behind its causing discard-landing flight — never simultaneously active", async () => {
+    const fake = setupFake()
+    const { handlers } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+    vi.useFakeTimers()
+    stubNonDegenerateRects()
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        deckCount: 25,
+        discard: ["5D"],
+        version: 5,
+      }),
+    )
+
+    // Same batch, server order (root plan clause 9): the landing precedes
+    // the re-arm reshuffle it caused.
+    act(() => {
+      room.emit("HeldSwapped", {
+        _tag: "HeldSwapped",
+        playerId: ME.userId,
+        slotIndex: 0,
+        discarded: "5D",
+      })
+      room.emit("DeckReshuffled", { _tag: "DeckReshuffled", deckCount: 25 })
+    })
+
+    // The reshuffle is queued behind the landing flight, not concurrent —
+    // the deck shows neither "draw" nor "reshuffling" yet.
+    expect(deckState()).toBe("populated")
+
+    // Advance past the landing flight's settle clock (FLIGHT_TRACK_MS * 2).
+    act(() => {
+      vi.advanceTimersByTime(680)
+    })
+
+    // The landing flight settled, released the cause latch, and the queued
+    // reshuffle flight is now active.
+    expect(deckState()).toBe("reshuffling")
+
+    // Settle the reshuffle flight and the debounced refetch before the test
+    // ends (review F6: an in-flight refetch at teardown is a flake source).
+    act(() => {
+      vi.advanceTimersByTime(680)
+    })
+    vi.useRealTimers()
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", {
+          name: "Draw a card",
+          description: "25 cards in the draw deck",
+        }),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it("holds the reshuffle for the LAST armed cause — an earlier cause settling first does not release it (review F1)", async () => {
+    // Models the fizzle batch `CardDrawn, PowerFizzled, PowerDiscarded,
+    // DeckReshuffled, SlamWindowOpened`: the reshuffle's true cause is the
+    // LAST discard-landing before it, but an earlier causing flight (the
+    // draw) settles first. The fizzle batch's own anchors are phase-
+    // entangled in jsdom (both `held`-anchored flights cancel under the
+    // AwaitingDraw bootstrap), so this pin substitutes structurally: the
+    // CardDrawn cause cancels instantly on its missing `held` anchor (the
+    // early settler), while HeldSwapped's slot→discard landing (anchors
+    // present in every phase) stands in as the true, still-flying cause.
+    const fake = setupFake()
+    const { handlers } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+    vi.useFakeTimers()
+    stubNonDegenerateRects()
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        deckCount: 25,
+        discard: ["5D"],
+        version: 5,
+      }),
+    )
+
+    act(() => {
+      room.emit("CardDrawn", { _tag: "CardDrawn", playerId: ME.userId })
+      room.emit("HeldSwapped", {
+        _tag: "HeldSwapped",
+        playerId: ME.userId,
+        slotIndex: 0,
+        discarded: "5D",
+      })
+      room.emit("DeckReshuffled", { _tag: "DeckReshuffled", deckCount: 25 })
+    })
+
+    // The CardDrawn cause has already cancelled (missing `held` anchor) —
+    // with the unguarded drain that cancel would have flushed the reshuffle
+    // here, concurrent with the still-flying landing. The guarded drain
+    // holds it: the deck shows neither choreography state.
+    expect(deckState()).toBe("populated")
+
+    // The true cause (the landing) settles — now the reshuffle plays.
+    act(() => {
+      vi.advanceTimersByTime(680)
+    })
+    expect(deckState()).toBe("reshuffling")
+
+    act(() => {
+      vi.advanceTimersByTime(680)
+    })
+    vi.useRealTimers()
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", {
+          name: "Draw a card",
+          description: "25 cards in the draw deck",
+        }),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it("is live under jsdom's default auto-cancelling measure — the batch still resolves to the refetched state", async () => {
+    const fake = setupFake()
+    const { handlers } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+    // No rect stub here — the default degenerate measure cancels every
+    // flight synchronously (onDone fires with "cancelled"), which must
+    // still release the cause latch and flush the queued reshuffle thunk
+    // rather than leaving it stuck forever.
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        deckCount: 25,
+        discard: ["KH"],
+        version: 5,
+      }),
+    )
+
+    act(() => {
+      room.emit("CardDrawn", { _tag: "CardDrawn", playerId: ME.userId })
+      room.emit("DeckReshuffled", { _tag: "DeckReshuffled", deckCount: 25 })
+    })
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", {
+          name: "Draw a card",
+          description: "25 cards in the draw deck",
+        }),
+      ).toBeInTheDocument()
+    })
+  })
+
+  it("flushes the queued reshuffle when its cause cancels — the reshuffle flight still animates (review F3)", async () => {
+    // The plain liveness test above cannot see the gate (the refetch lands
+    // regardless — review F3 called its assertion vacuous). This one makes
+    // the flush observable: the CardDrawn cause cancels on its missing
+    // `held` anchor (broadcasts never write the snapshot, so the bootstrap
+    // stays AwaitingDraw and the anchor never mounts), while the reshuffle
+    // flight's own anchors (discard, deck) exist in every phase — under
+    // stubbed rects it must therefore mount and fly, proving the cancelled
+    // cause released the latch rather than wedging the thunk.
+    const fake = setupFake()
+    const { handlers } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+    vi.useFakeTimers()
+    stubNonDegenerateRects()
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        deckCount: 25,
+        discard: ["KH"],
+        version: 5,
+      }),
+    )
+
+    act(() => {
+      room.emit("CardDrawn", { _tag: "CardDrawn", playerId: ME.userId })
+      room.emit("DeckReshuffled", { _tag: "DeckReshuffled", deckCount: 25 })
+    })
+
+    // The cancelled cause flushed the gate: the reshuffle flight is active.
+    expect(deckState()).toBe("reshuffling")
+
+    act(() => {
+      vi.advanceTimersByTime(680)
+    })
+    vi.useRealTimers()
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", {
+          name: "Draw a card",
+          description: "25 cards in the draw deck",
+        }),
+      ).toBeInTheDocument()
+    })
   })
 })
 

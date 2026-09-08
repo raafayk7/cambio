@@ -56,7 +56,6 @@ const channelsReady = async (fake: FakeRealtimeClient) => {
 const gameStartedPayload = () => ({
   _tag: "GameStarted",
   players: [ME.userId, FRIEND.id],
-  firstDiscard: "KH",
   deckCount: 40,
   config: { slamWindowMs: 8000 },
 })

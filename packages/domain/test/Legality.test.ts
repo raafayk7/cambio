@@ -159,13 +159,23 @@ describe("powerHasValidTarget (ADR-0010)", () => {
   })
 })
 
-describe("drawable (§1.7, CAM-10 — single source for Engine.ts's reshuffleIfEmpty)", () => {
+describe("drawable (§1.7, CAM-10 — DrawFromDeck legality; ADR-0040 note below)", () => {
+  // Under ADR-0040's resting invariant (deck empty ⟹ discard ≤ 1), a
+  // deck-empty-with-reshufflable-discard state is unreachable at rest.
+  // `drawable` keeps its `deck > 0 || discard > 1` disjunction anyway
+  // (root plan Decision Log): it is the legality answer to "can a draw
+  // succeed", including for hand-built states, and it is deliberately
+  // NOT the eager-reshuffle trigger — Engine.ts's `eagerReshuffle` guards
+  // with its own inline predicate ("deck empty AND discard reshufflable").
+  // Do not collapse either predicate into the other: "simplifying"
+  // `drawable` to `deck > 0` reads as safe from the invariant but the two
+  // predicates answer different questions (see the Engine.ts docstring).
   it("is true when the deck has a card, regardless of discard length", () => {
     expect(drawable({ ...base, deck: [card("2S")], discard: [] })).toBe(true)
     expect(drawable({ ...base, deck: [card("2S")], discard: [card("4S")] })).toBe(true)
   })
 
-  it("is true when the deck is empty but the discard has more than its top card", () => {
+  it("is true when the deck is empty but the discard has more than its top card (unreachable at rest, ADR-0040)", () => {
     expect(drawable({ ...base, deck: [], discard: [card("4S"), card("5S")] })).toBe(true)
   })
 

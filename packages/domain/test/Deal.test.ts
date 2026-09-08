@@ -2,8 +2,10 @@ import { describe, expect, it } from "@effect/vitest"
 import { Either } from "effect"
 import { ALL_CARD_SLUGS } from "../src/Card.js"
 import { dealGame } from "../src/Deal.js"
+import { applyCommand } from "../src/Engine.js"
 import { decodeGameConfig } from "../src/GameConfig.js"
 import { allCards } from "../src/GameState.js"
+import { legalCommandKinds } from "../src/Legality.js"
 import { ts, uid } from "./fixtures.js"
 
 const config = decodeGameConfig({ slamWindowMs: 4000 })
@@ -36,7 +38,7 @@ describe("dealGame", () => {
     }
   })
 
-  it("deals 4 cards to slots 0–3 per player, one discard, rest as deck (C1.2, §1.1)", () => {
+  it("deals 4 cards to slots 0–3 per player, empty discard, rest as deck (C1.2, §1.1, ADR-0039)", () => {
     for (const n of [2, 3, 4]) {
       const [state] = dealt(n)
       expect(state.players).toHaveLength(n)
@@ -44,8 +46,8 @@ describe("dealGame", () => {
         expect(player.hand).toHaveLength(4)
         expect(player.hand.map((s) => s.slotIndex)).toStrictEqual([0, 1, 2, 3])
       }
-      expect(state.discard).toHaveLength(1)
-      expect(state.deck).toHaveLength(52 - 4 * n - 1)
+      expect(state.discard).toStrictEqual([])
+      expect(state.deck).toHaveLength(52 - 4 * n)
     }
   })
 
@@ -73,7 +75,7 @@ describe("dealGame", () => {
     if (started._tag !== "GameStarted") throw new Error("expected GameStarted")
     expect(started.hands).toStrictEqual(state.players.map((p) => p.hand))
     expect(started.deck).toStrictEqual(state.deck)
-    expect(started.firstDiscard).toBe(state.discard[0])
+    expect(started).not.toHaveProperty("firstDiscard")
     expect(started.players).toStrictEqual(state.players.map((p) => p.id))
     expect(started.at).toBe(now)
     expect(started.seed).toBe(42)
@@ -82,5 +84,14 @@ describe("dealGame", () => {
 
   it("differs across seeds", () => {
     expect(dealt(3, 1)[0].deck).not.toStrictEqual(dealt(3, 2)[0].deck)
+  })
+
+  it("opening state (empty discard, ADR-0039): TakeDiscard is illegal, only draw-or-call is legal (C2)", () => {
+    const [state] = dealt(2)
+    const p0 = state.players[0]!.id
+    const result = applyCommand(state, { _tag: "TakeDiscard", playerId: p0 }, now)
+    expect(Either.isLeft(result)).toBe(true)
+    if (Either.isLeft(result)) expect(result.left._tag).toBe("EmptyDiscard")
+    expect(legalCommandKinds(state, p0, now)).toStrictEqual(["CallCambio", "DrawFromDeck"])
   })
 })

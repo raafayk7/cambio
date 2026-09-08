@@ -3,7 +3,7 @@ import * as React from "react"
 import { cn } from "@cambio/ui"
 
 /**
- * DrawDeck — design-system/components/core/draw-deck.md (r4, CAM-29).
+ * DrawDeck — design-system/components/core/draw-deck.md (r5, CAM-31).
  * Class: Game object.
  *
  * The face-down stock: a 2–3 offset stack of card backs. Deck count is
@@ -35,12 +35,20 @@ import { cn } from "@cambio/ui"
  * (button `aria-label` stays "Draw a card" so it keeps naming the action,
  * not the state); on the static stack (no `onClick`) it's the `role="img"`
  * wrapper's `aria-label` directly, since there's no action name to protect.
+ *
+ * r5 (CAM-31, ADR-0040): the empty dashed outline carries the same
+ * `animate-pulse-soft` motion as the populated stack during `draw`/
+ * `reshuffling` — r2's "occupancy-independent" claim, made actually true
+ * (the eager re-arm reshuffle plays over a snapshot that still says zero,
+ * so the empty branch is the guaranteed render path for that beat).
  */
 export interface DrawDeckProps {
   count: number
-  /** The draw affordance (T1: `DrawFromDeck` iff `deckCount > 0 ||
-   * discard.length > 1`) — omit entirely when drawing isn't legal right
-   * now; the deck then renders as a static, non-interactive stack. */
+  /** The draw affordance (T1: `DrawFromDeck` iff `deckCount > 0` — ADR-0040
+   * made the reshuffle eager, so a resting deck-empty state is never
+   * reshufflable and the old `|| discard.length > 1` fuel disjunction is
+   * gone) — omit entirely when drawing isn't legal right now; the deck then
+   * renders as a static, non-interactive stack. */
   onClick?: () => void
   /** `draw`: the top card is mid-flight to the holder (CH1) — `reshuffling`:
    * the discard-minus-top is mid-flight into the deck (CH2, step 13). Both
@@ -66,7 +74,10 @@ export function DrawDeck({ count, onClick, state, slamWindow = false, className 
     count === 0 ? (
       <span
         aria-hidden
-        className="block border-2 border-dashed border-ink-inverse/55 card-frame card-md"
+        className={cn(
+          "block border-2 border-dashed border-ink-inverse/55 card-frame card-md",
+          (state === "draw" || state === "reshuffling") && "animate-pulse-soft",
+        )}
       />
     ) : (
       <div

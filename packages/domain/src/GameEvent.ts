@@ -15,11 +15,12 @@ import { PrngState } from "./Prng.js"
 
 /**
  * Records the **concrete deal** — hands (parallel to `players`, seat order),
- * remaining deck order, first discard — so event-log replay never depends on
- * the PRNG staying byte-stable across versions. `seed` is audit-only. `at`
- * is the only event timestamp; later events are stamped by the persistence
- * layer's `at` column (§4.3). `prng` records the state **after** the deal
- * shuffle so the fold transcribes it, never recomputes (ADR-0014).
+ * remaining deck order — so event-log replay never depends on the PRNG
+ * staying byte-stable across versions. The discard pile starts empty
+ * (ADR-0039). `seed` is audit-only. `at` is the only event timestamp; later
+ * events are stamped by the persistence layer's `at` column (§4.3). `prng`
+ * records the state **after** the deal shuffle so the fold transcribes it,
+ * never recomputes (ADR-0014).
  */
 export const GameStarted = Schema.TaggedStruct("GameStarted", {
   at: Timestamp,
@@ -28,7 +29,6 @@ export const GameStarted = Schema.TaggedStruct("GameStarted", {
   config: GameConfig,
   hands: Schema.Array(Hand),
   deck: Schema.Array(CardSlug),
-  firstDiscard: CardSlug,
   prng: PrngState,
 })
 

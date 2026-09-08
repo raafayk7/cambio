@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import { Either } from "effect"
+import { rank } from "../src/Card.js"
 import { applyCommand } from "../src/Engine.js"
 import { decodeGameConfig } from "../src/GameConfig.js"
 import { allCards, type GameState } from "../src/GameState.js"
@@ -199,20 +200,23 @@ describe("DrawFromDeck (C2.4–5)", () => {
     expect(errorTag(holding, { _tag: "KeepHeld", playerId: p0 })).toBe("MustResolvePower")
   })
 
-  it("reshuffles the pile (keeping its top) when the deck is empty (C6.1)", () => {
-    const exhausted: GameState = {
+  it("draws the last deck card, then eagerly reshuffles the pile (keeping its top) (C6.1, ADR-0040)", () => {
+    const lastCard: GameState = {
       ...base,
-      deck: [],
-      discard: [card("4S"), card("2D"), card("3H")],
+      deck: [card("2D")],
+      discard: [card("4S"), card("3H")],
     }
-    const [after, events] = apply(exhausted, { _tag: "DrawFromDeck", playerId: p0 })
-    if (events[0]!._tag !== "DeckReshuffled") throw new Error("expected DeckReshuffled")
-    expect(events[0]!.prng).toStrictEqual(after.prng)
-    expect(events[1]!._tag).toBe("CardDrawn")
+    const [after, events] = apply(lastCard, { _tag: "DrawFromDeck", playerId: p0 })
+    expect(events.map((e) => e._tag)).toStrictEqual(["CardDrawn", "DeckReshuffled"])
+    if (events[0]!._tag !== "CardDrawn") throw new Error("expected CardDrawn")
+    expect(events[0]!.card).toBe(card("2D"))
+    if (events[1]!._tag !== "DeckReshuffled") throw new Error("expected DeckReshuffled")
+    expect(events[1]!.prng).toStrictEqual(after.prng)
     expect(after.discard).toStrictEqual([card("4S")])
+    expect(after.deck).toStrictEqual([card("3H")])
     if (after.phase._tag !== "HoldingCard") throw new Error("expected HoldingCard")
-    expect([after.phase.card, ...after.deck].sort()).toStrictEqual([card("2D"), card("3H")].sort())
-    expect(partition(after)).toStrictEqual(partition(exhausted))
+    expect(after.phase.card).toBe(card("2D"))
+    expect(partition(after)).toStrictEqual(partition(lastCard))
   })
 
   it("rejects a draw when no card exists anywhere (C6.2)", () => {
@@ -256,5 +260,74 @@ describe("exhausted-deck turn options (C6.2)", () => {
   it("Cambio and a legal take remain available when no draw is possible", () => {
     const dry: GameState = { ...base, deck: [], discard: [card("4S")] }
     expect(legalCommandKinds(dry, p0, now)).toStrictEqual(["CallCambio", "TakeDiscard"])
+  })
+})
+
+describe("eager reshuffle re-arms on a discard landing (ADR-0040, C9)", () => {
+  // Deck empty, single-card discard: unreshufflable at rest (the resting
+  // invariant, ADR-0040). A held card landing on the pile is the re-arm
+  // case — it makes the pile reshufflable, and the reshuffle must fire
+  // from the landing site, before any slam window opens.
+  const rearmBase: GameState = {
+    ...base,
+    deck: [],
+    discard: [card("4S")],
+    phase: { _tag: "HoldingCard", playerId: p0, card: card("5D"), source: "deck" },
+  }
+
+  it("HeldDiscarded's landing re-arms the reshuffle before the window opens", () => {
+    const [after, events] = apply(rearmBase, { _tag: "DiscardHeld", playerId: p0 })
+    expect(events.map((e) => e._tag)).toStrictEqual([
+      "HeldDiscarded",
+      "DeckReshuffled",
+      "SlamWindowOpened",
+    ])
+    expect(after.discard).toStrictEqual([card("5D")])
+    expect(after.deck).toStrictEqual([card("4S")])
+    if (after.phase._tag !== "SlamWindow") throw new Error("expected SlamWindow")
+    expect(after.phase.rank).toBe(rank(card("5D")))
+  })
+
+  it("SwapHeld's displaced-card landing re-arms the reshuffle before the window opens", () => {
+    const [after, events] = apply(rearmBase, {
+      _tag: "SwapHeld",
+      playerId: p0,
+      slotIndex: slot(0),
+    })
+    expect(events.map((e) => e._tag)).toStrictEqual([
+      "HeldSwapped",
+      "DeckReshuffled",
+      "SlamWindowOpened",
+    ])
+    // The displaced card (AS, slot 0's prior occupant) is the retained top.
+    expect(after.discard).toStrictEqual([card("AS")])
+    expect(after.deck).toStrictEqual([card("4S")])
+    if (after.phase._tag !== "SlamWindow") throw new Error("expected SlamWindow")
+    expect(after.phase.rank).toBe(rank(card("AS")))
+  })
+
+  it("the obligatory-power fizzle's landing re-arms the reshuffle before the window opens", () => {
+    // A 7/8 with no hand cards is the only power that can be drawn with a
+    // non-empty deck yet fizzle unconditionally (ADR-0010) — give p0 an
+    // empty hand so the drawn 7 has no peek target.
+    const fizzleBase: GameState = {
+      ...base,
+      players: [{ id: p0, hand: [] }, base.players[1]!],
+      deck: [card("7D")],
+      discard: [card("4S")],
+      phase: { _tag: "AwaitingDraw", playerId: p0 },
+    }
+    const [after, events] = apply(fizzleBase, { _tag: "DrawFromDeck", playerId: p0 })
+    expect(events.map((e) => e._tag)).toStrictEqual([
+      "CardDrawn",
+      "PowerFizzled",
+      "PowerDiscarded",
+      "DeckReshuffled",
+      "SlamWindowOpened",
+    ])
+    expect(after.discard).toStrictEqual([card("7D")])
+    expect(after.deck).toStrictEqual([card("4S")])
+    if (after.phase._tag !== "SlamWindow") throw new Error("expected SlamWindow")
+    expect(after.phase.rank).toBe(rank(card("7D")))
   })
 })

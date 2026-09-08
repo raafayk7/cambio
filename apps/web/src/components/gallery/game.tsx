@@ -236,9 +236,14 @@ export function DeckAndDiscardSection() {
           <DrawDeck count={3} />
         </TableGround>
       </StateCard>
-      <StateCard label="deck empty (reshuffle imminent)">
+      <StateCard label="deck empty (nothing left to reshuffle, ADR-0040)">
         <TableGround>
           <DrawDeck count={0} />
+        </TableGround>
+      </StateCard>
+      <StateCard label="deck empty, reshuffling (ADR-0040 re-arm — motion over the dashed outline)">
+        <TableGround>
+          <DrawDeck count={0} state="reshuffling" />
         </TableGround>
       </StateCard>
       <StateCard label="deck clickable (CAM-18 T1 — the draw affordance)">

@@ -271,23 +271,66 @@ describe("zero-card slammer — draw-then-give (ADR-0009)", () => {
     expect(after.players[1]!.hand).toStrictEqual([])
     expect(after.deck).toStrictEqual([card("3S")])
   })
+
+  it("a give-draw that itself takes the last deck card reshuffles after the give (ADR-0040)", () => {
+    // The slam's own landing doesn't reshuffle here (deck still has the one
+    // card the give-draw is about to take); the give-draw empties it, and
+    // only then is the (now 2-card) pile reshufflable.
+    const zeroSlammerLastCard: GameState = {
+      ...base,
+      deck: [card("2S")],
+      players: [base.players[0]!, { id: p1, hand: [] }],
+    }
+    const [after, events] = apply(zeroSlammerLastCard, {
+      _tag: "Slam",
+      playerId: p1,
+      target: { playerId: p0, slotIndex: slot(2) },
+      giveSlot: null,
+    })
+    expect(events).toStrictEqual([
+      {
+        _tag: "SlamSucceeded",
+        slammerId: p1,
+        target: { playerId: p0, slotIndex: slot(2) },
+        card: card("4H"),
+      },
+      {
+        _tag: "CardGivenFromDeck",
+        slammerId: p1,
+        to: { playerId: p0, slotIndex: slot(2) },
+        card: card("2S"),
+      },
+      { _tag: "DeckReshuffled", deck: after.deck, prng: after.prng },
+    ])
+    expect(after.discard).toStrictEqual([card("4H")])
+    expect(after.deck).toStrictEqual([card("4S")])
+  })
 })
 
 describe("exhaustion during slams (C4.5, ADR-0011)", () => {
-  it("penalty draws reshuffle the pile (minus top) first", () => {
-    const lowDeck: GameState = { ...base, deck: [], discard: [card("4S"), card("2D")] }
-    const [after, events] = apply(lowDeck, {
+  it("a penalty draw that takes the last deck card reshuffles the pile after (minus top) (ADR-0040)", () => {
+    // One-card deck: the penalty draw itself empties it. Reshuffling
+    // beforehand (the old lazy timing) would pin an unreachable state under
+    // the resting invariant (deck empty ⟹ discard ≤ 1) — see Legality.test.ts.
+    const lastCard: GameState = { ...base, deck: [card("2D")], discard: [card("4S"), card("3H")] }
+    const [after, events] = apply(lastCard, {
       _tag: "Slam",
       playerId: p0,
       target: { playerId: p0, slotIndex: slot(0) },
       giveSlot: null,
     })
-    expect(events.map((e) => e._tag)).toStrictEqual([
-      "SlamFailed",
-      "DeckReshuffled",
-      "PenaltyDrawn",
+    expect(events).toStrictEqual([
+      {
+        _tag: "SlamFailed",
+        slammerId: p0,
+        target: { playerId: p0, slotIndex: slot(0) },
+        card: card("AS"),
+      },
+      { _tag: "PenaltyDrawn", playerId: p0, slotIndex: slot(3), card: card("2D") },
+      { _tag: "DeckReshuffled", deck: after.deck, prng: after.prng },
     ])
     expect(after.discard).toStrictEqual([card("4S")])
+    expect(after.deck).toStrictEqual([card("3H")])
   })
 
   it("skips the penalty when no card exists anywhere (dedicated ADR-0011 test)", () => {
@@ -330,6 +373,62 @@ describe("exhaustion during slams (C4.5, ADR-0011)", () => {
     ])
     expect(after.discard).toStrictEqual([card("4H")])
     expect(after.players[0]!.hand.find((s) => s.slotIndex === slot(2))!.card).toBe(card("4S"))
+  })
+})
+
+describe("eager reshuffle re-arms on a slam landing (ADR-0040, C9)", () => {
+  // Deck empty, single-card discard: unreshufflable at rest. The slam's
+  // landing card is the re-arm — own-slam and give-from-hand never open a
+  // window (slams don't), so the reshuffle must be composed at these
+  // returns directly, not via openWindowOrAdvance.
+  const rearmBase: GameState = { ...base, deck: [], discard: [card("4S")] }
+
+  it("own-slam re-arms the reshuffle — no window follows", () => {
+    const [after, events] = apply(rearmBase, {
+      _tag: "Slam",
+      playerId: p0,
+      target: { playerId: p0, slotIndex: slot(2) },
+      giveSlot: null,
+    })
+    expect(events).toStrictEqual([
+      {
+        _tag: "SlamSucceeded",
+        slammerId: p0,
+        target: { playerId: p0, slotIndex: slot(2) },
+        card: card("4H"),
+      },
+      { _tag: "DeckReshuffled", deck: after.deck, prng: after.prng },
+    ])
+    expect(after.discard).toStrictEqual([card("4H")])
+    expect(after.deck).toStrictEqual([card("4S")])
+    expect(after.phase).toStrictEqual(rearmBase.phase)
+  })
+
+  it("give-from-hand re-arms the reshuffle before the give event — no window follows", () => {
+    const [after, events] = apply(rearmBase, {
+      _tag: "Slam",
+      playerId: p1,
+      target: { playerId: p0, slotIndex: slot(2) },
+      giveSlot: slot(1),
+    })
+    expect(events).toStrictEqual([
+      {
+        _tag: "SlamSucceeded",
+        slammerId: p1,
+        target: { playerId: p0, slotIndex: slot(2) },
+        card: card("4H"),
+      },
+      { _tag: "DeckReshuffled", deck: after.deck, prng: after.prng },
+      {
+        _tag: "CardGivenFromHand",
+        slammerId: p1,
+        fromSlot: slot(1),
+        to: { playerId: p0, slotIndex: slot(2) },
+      },
+    ])
+    expect(after.discard).toStrictEqual([card("4H")])
+    expect(after.deck).toStrictEqual([card("4S")])
+    expect(after.players[0]!.hand.find((s) => s.slotIndex === slot(2))!.card).toBe(card("4C"))
   })
 })
 

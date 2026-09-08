@@ -10,6 +10,7 @@ import { card, slot, ts, uid } from "../fixtures.js"
 import { playerCountFor } from "../../src/testing/driver.js"
 import {
   cardPartitionViolations,
+  deckRestingInvariantViolations,
   endViolations,
   handIntegrityViolations,
   stepViolations,
@@ -123,11 +124,64 @@ describe("hand & seat integrity checker (C2.2, §4.5 restated)", () => {
     expect(counts).toStrictEqual(new Set([2, 3, 4]))
   })
 
-  it("stepViolations combines both checkers", () => {
+  it("stepViolations combines all three checkers", () => {
     const state = healthy()
     expect(stepViolations(state, players3, FULL_DECK_SORTED)).toStrictEqual([])
-    const corrupt: GameState = { ...state, deck: [state.deck[0]!, ...state.deck] }
-    expect(stepViolations(corrupt, players3, FULL_DECK_SORTED)).not.toStrictEqual([])
+    // One trip per checker, so the title is earned (review F5b): partition…
+    const badPartition: GameState = { ...state, deck: [state.deck[0]!, ...state.deck] }
+    expect(stepViolations(badPartition, players3, FULL_DECK_SORTED).join(" ")).toContain(
+      "card partition broken",
+    )
+    // …hand integrity (roster shrunk below 2)…
+    const badRoster: GameState = { ...state, players: state.players.slice(0, 1) }
+    expect(stepViolations(badRoster, players3.slice(0, 1), FULL_DECK_SORTED).join(" ")).toContain(
+      "outside 2–4",
+    )
+    // …and the ADR-0040 resting invariant.
+    const badResting: GameState = { ...state, deck: [], discard: [card("4S"), card("5S")] }
+    expect(stepViolations(badResting, players3, FULL_DECK_SORTED).join(" ")).toContain("ADR-0040")
+  })
+})
+
+describe("deck resting invariant checker (§1.7, ADR-0040)", () => {
+  it("accepts a freshly dealt state (empty deck is unreachable at deal, but well within bounds)", () => {
+    expect(deckRestingInvariantViolations(healthy())).toStrictEqual([])
+  })
+
+  it("accepts deck empty with at most a single-card discard", () => {
+    const state = healthy()
+    expect(deckRestingInvariantViolations({ ...state, deck: [], discard: [] })).toStrictEqual([])
+    expect(
+      deckRestingInvariantViolations({ ...state, deck: [], discard: [card("4S")] }),
+    ).toStrictEqual([])
+  })
+
+  it("accepts a non-empty deck regardless of discard size", () => {
+    const state = healthy()
+    expect(
+      deckRestingInvariantViolations({
+        ...state,
+        deck: [card("2S")],
+        discard: [card("4S"), card("5S")],
+      }),
+    ).toStrictEqual([])
+  })
+
+  it("rejects deck empty with a reshufflable (≥ 2 card) discard — the eager trigger should have fired", () => {
+    const state = healthy()
+    const violations = deckRestingInvariantViolations({
+      ...state,
+      deck: [],
+      discard: [card("4S"), card("5S")],
+    })
+    expect(violations).not.toStrictEqual([])
+    expect(violations.join(" ")).toContain("ADR-0040")
+  })
+
+  it("stepViolations includes the resting-invariant check", () => {
+    const state = healthy()
+    const violating: GameState = { ...state, deck: [], discard: [card("4S"), card("5S")] }
+    expect(stepViolations(violating, players3, FULL_DECK_SORTED).join(" ")).toContain("ADR-0040")
   })
 })
 

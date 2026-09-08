@@ -28,16 +28,20 @@ import { endViolations } from "../../src/testing/invariants.js"
  * strict env mode strips undeclared variables):
  *   SIM_GAMES — how many games to play (default 250; the deep run uses
  *               `SIM_GAMES=5000 pnpm --filter @cambio/domain test`)
- *   SIM_SEED  — base seed (default 20260831); game i uses seedPair(SIM_SEED, i)
+ *   SIM_SEED  — base seed (default 20260908 — re-chosen under CAM-31's
+ *               empty-discard deal, which shifted the deck cut by one card
+ *               and moved the old default (20260831) below the C5.2
+ *               reachability floor for the 9/T fizzle; 20260908 reaches all
+ *               six rare cases at 250 games); game i uses seedPair(SIM_SEED, i)
  *
  * Games play once in `beforeAll`; the `it`s assert over the shared runs.
  */
 const GAMES = Number(process.env.SIM_GAMES ?? "250")
-const BASE_SEED = Number(process.env.SIM_SEED ?? "20260831")
+const BASE_SEED = Number(process.env.SIM_SEED ?? "20260908")
 const BATCH_TIMEOUT_MS = Math.max(120_000, GAMES * 120)
 /** C5.2 counts are pinned against the default batch only — a rescaled or
  * reseeded run proves invariants, not rare-case reachability. */
-const DEFAULT_BATCH = GAMES === 250 && BASE_SEED === 20260831
+const DEFAULT_BATCH = GAMES === 250 && BASE_SEED === 20260908
 
 const config = decodeGameConfig({ slamWindowMs: 4000 })
 

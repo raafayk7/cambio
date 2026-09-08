@@ -1,6 +1,6 @@
 name: discard-pile
 status: draft
-version: 2
+version: 3
 extends: none
 
 The face-up pile slams match against. Class: **Game object**.
@@ -15,9 +15,11 @@ The face-up pile slams match against. Class: **Game object**.
 ## States
 
 - `populated` — top card face-up.
-- `empty` — a zero-card keep took the last card: dashed outline where the
-  pile was. No slam window opens on an empty pile and taking from it is
-  illegal — the empty state must read as "nothing to act on", not "loading".
+- `empty` — dashed outline where the pile was: every game's opening state
+  (ADR-0039, r3 — no card is turned face up at the deal), and reachable
+  again mid-game by a zero-card keep taking the last card. No slam window
+  opens on an empty pile and taking from it is illegal — the empty state
+  must read as "nothing to act on", not "loading".
 - `receiving` — a discarded/slammed card arrives `leaving-play` and settles
   as the new top.
 - `slam-target` — while the slam window is open, the top card gets the
@@ -50,3 +52,8 @@ None.
 - r2 (CAM-18, T1/T2/CH1): `onClick` (accessible-button wrap, same
   precedent as `hand.md`/`draw-deck.md`) and the `receiving` state — the
   CAM-15 carve-out this task repays.
+- r3 (CAM-31, 2026-09-08): `empty` is now also the opening state of every
+  game (ADR-0039 — no face-up card at the deal), not only the ADR-0012
+  zero-card-keep edge case — a first-run experience, still "nothing to act
+  on", never "loading". Pre-authorized through the creation gate by the
+  CAM-31 root plan's Decision Log (2026-09-08).

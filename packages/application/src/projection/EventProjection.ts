@@ -47,7 +47,6 @@ export const projectEvents = (events: ReadonlyArray<GameEvent>): ProjectedEvents
         room.push({
           _tag: "GameStarted",
           players: [...event.players],
-          firstDiscard: event.firstDiscard,
           deckCount: event.deck.length,
           config: { slamWindowMs: event.config.slamWindowMs },
         })

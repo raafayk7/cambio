@@ -160,7 +160,6 @@ describe("engine-shaped batch (C4.1's projection wiring)", () => {
           [{ slotIndex: slot(0), card: card("KD") }],
         ],
         deck: [card("4C"), card("5C")],
-        firstDiscard: card("5D"),
         prng: [1, 2, 3, 4],
       }
       yield* publisher.publishGame(game, dummyState, [started])
@@ -171,7 +170,6 @@ describe("engine-shaped batch (C4.1's projection wiring)", () => {
           payload: {
             _tag: "GameStarted",
             players: [p0, p1],
-            firstDiscard: "5D",
             deckCount: 2,
             config: { slamWindowMs: 5000 },
           },

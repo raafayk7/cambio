@@ -11,8 +11,9 @@ import { PlayingCard } from "./playing-card.js"
  * played — face-up rendering leaks nothing; the top card is the only
  * always-public card in the game. Under-card edges are decorative
  * history at thrown angles — the pile is NOT browsable (memory fidelity
- * applies to discards too). `empty` (a zero-card keep took the last
- * card) reads as "nothing to act on", never as loading; no slam window
+ * applies to discards too). `empty` (every game's opening state per
+ * ADR-0039, and reachable again mid-game by a zero-card keep — canon r3)
+ * reads as "nothing to act on", never as loading; no slam window
  * exists then (ADR-0012). Takeability is server logic — the component
  * renders only what the view grants.
  *

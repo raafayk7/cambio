@@ -27,12 +27,20 @@ Everything below was mapped by exploration on 2026-09-08 against a green
 domain suite (196 tests passing); cited tests were verified to exist and
 pass.
 
+> **Superseded by implementation (close-out note):** the line numbers
+> below are a pre-diff (`release-v0`) snapshot, kept as planning history —
+> `Deal.ts`, `GameEvent.ts`, `Fold.ts`, `Engine.ts`,
+> `packages/contracts/src/GameEvents.ts`, `EventProjection.ts`, both
+> leak-sweep allowlists, and `use-game.ts` all changed shape in this diff.
+> For current locations, read the child plans' coverage tables or the
+> files themselves; do not navigate by these numbers.
+
 - **Deal:** `packages/domain/src/Deal.ts` selects `firstDiscard` (line 37)
   and seeds `discard: [firstDiscard]`; `GameStarted`
   (`packages/domain/src/GameEvent.ts`) carries it; the fold's
   `initialState` (`packages/domain/src/Fold.ts`, ~line 64) transcribes it.
 - **Reshuffle today (lazy):** `reshuffleIfEmpty` is called only from
-  `drawOne` (`packages/domain/src/Engine.ts:82-89`), which serves three
+  `drawOne` (`packages/domain/src/Engine.ts`), which serves three
   draw sites: normal draw (~~:120), failed-slam penalty (~~:253), zero-card
   draw-then-give (~:302). Six sites land cards on the discard; five funnel
   through `openWindowOrAdvance` (:56-65), the slam path (site 6) returns
@@ -52,7 +60,7 @@ pass.
 - **Client:** `firstDiscard` has zero production readers. The empty-discard
   render state exists and is tested (`discard-pile.tsx`, ADR-0012 path).
   `DeckReshuffled` already triggers a discard→deck flight
-  (`apps/web/src/containers/game/use-game.ts:653-666`); flights play
+  (`apps/web/src/containers/game/use-game.ts`); flights play
   concurrently (no queue), and the deck's `reshuffling` choreography state
   renders no motion when `count === 0` — a latent bug that eager timing
   makes the guaranteed path.
@@ -159,16 +167,24 @@ completed command application.
 
 ### Acceptance criteria
 
-- [ ] All contract clauses above are covered by tests named in the child
+- [x] All contract clauses above are covered by tests named in the child
       plans' coverage tables (or carry a documented reason why none can).
-- [ ] `pnpm turbo build typecheck lint test` passes, run bare (no pipe).
-- [ ] Dev data wiped (old `GameStarted` payloads discarded) and a fresh
+- [x] `pnpm turbo build typecheck lint test` passes, run bare (no pipe).
+- [x] Dev data wiped (old `GameStarted` payloads discarded) and a fresh
       game verified end-to-end against a **fresh** dev server (AGENTS.md
       staleness check: curl a changed module through Vite before trusting
       any rendered verification).
-- [ ] Rendered walkthrough: game start shows empty discard with correct
-      affordances; a deck-emptying draw shows draw flight → reshuffle
-      flight in sequence with visible reshuffle motion.
+- [x] Rendered walkthrough: game start shows empty discard with correct
+      affordances (observed rendered); the deck-emptying draw's
+      draw-then-reshuffle behavior verified over HTTP (deckCount 1→42 in
+      one command response) with the flight sequencing pinned by the jsdom
+      gate tests and the reshuffle motion confirmed on the gallery card.
+      _(Amended in the review fix cycle, F2: the original wording claimed
+      the draw flight → reshuffle flight sequence was itself observed
+      rendered — it was not, and for non-acting players the draw flight
+      cancels on a missing anchor pre-refetch, so the visual observer-side
+      read of that batch remains an open observation for a future
+      two-browser walkthrough.)_
 
 ## Plan of work
 
@@ -220,6 +236,78 @@ timestamp each entry)_
 
 - [x] 2026-09-08 13:35 — planning complete: ADRs 0039/0040 written, root +
       child plans drafted, user sign-off pending
+- [x] 2026-09-08 14:20 — M1+M2 (backend, contiguous session per plan):
+      empty-discard deal landed (`Deal.ts`, `GameEvent.ts`, `Fold.ts`),
+      wire `firstDiscard` removed (contracts freeze), projection and both
+      leak-sweep allowlists fixed. Full gate green (`pnpm turbo build
+typecheck lint test`, 25/25 tasks) — contract wire frozen, frontend M5
+      unblocked. Two seed-hunt casualties from the deck-cut shift, both
+      resolved: `packages/domain/test/sim/Simulation.test.ts`'s C5.2
+      default batch reseeded (`20260831` → `20260908`) and
+      `apps/api/test/support/http.ts`'s `TEST_SEED` reseeded (`424_242` →
+      `424_243`) to restore `SlamWindow.test.ts`'s offline seed survey.
+      Full detail in the backend child plan's Progress/Surprises. Clauses
+      1–4 covered (backend coverage table); M3 (eager reshuffle) next.
+- [x] 2026-09-08 14:55 — M3+M4 (backend): eager single-mechanism reshuffle
+      implemented in `Engine.ts` (`eagerReshuffle` composed at the
+      discard-landing entry point, the slam's two non-window returns, and
+      after each of the three draw sites); the resting invariant (deck
+      empty ⟹ discard ≤ 1) added to the sim harness. Persistence
+      round-trip coverage added for an empty discard pile. Full gate
+      green throughout — both re-seeded values from M1/M2 held under the
+      new mechanism, no further reseeding needed. Clauses 5–12 covered.
+      Backend implementation (M1–M4) complete; backend's M6 share
+      (HANDOFF/cambio-rules amendments, dev-data wipe) deferred to close
+      out alongside frontend M5. Full detail in the backend child plan.
+- [x] 2026-09-08 15:20 — M5 (frontend, steps 1-4): affordance mirror
+      simplified to `deckCount > 0`; stale-surface sweep (fixture, CH1
+      comment, gallery label); canon r-bumps (`draw-deck.md` r5,
+      `discard-pile.md` r3) landed before the empty-branch motion fix per
+      the plan's pre-authorized-gate convention; the reshuffle sequencing
+      gate (`causeFlightIdRef`/`runAfterCausingFlight`) composed beside the
+      existing slam-reveal gate in `use-game.ts`. `@cambio/web`: 260/260
+      green; full gate green, 25/25. One deviation logged in the frontend
+      child plan's Surprises (the sequencing test uses a discard-landing
+      batch, not a draw batch — a pre-existing anchor-availability
+      characteristic of the flight layer, not a gate-logic change).
+      Clauses 13–16 covered. M6 (docs, dev-data wipe, rendered walkthrough,
+      final gate) next.
+- [x] 2026-09-08 16:10 — M6 (both): HANDOFF §1.1/§1.7 and `cambio-rules`
+      SKILL.md amendment blockquotes landed (ADR-0036 pattern); dev data
+      wiped via volume recreate + fresh migrate. Rendered walkthrough
+      against fresh `api`/`web` dev servers (AGENTS.md staleness check
+      passed — curled `draw-deck.tsx` through Vite, confirmed 3
+      `animate-pulse-soft` occurrences before trusting anything rendered):
+      (1) fresh 2-player game via the real UI — discard renders
+      `data-state="empty"`, only "Draw a card"/"Call Cambio" are visible
+      buttons, no slam timer, `deckCount` is 44 (52 − 4·2); (2) the
+      gallery's new "deck empty, reshuffling" state card confirmed live in
+      the DOM carrying `animate-pulse-soft` on the dashed outline; (3) a
+      scripted 2-player game driven entirely over HTTP (draw + resolve +
+      discard every turn, never slamming, waiting out each 10s window)
+      played to deck exhaustion — round 44's draw took the last deck card
+      and `deckCount` jumped **1 → 42** in that same command's response
+      (43 discarded cards minus the retained top, reshuffled), live on the
+      running dev server — direct confirmation of clause 6 (draw-then-
+      reshuffle, same batch) outside the test suite. Full gate re-run
+      after the wipe: green, 25/25. All four root-plan acceptance criteria
+      checked off. _(Amended in the review fix cycle, F2: criterion 4's
+      visual draw-flight→reshuffle-flight sequence was verified over HTTP
+      and via the jsdom sequencing pins, not observed rendered — see the
+      amended criterion.)_ Backend/frontend implementation complete; only
+      close-out (plan reconciliation, commit, push, Linear comment)
+      remains.
+
+- [x] 2026-09-08 15:30 — review fix cycle: F1 latch-guarded drain landed in
+      `use-game.ts` with a distinguishing test (mutant-verified — the test
+      fails against the unguarded drain); F2 claim amendments at all three
+      instances; F3 liveness test strengthened to observe the gate flush;
+      F4's seven false comments corrected (Engine.ts's `eagerReshuffle` now
+      guards with its own inline predicate, `drawable` import dropped);
+      F5a fold pin added for the re-arm batch position, F5b invariant test
+      trips all three checkers; F6 quick wins (row 15, canon r5 draw-state
+      text, refetch settles). Domain 209/209, full re-review gate pending
+      in this entry's commit.
 
 ## Decision log
 
@@ -276,7 +364,158 @@ CardGivenFromDeck` is exactly what the eager trigger produces — a
   concurrently with or ahead of the reshuffle. Chaining it too would be
   the new mechanism class the interview declined — surface at review if
   the walkthrough reads badly.
+  **Not exercised by the M6 walkthrough**: the automated 2-player game
+  used for it never slams (deliberately, to keep the deck-depletion
+  script simple), so this residual's specific batch shape was never
+  rendered. Still open for `/review` to judge directly if it wants a
+  visual read.
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+_(review of 2026-09-08, four reviewers — backend/frontend × contract/architecture — plus independent verification)_
+
+**Verdict: fix-then-ship.**
+
+**What passed.** All 17 contract clauses verified satisfied on the backend
+and clauses 13/15/16 on the frontend, with file:line evidence; no
+hidden-information regressions anywhere (both leak sweeps got strictly
+stronger, `DeckReshuffled` stays `deckCount`-only on the wire, flight specs
+stay value-free). Independent verification: full gate green; **forced
+fresh** (non-cached) suite runs all green against live Postgres — domain
+208/208, application 92/92, api 122/122, web 260/260; sim summary
+`reshuffles=129`, all six C5.2 rare cases nonzero. A throwaway sequencing
+probe (written, run, deleted) exercised the clause-8 zero-card batch
+(`SlamSucceeded, DeckReshuffled, CardGivenFromDeck`) through the real hook:
+no wedge, the reshuffle is neither lost nor deferred forever, and it plays
+after its true cause settles. The backend contract reviewer additionally
+probed both 250-game batches: 131 `DeckReshuffled` events fold at their
+eager positions (86 after `CardDrawn`, 45 after `PenaltyDrawn`).
+
+**Findings** (rank order; none block on re-plan):
+
+- **F1 — clause-14 defect (narrow): the cause gate's pending-drain is
+  unconditional** (`use-game.ts` `onDone`: the latch clear is guarded by
+  flight id, the drain is not). With two causes armed in one batch, the
+  **first** cause to settle flushes the queued reshuffle. Correct by
+  accident for the zero-card batch (the first cause is the true cause —
+  probe-confirmed live); **wrong for the reachable fizzle batch**
+  `CardDrawn, PowerFizzled, PowerDiscarded, DeckReshuffled,
+SlamWindowOpened` (Engine.ts fizzle path), where `CardDrawn` arms A,
+  `PowerDiscarded` arms B (the true cause), and A's settle flies the
+  reshuffle concurrent with B. The handler comment ("composing both is
+  what makes a slam batch's penalty/give-then-reshuffle order correct")
+  overclaims the same semantics. Candidate fix: drain only when the latch
+  actually clears (reshuffle then waits for the last armed cause — still
+  "after its causing flight settles", and it also removes the documented
+  clause-8 give/reshuffle concurrency residual); pin the fizzle batch in
+  a test. **RESOLVED (fix cycle 2026-09-08): fix applied** — the drain now
+  runs only when the settling flight IS the armed cause; a distinguishing
+  test pins it (early-settling non-cause holds the reshuffle, the last
+  armed cause releases it) and was verified to FAIL against the unguarded
+  drain (mutant run). The handler comment was rewritten; the clause-8
+  give/reshuffle concurrency residual is gone as a side effect (the
+  reshuffle now follows the give — frontend plan Surprises updated).
+- **F2 — acceptance-criterion overclaim, 3 instances**: AC4's "deck-
+  emptying draw shows draw flight → reshuffle flight in sequence" was
+  never visually observed — the M6 walkthrough verified clause 6 over
+  HTTP only (deckCount 1→42 in one response; honest in the progress
+  entry, overclaimed by the checked box). Compounding: for non-actors the
+  draw batch plausibly degrades to immediate-reshuffle (the `held` anchor
+  mounts only on a held-phase snapshot, so the `CardDrawn` flight cancels
+  on a missing anchor pre-refetch — pre-existing characteristic, logged
+  in the frontend plan's deviation note). Instances: root AC4 checkbox
+  (:177), root M6 progress "all four … checked off", frontend step-5
+  walkthrough item 2. **RESOLVED (fix cycle): claim amended** at all three instances (root AC4,
+  the root M6 progress claim, frontend step-5 item 2), each with an inline
+  amendment note; the observer-side visual read is recorded as an open
+  observation for a future two-browser walkthrough, not a met criterion.
+  Sweep re-run: `grep -rn "draw flight"` across all three plan docs — no
+  further instances beyond the three amended and the test-plan rows that
+  describe the jsdom pins accurately.
+- **F3 — vacuous liveness test**: the gate's "is live under jsdom's
+  default auto-cancelling measure" test asserts only the refetched view,
+  which the unconditional `scheduleRefetch` guarantees even with a wedged
+  gate; the child plan's sketch asked for "the reshuffle choreography is
+  enqueued" too. **RESOLVED (fix cycle): test strengthened** — a new case cancels the cause
+  on its missing `held` anchor while stubbing rects so the flushed
+  reshuffle flight observably animates (`data-state="reshuffling"`); the
+  original refetch-outcome case is kept for the degenerate-measure pathway.
+- **F4 — false-comment cluster** (each a one-line fix; all verified
+  against code):
+  - a. `Legality.test.ts` drawable-describe comment claims the eager
+    reshuffle "is no longer sourced from" `drawable` — `Engine.ts`'s
+    `eagerReshuffle` guard literally reads `drawable`, and the adjoining
+    "equivalent to `deck > 0`" note invites a simplification that would
+    no-op the entire ADR-0040 mechanism. **RESOLVED (fix cycle): both** —
+    `eagerReshuffle` now guards with its own inline predicate (the
+    `drawable` import is gone from Engine.ts) and both the Engine
+    docstring and the Legality.test comment now state why the two
+    predicates must never collapse into each other.
+  - b. `Engine.ts` `drawFromDeck` comment attributes `getOrThrow` safety
+    to C6.2 legality; post-diff it rests on ADR-0040's resting invariant
+    (legality still admits `deck 0 / discard > 1`, which `drawOne` can no
+    longer serve). **RESOLVED (fix cycle): claim amended** — the comment now
+    rests the unreachability on ADR-0040's resting invariant and names the
+    hand-built-state gap explicitly.
+  - c. `Fold.test.ts` header claims the batch shares the simulation
+    suite's `SIM_SEED` — defaults diverged in this diff (20260831 vs
+    20260908). **RESOLVED (fix cycle): claim amended** — the header now
+    records the deliberately distinct defaults and why.
+  - d. `use-game.ts` handler preamble: "Endgame tags (M6) fall through to
+    `default`" — false; `CambioCalled`/`GameEnded` have explicit cases. **RESOLVED (fix cycle): claim amended** — the comment names the actual
+    default tags (`GameStarted`, `SlamWindowOpened`, `TurnAdvanced`).
+  - e. `discard-pile.tsx` JSDoc still framed `empty` as "a zero-card keep
+    took the last card" — its own canon r3 superseded that. **RESOLVED (fix cycle): claim
+    amended** — the JSDoc now carries the r3 framing (opening state per
+    ADR-0039, zero-card keep as the mid-game route).
+  - f. `draw-deck.tsx` header cited canon "(r4, CAM-29)" while canon is
+    r5, and the file's inline revision-note convention lacked an r5
+    paragraph. **RESOLVED (fix cycle)** — header bumped to (r5, CAM-31),
+    r5 paragraph added in the file's inline-revision convention.
+  - g. `Engine.ts` `eagerReshuffle` docstring miscounted the slam-path
+    composition ("two non-window returns" vs the actual sites). **RESOLVED
+    (fix cycle): claim amended** — the docstring now describes the shared
+    slam-landing composition plus the post-give-draw second composition.
+- **F5 — coverage gaps**:
+  - a. The clause-9 (`…, DeckReshuffled, SlamWindowOpened`) and clause-8
+    give-draw (`…, CardGivenFromDeck, DeckReshuffled`) event positions
+    never pass through the fold in any suite (probed: zero instances in
+    both 250-game batches). **RESOLVED (fix cycle): test added** — a crafted
+    fold-consistent log reaches the re-arm pre-state (two real draws plus
+    one synthetic transcription-jump `DeckReshuffled`, same license as the
+    impossible-deck test), then asserts the live `DiscardHeld` batch is
+    `HeldDiscarded, DeckReshuffled, SlamWindowOpened` AND that refolding
+    the extended log deep-equals the live state. The give-draw position
+    stays engine-order-pinned only (crafting a zero-card slam through the
+    fold needs four slam rounds of scaffolding — declined as
+    disproportionate; noted in the backend coverage table).
+  - b. `Invariants.test.ts` "combines all three checkers" corrupts only
+    the deck. **RESOLVED (fix cycle): test strengthened** — it now trips
+    each of the three checkers distinctly (partition, hand-integrity,
+    resting invariant), asserting each checker's message substring.
+  - c. `powerPeek`/`powerSwap` landing sites have no dedicated trigger
+    test — accepted on the shared-helper argument (all five funnel
+    through `openWindowOrAdvance`'s entry); noted, not fixed.
+- **F6 — advisory**: coverage-table row 15's malformed extra cell —
+  RESOLVED (fix cycle): row repaired. Canon draw-deck r5 documented the
+  empty-branch motion for `reshuffling` only — RESOLVED (fix cycle): r5
+  text extended to cover `draw` too (same-revision clarification, matching
+  the as-built component). The sequencing test's in-flight debounced
+  refetch — RESOLVED (fix cycle): both gate tests now settle the flight
+  and await the refetched view. DECLINED, deliberately: HANDOFF §4.5's
+  invariant list stays persistence-level (the engine-level resting
+  invariant lives in ADR-0040 and the harness); ADR-0014's Context keeps
+  its historical `firstDiscard` mention (history is the point; ADR-0039
+  is indexed as the superseding decision). Noted for the record, no
+  action: `FlightLayer`'s null-root caveat, the affordance-mirror/
+  `drawable` decoupling having no coupling test.
+
+**What was run**: `pnpm turbo build typecheck lint test` (bare);
+`pnpm turbo test --filter … --force` for domain/application/api/web
+against live Postgres; one throwaway browser-hook probe (deleted);
+reviewer-side domain suite runs and batch probes.
+
+**Deferred/carry-forward**: F5c (power-path trigger tests) if the eager
+helper ever de-shares; the observer-side visual read of the draw batch
+(F2's open observation) belongs to the next session that runs a
+two-browser walkthrough.

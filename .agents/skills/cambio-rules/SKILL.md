@@ -28,6 +28,13 @@ Cambio is a hidden-information, memory-based card game. **Lowest score wins.**
 - One card is turned face up to start the discard pile; the rest is the
   face-down draw deck.
 
+  > **Amended:** ADR-0039 removes the opening face-up card — the deal
+  > leaves the discard pile **empty**, and all 52 cards minus the four
+  > dealt to each player form the draw deck (`52 − 4n`). The first
+  > player's opening options are draw or call Cambio only; no slam is
+  > possible until the first discard lands. The "one card is turned face
+  > up" line above is superseded.
+
 ## Scoring
 
 | Card        | Score      |
@@ -109,6 +116,14 @@ momentarily — that leak is part of the cost.
   discard.
 - When the draw deck empties, reshuffle the discard pile into a new draw
   deck, **retaining the current top card** as the new top discard.
+
+  > **Amended:** ADR-0040 makes the reshuffle **eager**: it fires the
+  > instant a draw empties the deck, or a discard lands on an empty deck
+  > making the pile reshufflable — never waiting for the next draw. The
+  > engine enforces a resting invariant (deck empty ⟹ discard ≤ 1) from
+  > exactly one mechanism; the retain-top rule above is unchanged, only
+  > the timing.
+
 - The game ends **only** by a Cambio call. Lowest total wins. **Ties are
   possible and must be representable** — no caller tiebreak, no `winner`
   column.

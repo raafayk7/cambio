@@ -425,6 +425,55 @@ export function useGame(gameId: string) {
     }
   }
 
+  // CH2 (ADR-0040): the reshuffle sequencing gate. A card that empties the
+  // deck (a draw) or lands on it while it's empty (the re-arm case) is the
+  // reshuffle's CAUSE — the server always emits the causing event before
+  // `DeckReshuffled` in the same batch (root plan clauses 6-9), and the
+  // client mirrors that as a choreography order: the reshuffle flight waits
+  // for its causing flight to finish, mirroring `runAfterReveal`'s shape
+  // rather than a new event-queue abstraction.
+  const causeFlightIdRef = React.useRef<string | null>(null)
+  const pendingAfterCauseRef = React.useRef<Array<() => void>>([])
+
+  /** Runs `thunk` now, or queues it for the moment the armed causing flight
+   * settles. No cause armed (undecoded causing event, resubscribe, a
+   * reshuffle-only batch) is the degraded mode: run immediately, exactly
+   * today's concurrent behavior — never a hang. */
+  function runAfterCausingFlight(thunk: () => void) {
+    if (causeFlightIdRef.current !== null) {
+      pendingAfterCauseRef.current.push(thunk)
+    } else {
+      thunk()
+    }
+  }
+
+  /** Enqueues a flight that can be the reshuffle's cause: arms the latch at
+   * enqueue time, releases it (and drains whatever queued behind it) the
+   * moment THIS flight settles. `useFlights` fires `onDone` on every
+   * outcome — completed or cancelled — so a degenerate jsdom rect, a
+   * missing anchor, or an unmount `cancelAll` can never wedge the gate;
+   * liveness is structural, not a timeout. */
+  function enqueueCausingFlight(spec: Omit<Parameters<typeof flights.enqueue>[0], "onDone">) {
+    causeFlightIdRef.current = spec.id
+    flights.enqueue({
+      ...spec,
+      onDone: () => {
+        // Drain only when THIS flight is the armed cause (review F1): the
+        // latch always holds the last-armed cause, which is the event that
+        // immediately preceded `DeckReshuffled` in the batch — its true
+        // cause. An earlier cause settling first (e.g. the fizzle batch's
+        // CardDrawn ahead of the PowerDiscarded that actually re-armed the
+        // pile) must NOT release the reshuffle early. Liveness is intact:
+        // the armed cause's own onDone still fires on every outcome.
+        if (causeFlightIdRef.current !== spec.id) return
+        causeFlightIdRef.current = null
+        const pending = pendingAfterCauseRef.current
+        pendingAfterCauseRef.current = []
+        pending.forEach((thunk) => thunk())
+      },
+    })
+  }
+
   function pulseSeat(playerId: string) {
     if (actingTimeoutRef.current !== null) window.clearTimeout(actingTimeoutRef.current)
     setActingPlayerId(playerId)
@@ -437,13 +486,16 @@ export function useGame(gameId: string) {
   // CH1 (T2/T3): one handler per room event, enqueuing flights/beats THEN
   // (back at the call site below) scheduling the refetch — ADR-0033: a
   // flight spec references only the event's own payload, never live state.
-  // Slam/reshuffle/endgame tags (M5/M6) fall through to `default`: out of
-  // this milestone's scope, so the generic refetch is their entire handling
-  // for now (the screen renders whatever minimal branch M3 left for them).
+  // CH2/ADR-0040: sites that can leave the deck empty (draws, and
+  // discard-landings) enqueue through `enqueueCausingFlight` instead of
+  // `flights.enqueue` directly, arming the reshuffle sequencing gate above.
+  // `GameStarted`, `SlamWindowOpened`, and `TurnAdvanced` fall through to
+  // `default`: no choreography of their own, so the generic refetch is
+  // their entire handling.
   function handleRoomEvent(event: RoomGameEvent) {
     switch (event._tag) {
       case "CardDrawn":
-        flights.enqueue({
+        enqueueCausingFlight({
           id: nextFlightId(),
           face: { face: "down" },
           originId: "deck",
@@ -466,7 +518,9 @@ export function useGame(gameId: string) {
           originId: "held",
           destinationId: slot,
         })
-        flights.enqueue({
+        // The displaced card is the one landing on the discard — the
+        // re-arm case (C9): it can make an empty deck reshufflable.
+        enqueueCausingFlight({
           id: nextFlightId(),
           face: { face: "up", card: event.discarded },
           originId: slot,
@@ -475,7 +529,7 @@ export function useGame(gameId: string) {
         break
       }
       case "HeldDiscarded":
-        flights.enqueue({
+        enqueueCausingFlight({
           id: nextFlightId(),
           face: { face: "up", card: event.card },
           originId: "held",
@@ -483,7 +537,7 @@ export function useGame(gameId: string) {
         })
         break
       case "PowerDiscarded":
-        flights.enqueue({
+        enqueueCausingFlight({
           id: nextFlightId(),
           face: { face: "up", card: event.card },
           originId: "held",
@@ -546,7 +600,9 @@ export function useGame(gameId: string) {
         const isOwnSlam = slammerId === target.playerId
         runAfterReveal(() => {
           const slot = slotAnchorId(target.playerId, target.slotIndex)
-          flights.enqueue({
+          // The slammed card lands on the discard — a slam re-arm case (C9)
+          // never opens a window, but can still reshuffle.
+          enqueueCausingFlight({
             id: nextFlightId(),
             face: { face: "up", card },
             originId: slot,
@@ -570,7 +626,7 @@ export function useGame(gameId: string) {
       case "PenaltyDrawn": {
         const { playerId, slotIndex } = event
         runAfterReveal(() => {
-          flights.enqueue({
+          enqueueCausingFlight({
             id: nextFlightId(),
             // Unseen by everyone, including the slammer (ADR-0022) — never
             // a `face: "up"` spec, structurally, same as the wire itself.
@@ -599,7 +655,7 @@ export function useGame(gameId: string) {
       case "CardGivenFromDeck": {
         const { to } = event
         runAfterReveal(() => {
-          flights.enqueue({
+          enqueueCausingFlight({
             id: nextFlightId(),
             face: { face: "down" },
             originId: "deck",
@@ -636,6 +692,10 @@ export function useGame(gameId: string) {
         slamRevealTimeoutRef.current = null
         revealActiveRef.current = false
         pendingAfterRevealRef.current = []
+        // The cause latch clears alongside the reveal queue so nothing
+        // dangles into the next phase.
+        causeFlightIdRef.current = null
+        pendingAfterCauseRef.current = []
         setSlamReveal(null)
         setAwaitingGive(null)
         break
@@ -656,12 +716,24 @@ export function useGame(gameId: string) {
         // retained top" (root plan CH2 note) — the overlay design shows one
         // moving card per spec, and the top staying put is already true by
         // construction: broadcasts never touch the snapshot (ADR-0033), so
-        // `view.discard[0]` is untouched until the refetch lands.
-        flights.enqueue({
-          id: nextFlightId(),
-          face: { face: "down" },
-          originId: "discard",
-          destinationId: "deck",
+        // `view.discard[0]` is untouched until the refetch lands. ADR-0040:
+        // this always follows its causing event in the batch, so the flight
+        // is sequenced behind the reveal gate AND the cause gate. Composing
+        // both keeps the batch order: causing thunks queue ahead of this
+        // one behind the same reveal, so they enqueue and arm the latch
+        // first, and the latch-guarded drain releases this flight only when
+        // the LAST armed cause settles — in the zero-card batch that means
+        // after the give flight too, which is later than the reshuffle's
+        // own cause strictly requires but never concurrent with any cause.
+        runAfterReveal(() => {
+          runAfterCausingFlight(() => {
+            flights.enqueue({
+              id: nextFlightId(),
+              face: { face: "down" },
+              originId: "discard",
+              destinationId: "deck",
+            })
+          })
         })
         break
       default:

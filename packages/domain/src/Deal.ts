@@ -8,10 +8,10 @@ import { SlotIndex, type Timestamp, type UserId } from "./Ids.js"
 import { prngStateFromSeed, shuffle } from "./Prng.js"
 
 /**
- * Game creation (§1.1 as amended by ADR-0036): shuffle the 52-card deck from
- * the seed, deal 4 face-down cards to each of 2–4 players (slots 0–3, never
- * looked at — there is no opening peek), turn one card face up to start the
- * discard pile, and await seat 0's first draw. Pure: same inputs, same game.
+ * Game creation (§1.1 as amended by ADR-0036 and ADR-0039): shuffle the
+ * 52-card deck from the seed, deal 4 face-down cards to each of 2–4 players
+ * (slots 0–3, never looked at — there is no opening peek), leave the discard
+ * pile empty, and await seat 0's first draw. Pure: same inputs, same game.
  */
 export const dealGame = (
   players: ReadonlyArray<UserId>, // seat order
@@ -34,13 +34,12 @@ export const dealGame = (
       card: shuffled[seat * 4 + i]!,
     })),
   )
-  const firstDiscard = shuffled[players.length * 4]!
-  const deck = shuffled.slice(players.length * 4 + 1)
+  const deck = shuffled.slice(players.length * 4)
 
   const state: GameState = {
     players: players.map((id, seat) => ({ id, hand: hands[seat]! })),
     deck,
-    discard: [firstDiscard],
+    discard: [],
     prng,
     phase: { _tag: "AwaitingDraw", playerId: players[0]! },
     config,
@@ -54,7 +53,6 @@ export const dealGame = (
     config,
     hands,
     deck,
-    firstDiscard,
     prng,
   }
 
