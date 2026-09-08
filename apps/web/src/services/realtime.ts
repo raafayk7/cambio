@@ -47,10 +47,12 @@ let injected: RealtimeClientLike | null = null
 
 function getClient(): RealtimeClientLike {
   if (injected !== null) return injected
-  // The singleton must never construct server-side: TanStack Start SSRs the
-  // first render, and a server-built socket would outlive the request and be
-  // shared across users. Subscriptions live in effects, which never run on
-  // the server — reaching this guard means that discipline broke.
+  // The singleton must never construct server-side. Since CAM-32 the only
+  // server-side render is the one-shot build-time SPA prerender (ADR-0041),
+  // so this is now a prerender guard — a socket opened there would hang the
+  // build; under any future per-request SSR it would be shared across users.
+  // Subscriptions live in effects, which never run server-side — reaching
+  // this guard means that discipline broke.
   if (typeof window === "undefined") {
     throw new Error("realtime client requested during SSR — subscribe from browser effects only")
   }
@@ -66,18 +68,20 @@ function getClient(): RealtimeClientLike {
     const url: string | undefined = tunnelHost
       ? `wss://${window.location.host}/socket`
       : import.meta.env.VITE_REALTIME_URL
-    const jwt: string | undefined = import.meta.env.VITE_REALTIME_ANON_JWT
+    const apikey: string | undefined = import.meta.env.VITE_REALTIME_APIKEY
     // Empty/whitespace counts as missing: .env.example ships
-    // VITE_REALTIME_ANON_JWT= blank, and `""` would pass an undefined-only
+    // VITE_REALTIME_APIKEY= blank, and `""` would pass an undefined-only
     // check, then fail the handshake with no diagnostic (review F10).
-    if (url === undefined || url.trim() === "" || jwt === undefined || jwt.trim() === "") {
+    if (url === undefined || url.trim() === "" || apikey === undefined || apikey.trim() === "") {
       throw new Error(
-        "realtime env missing — VITE_REALTIME_URL and VITE_REALTIME_ANON_JWT must be set and non-empty (ADR-0032)",
+        "realtime env missing — VITE_REALTIME_URL and VITE_REALTIME_APIKEY must be set and non-empty (ADR-0032, amended by ADR-0041)",
       )
     }
-    // The anon JWT is public by design (ADR-0032): it gates the socket
-    // handshake only; capability topics are the authorization.
-    client = new RealtimeClient(url, { params: { apikey: jwt } })
+    // The apikey is public by design: locally a self-minted anon JWT
+    // (ADR-0032), in prod the Supabase publishable key (ADR-0041). Either
+    // way it gates the socket handshake only; capability topics are the
+    // authorization.
+    client = new RealtimeClient(url, { params: { apikey } })
   }
   return client
 }

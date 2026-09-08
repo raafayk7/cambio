@@ -7,7 +7,7 @@ import {
 } from "@cambio/application"
 import type { GameEvent, GameId, GameState, GameVersion, Lobby } from "@cambio/domain"
 import { Timestamp } from "@cambio/domain"
-import { Effect, Layer, ManagedRuntime, Redacted, Ref } from "effect"
+import { Effect, Layer, ManagedRuntime, Option, Redacted, Ref } from "effect"
 import { pino } from "pino"
 
 import type { AppConfig } from "../../src/config.js"
@@ -126,6 +126,9 @@ const makeAppLayer = (ports?: TestPorts) => {
 export const TestAppLayer = makeAppLayer()
 
 const baseConfig: AppConfig = {
+  // "test", not "production": the C12 guard must stay out of the way here —
+  // cookie-attribute suites drive secure/sameSite via overrides, not NODE_ENV.
+  nodeEnv: "test",
   port: 0,
   host: "127.0.0.1",
   logLevel: "silent",
@@ -141,6 +144,7 @@ const baseConfig: AppConfig = {
   // recording stub); literals keep the config total.
   realtimeUrl: "http://realtime-dev.localhost:4000",
   realtimeJwtSecret: Redacted.make("cam-6-test-realtime-jwt-secret-padding-to-32"),
+  realtimeSecretKey: Option.none(),
   topicSecret: Redacted.make(TEST_TOPIC_SECRET),
 }
 

@@ -18,7 +18,7 @@ import { describe, expect, it } from "vitest"
  * `toContain` cannot tell the slots apart.
  */
 
-const VITE_VARS = ["VITE_API_URL", "VITE_REALTIME_URL", "VITE_REALTIME_ANON_JWT"]
+const VITE_VARS = ["VITE_API_URL", "VITE_REALTIME_URL", "VITE_REALTIME_APIKEY"]
 
 // vitest's cwd is the package root (apps/web); jsdom rewrites
 // import.meta.url to a non-file scheme, so resolve from cwd instead.

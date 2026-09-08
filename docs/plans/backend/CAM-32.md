@@ -117,6 +117,7 @@ describe pre-change code):
 | task branch | `apps/api/src/config.ts`                   | `nodeEnv` + optional `REALTIME_SECRET_KEY` + C12 validation         |
 | task branch | `apps/api/src/infra/realtime-publisher.ts` | `makeFetchTransport` learns cloud-auth headers (C9)                 |
 | task branch | `apps/api/test/support/http.ts`            | `baseConfig` literal gains the new `AppConfig` fields (no behavior) |
+| task branch | `apps/api/test/RealtimeTransport.test.ts`  | new — stubbed-fetch unit suite pinning both C9 header sets          |
 | task branch | `turbo.json`                               | `REALTIME_SECRET_KEY` added to `globalPassThroughEnv`               |
 | task branch | `.env.example`                             | cloud-flavor docs + SameSite guidance correction (C13)              |
 
@@ -442,24 +443,68 @@ file, name, and assertion phrase are written by `/implement` when the test
 actually lands. A plan-time row that invents a test title and assertion is
 an overclaim waiting to become a review finding.)_
 
-| Clause                                                                                                                                                                                                 | Test (file + name) | What is asserted |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ | ---------------- |
-| C1 — planned: no unit test can pin a workflow; proven in anger via the deliberate-failure test PR (red on failure, green on revert), run URLs recorded in Progress (B1, step 2)                        |                    |                  |
-| C2 — planned: same test-PR evidence + a grep of the CI job log showing `RealtimeIntegration` executed (compose up + `/etc/hosts` line preceding the bare gate in `gate.yml`)                           |                    |                  |
-| C3 — planned: workflow-run evidence — the `development` job graph shows gate → migrate → deploy-hook with `needs` ordering; pre-secrets run shows deploy **skipped** on migrate failure (B1, step 5)   |                    |                  |
-| C4 — planned: live re-run of the migrate job against the already-migrated Supabase DB is a no-op success (idempotent `_cambio_migrations` ledger); run URL in Progress (step 5)                        |                    |                  |
-| C5 (backend half) — planned: live curl of `/api/health` (and a 404-shape probe) through the Vercel proxy, output captured in Progress (B6)                                                             |                    |                  |
-| C6 (backend half) — planned: live curl cookie flow — `POST /api/users` set-cookie attribute inspection (`Secure`, `SameSite=Lax`, `HttpOnly`, `Path=/`, no `Domain`) then `GET /api/me` replay (B6)    |                    |                  |
-| C8 (backend half) — planned: SQL against prod — `_cambio_migrations` matches the deployed branch's migrations dir; `cron.job` lists the three ADR-0025 jobs once `0004` deploys; pooler fallback (B5)  |                    |                  |
-| C9 — planned: transport unit tests with a stubbed `fetch` pinning both header sets (cloud: `apikey` + bearer key; local: byte-identical to today, no `apikey`); existing realtime suites unedited (B2) |                    |                  |
-| C12 — planned: `Config.test.ts` cases — production without `SESSION_COOKIE_SECURE=true` fails config load naming the variable; production with it loads; dev default unaffected (B3, fail-at-boot)     |                    |                  |
-| C13 — planned: not a test — `.env.example` rewrite reviewed against B4's checklist (cloud flavors documented, SameSite=none advice corrected to the single-origin lax story, new vars present)         |                    |                  |
+| Clause                                                                                                                                                                                                 | Test (file + name)                                                                                                                                                                                                                   | What is asserted                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| C1 — planned: no unit test can pin a workflow; proven in anger via the deliberate-failure test PR (red on failure, green on revert), run URLs recorded in Progress (B1, step 2)                        | PR #25: red run 34248814457, green run 34249321407 (no unit test can pin a workflow)                                                                                                                                                 | gate check red on a deliberate failure, green on revert                                                                          |
+| C2 — planned: same test-PR evidence + a grep of the CI job log showing `RealtimeIntegration` executed (compose up + `/etc/hosts` line preceding the bare gate in `gate.yml`)                           | CI log of run 34248814457, gate job                                                                                                                                                                                                  | RealtimeIntegration executed on the runner (compose + /etc/hosts); 1 failed                                                      | 122 passed — only the deliberate test |
+| C3 — planned: workflow-run evidence — the `development` job graph shows gate → migrate → deploy-hook with `needs` ordering; pre-secrets run shows deploy **skipped** on migrate failure (B1, step 5)   | deploy runs 34243991527 (pre-secrets) and 34249417948 (green)                                                                                                                                                                        | needs-ordered gate → migrate → deploy-api; hook skipped on red migrate, fired on green                                           |
+| C4 — planned: live re-run of the migrate job against the already-migrated Supabase DB is a no-op success (idempotent `_cambio_migrations` ledger); run URL in Progress (step 5)                        | run 34249417948 job 102174350020 — migrate rerun                                                                                                                                                                                     | second run logs 'no pending migrations (1 applied)' — no-op success                                                              |
+| C5 (backend half) — planned: live curl of `/api/health` (and a 404-shape probe) through the Vercel proxy, output captured in Progress (B6)                                                             | live curls via the Vercel proxy (root plan M4 entry)                                                                                                                                                                                 | GET /api/health → 200 through the proxy; /api/nonexistent → api JSON 404 (prefix stripped)                                       |
+| C6 (backend half) — planned: live curl cookie flow — `POST /api/users` set-cookie attribute inspection (`Secure`, `SameSite=Lax`, `HttpOnly`, `Path=/`, no `Domain`) then `GET /api/me` replay (B6)    | deferred to /release day (root acceptance criteria)                                                                                                                                                                                  | cookie attributes pinned locally by existing route suites; live flow needs /users on development                                 |
+| C8 (backend half) — planned: SQL against prod — `_cambio_migrations` matches the deployed branch's migrations dir; `cron.job` lists the three ADR-0025 jobs once `0004` deploys; pooler fallback (B5)  | SQL via Supabase MCP (root plan M4 entry)                                                                                                                                                                                            | _cambio_migrations = exactly 0001_init.sql on prod; cron.job half deferred to release day                                        |
+| C9 — planned: transport unit tests with a stubbed `fetch` pinning both header sets (cloud: `apikey` + bearer key; local: byte-identical to today, no `apikey`); existing realtime suites unedited (B2) | apps/api/test/RealtimeTransport.test.ts (all three cases); apps/api/test/Config.test.ts cloud-key cases incl. "blank or whitespace REALTIME_SECRET_KEY loads as none — a stray empty .env line must not flip cloud mode (review F1)" | cloud mode sends apikey + bearer carrying the key verbatim; local mode byte-identical two-header set; blank env treated as unset |
+| C12 — planned: `Config.test.ts` cases — production without `SESSION_COOKIE_SECURE=true` fails config load naming the variable; production with it loads; dev default unaffected (B3, fail-at-boot)     | apps/api/test/Config.test.ts C12 cases incl. "a NODE_ENV typo fails config load naming NODE_ENV — the guard must fail closed, not open (review F2)"                                                                                  | production without secure fails naming SESSION_COOKIE_SECURE; NODE_ENV typo fails naming NODE_ENV; dev default unaffected        |
+| C13 — planned: not a test — `.env.example` rewrite reviewed against B4's checklist (cloud flavors documented, SameSite=none advice corrected to the single-origin lax story, new vars present)         | review pass (backend contract reviewer) — no assertable test, prose artifact                                                                                                                                                         | every config var documented incl. cloud flavors; SameSite=none/split-origin guidance gone (sweep: zero hits)                     |
 
 ## Progress
 
 _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [ ] 2026-09-08 — backend child plan written; awaiting /implement
+- [x] 2026-09-08 — B2 (C9) landed test-first: `REALTIME_SECRET_KEY` as
+      `Config.option(Config.redacted(...))` in `apps/api/src/config.ts`;
+      `makeFetchTransport` grew an optional `secretKey` (cloud mode:
+      `apikey` + `Bearer <key>`, no JWT minted; absent: byte-identical
+      request); `RealtimePublisherLive` unwraps via
+      `Option.getOrUndefined(Option.map(..., Redacted.value))`;
+      `REALTIME_SECRET_KEY` added to turbo `globalPassThroughEnv`. New
+      suite `apps/api/test/RealtimeTransport.test.ts` (3 tests, sibling
+      file — so `RealtimePublisher.test.ts` stays byte-untouched); two new
+      `Config.test.ts` cases. Port interface unchanged.
+- [x] 2026-09-08 — B3 (C12) landed test-first: `nodeEnv` (default
+      `"development"`) + `Config.validate` wrapping the `Config.all` bag —
+      production without `SESSION_COOKIE_SECURE=true` refuses config load
+      with a message naming the variable. Three new `Config.test.ts`
+      cases; all 7 pre-existing cases pass unchanged. Known compile
+      fallout landed as predicted: `baseConfig` in
+      `apps/api/test/support/http.ts` gained `nodeEnv: "test"` and
+      `realtimeSecretKey: Option.none()` — zero behavior change.
+- [x] 2026-09-08 — B4 (C13): `.env.example` rewritten per the checklist —
+      SameSite=none advice replaced with the ADR-0041 single-origin
+      lax + Secure story and the C12 boot-guard note; `NODE_ENV`
+      documented (commented-out entry); `DATABASE_URL` cloud flavor =
+      session pooler (with the IPv4 rationale); `REALTIME_URL` cloud
+      shape `https://<ref>.supabase.co/realtime/v1`; new blank
+      `REALTIME_SECRET_KEY` entry; `REALTIME_JWT_SECRET`'s EOL'd
+      "Supabase project's JWT secret" tail corrected to
+      required-but-unused-in-cloud + minted throwaway. `VITE_*` block
+      untouched (frontend lane owns it).
+- [x] 2026-09-08 — checkpoints: `pnpm turbo test --filter @cambio/api`
+      green (21 files, 130 tests — `RealtimePublisher.test.ts` and
+      `RealtimeIntegration.test.ts` pass with zero edits, container up).
+      Full gate `pnpm turbo build typecheck lint test` bare: 25/25 tasks
+      successful (first attempt caught an unformatted `Config.test.ts`
+      via `//#format:check` — fixed with `prettier --write`; see
+      Surprises for a one-off `@cambio/config#test` flake in that same
+      run). Module-layout table reconciled: one addition, the new
+      `RealtimeTransport.test.ts` row.
+
+- [x] 2026-09-08 23:30 — review fix cycle: F1 (blank-as-absent
+      `REALTIME_SECRET_KEY` + Config test), F2 (`nodeEnv` literal union +
+      typo test), coverage rows C1–C6/C8/C13 filled with run/probe evidence,
+      C9/C12 rows refreshed with the new cases, compose-form Surprise
+      resolved. Fresh `pnpm turbo test --filter @cambio/api --force`:
+      132/132.
 
 ## Surprises & notes for the root plan
 
@@ -482,3 +527,24 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
   (B1 step 6) is the one place the workflow spec may need its documented
   fallback form; whichever form ships, record it here so the ADR-0042
   "compose file verbatim" claim stays honest.
+  **Resolved (review fix cycle, 2026-09-08):** the plain unscoped form
+  shipped — `docker compose -f docker/docker-compose.yml up -d --wait` —
+  and worked on GitHub runners with no fallback needed (proven in runs
+  34248814457/34249321407, where `RealtimeIntegration` executed against
+  the compose containers). The fallback form remains documented at B1
+  step 6 in case a future compose version regresses.
+- 2026-09-08 (implement, B2–B4) — **one-off `@cambio/config#test` flake
+  under the full gate:** the first full-gate run failed
+  `@cambio/config#test` (exit 1) alongside the genuine `//#format:check`
+  finding (unformatted `Config.test.ts`). The same turbo input hash
+  (`19fb6c4f72f42734`) passed on an immediate bare re-run and again as a
+  cache hit in the green gate — nondeterministic, most plausibly resource
+  contention while `domain`'s fuzz suite saturated the machine. Not
+  reproduced; nothing changed in `packages/config`. If CI ever shows the
+  same signature, suspect the runner, not the config package.
+- 2026-09-08 (implement, B3) — the C12 guard message deliberately does
+  not use `Config.validate`'s per-variable error nesting: `Config.validate`
+  wraps the whole bag, so the message itself carries
+  `SESSION_COOKIE_SECURE` by name (the `Config.test.ts` convention of
+  asserting the variable name in the error still holds — the test greps
+  the stringified `Left`).

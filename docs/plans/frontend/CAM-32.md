@@ -39,7 +39,11 @@ gate is not in play. `hidden-information` is likewise untouched — no
 payload, channel, or projection changes; the realtime work is env-var
 naming and value shapes only.
 
-**Current state, probe-verified (re-verify before building on it):**
+**Current state, probe-verified (re-verify before building on it).**
+_Close-out note (2026-09-08): the `src/` line anchors below describe
+pre-change code as of plan commit `bda7e02` — F2/F3/F4 edited
+`vite.config.ts`, `api.ts`, and `realtime.ts`, so the as-built diff is the
+authority, not these numbers._
 
 - `apps/web/src/services/api.ts:39` is the single HTTP choke point:
   `const API_URL: string = TUNNEL_MODE ? "" : (import.meta.env.VITE_API_URL ?? "http://localhost:3001")`,
@@ -226,9 +230,12 @@ Change the fallback at `apps/web/src/services/api.ts:39` from
 `TUNNEL_MODE` ternary intact. Rationale against C11's two allowed
 failure shapes: a production build with `VITE_API_URL` missing then
 issues **same-origin relative requests** — behind the Vercel proxy those
-hit the static host and fail loudly (non-JSON body → the existing
-decode/ApiError path throws), and in local dev they hit :3000 and fail
-equally loudly — instead of today's silent
+miss the `/api` rewrite, the SPA catch-all serves `_shell.html` with HTTP
+200, and `response.json()` throws a raw SyntaxError on the HTML
+(_corrected in the review fix cycle — the original claim here named the
+decode/ApiError branch, which never runs on a 200; review F5_), and in
+local dev they hit :3000 and fail equally loudly — instead of today's
+silent
 `http://localhost:3001`-baked-into-a-prod-bundle. A build-time throw was
 considered and rejected: `""` is already a legitimate value of this
 const (tunnel mode), the same-origin shape is exactly what the proxy
@@ -398,13 +405,13 @@ become review findings."
 table and module layout are the artifacts reconciled against as-built
 code."
 
-| Clause                                                                                                                                                                                                                                                                                                                                    | Test (file + name) | What is asserted |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------- |
-| C5 — planned: rewrite spec in `vercel.json` (F1: `/api/:path*` → Render host with prefix stripped, ordered before the SPA catch-all); no unit test can pin a Vercel-side rewrite — verification is the live `curl /api/health` probe (first M4 smoke, shared with the backend child)                                                      |                    |                  |
-| C7 — planned: SPA mode via `tanstackStart({ spa: … })` (F2); pinned locally by the static-build verification block (shell exists, asset closure, static serve renders) and live by the zero-functions deployment check; a repo test asserting `dist` contents is possible but likely overkill — decided at /implement                     |                    |                  |
-| C10 — planned: env rename to `VITE_REALTIME_APIKEY` (F4) with the cloud URL/key value shapes documented; the existing realtime suite (channel pattern, F10 degradation) re-pins the unchanged local flow under the new name; the cloud connection itself is live-verified in M4 (no jsdom socket possible, ADR-0030)                      |                    |                  |
-| C11 — planned: fallback `""` in `api.ts` (F3) + a new api.test.ts case stubbing the var away and asserting relative-path requests with no localhost prefix (module re-import required — `API_URL` is module-scope)                                                                                                                        |                    |                  |
-| C13 (frontend half) — planned: `.env.example` web section — `VITE_API_URL` prod value `/api`, cloud `VITE_REALTIME_URL` shape (no `/socket`/`/websocket` suffix), renamed `VITE_REALTIME_APIKEY` with both value flavors; prose-only, no assertable pin — proven by review reading the section (backend child owns the file-wide rewrite) |                    |                  |
+| Clause                                                                                                                                                                                                                                                                                                                                    | Test (file + name)                                                                                                                                                                                                                                                                   | What is asserted                                                                                                                                       |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C5 — planned: rewrite spec in `vercel.json` (F1: `/api/:path*` → Render host with prefix stripped, ordered before the SPA catch-all); no unit test can pin a Vercel-side rewrite — verification is the live `curl /api/health` probe (first M4 smoke, shared with the backend child)                                                      | vercel.json rewrite spec + live curl (root plan M4 entry)                                                                                                                                                                                                                            | api rule precedes the catch-all, prefix stripped to the Render host; /api/health 200 live through the proxy                                            |
+| C7 — planned: SPA mode via `tanstackStart({ spa: … })` (F2); pinned locally by the static-build verification block (shell exists, asset closure, static serve renders) and live by the zero-functions deployment check; a repo test asserting `dist` contents is possible but likely overkill — decided at /implement                     | no repo test (decided at /implement: dist-contents assertion is overkill); locally proven 2026-09-08 by the static-build verification block — prod-shaped build emitted dist/client/_shell.html, asset closure clean, python3 http.server served the shell (HTTP 200, 3 script tags) | dist/client alone is a self-sufficient static artifact; live zero-functions check remains for root M4/release day                                      |
+| C10 — planned: env rename to `VITE_REALTIME_APIKEY` (F4) with the cloud URL/key value shapes documented; the existing realtime suite (channel pattern, F10 degradation) re-pins the unchanged local flow under the new name; the cloud connection itself is live-verified in M4 (no jsdom socket possible, ADR-0030)                      | apps/web/test/env-declaration.test.ts (both turbo slots); apps/web/test/realtime.test.ts incl. "names VITE_REALTIME_APIKEY when only the apikey is blank — pins the rename code-side (review F3)"                                                                                    | rename pinned in turbo.json and code-side; apikey-term guard failure names VITE_REALTIME_APIKEY, killing both rename-revert mutants                    |
+| C11 — planned: fallback `""` in `api.ts` (F3) + a new api.test.ts case stubbing the var away and asserting relative-path requests with no localhost prefix (module re-import required — `API_URL` is module-scope)                                                                                                                        | apps/web/test/api.test.ts — "issues bare same-origin relative requests when VITE_API_URL is missing (C11)" (stubEnv + resetModules + dynamic re-import; existing pins unchanged)                                                                                                     | with VITE_API_URL unset the fetched URL is exactly the bare relative path (/me), never localhost-prefixed                                              |
+| C13 (frontend half) — planned: `.env.example` web section — `VITE_API_URL` prod value `/api`, cloud `VITE_REALTIME_URL` shape (no `/socket`/`/websocket` suffix), renamed `VITE_REALTIME_APIKEY` with both value flavors; prose-only, no assertable pin — proven by review reading the section (backend child owns the file-wide rewrite) | prose-only, no assertable pin — proven by review reading the .env.example web section (rewritten 2026-09-08, reconciled onto the backend lane's C13 rewrite)                                                                                                                         | VITE_API_URL prod value /api, cloud VITE_REALTIME_URL shape (no /socket or /websocket suffix), VITE_REALTIME_APIKEY with both value flavors documented |
 
 ## Progress
 
@@ -412,6 +419,55 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [ ] 2026-09-08 — frontend child plan written (planning phase; no
       implementation yet)
+- [x] 2026-09-08 — F2 landed: `tanstackStart({ spa: { enabled: true } })`
+      in `apps/web/vite.config.ts` (option names re-verified against the
+      installed `@tanstack/start-plugin-core@1.171.26` `spaSchema` before
+      writing — `spa.enabled`, `maskPath` default `"/"`,
+      `prerender.outputPath` default `"/_shell"`, exactly as planned).
+      Local static-build verification passed: build with prod-shaped env
+      (`VITE_API_URL=/api`, dummy realtime values) ran client + ssr builds
+      then `[prerender] Prerendered 1 pages: /`;
+      `apps/web/dist/client/_shell.html` exists; every `/assets/*` path the
+      shell references resolves inside `dist/client` (asset closure clean);
+      `python3 -m http.server` on `dist/client` served `_shell.html` with
+      HTTP 200 and its 3 script tags intact. `dist/server/` exists as
+      predicted — build-time prerender machinery only, not deployed.
+- [x] 2026-09-08 — F3 landed (TDD): new red-first case in
+      `apps/web/test/api.test.ts` ("issues bare same-origin relative
+      requests when VITE_API_URL is missing (C11)") via
+      `vi.stubEnv` + `vi.resetModules` + dynamic re-import; then the
+      fallback at `apps/web/src/services/api.ts` changed
+      `?? "http://localhost:3001"` → `?? ""` (TUNNEL_MODE ternary intact).
+      Existing pins green unchanged.
+- [x] 2026-09-08 — F4 landed (atomic rename, red-first via the
+      env-declaration test's `VITE_VARS` flip): `VITE_REALTIME_ANON_JWT` →
+      `VITE_REALTIME_APIKEY` across all five touch points —
+      `realtime.ts` (read + guard message, citation now "ADR-0032, amended
+      by ADR-0041", apikey-flavor comments), `turbo.json`
+      (`@cambio/web#build.env` and `dev.passThroughEnv`),
+      `env-declaration.test.ts` `VITE_VARS`, `realtime.test.ts` F10 stub,
+      and the `.env.example` web section (reconciled in place on top of the
+      backend lane's C13 rewrite — `VITE_API_URL` prod value `/api`
+      documented, cloud `VITE_REALTIME_URL` shape
+      `wss://<ref>.supabase.co/realtime/v1` with the no-`/socket`/
+      no-`/websocket` note, both apikey value flavors). ADR-0032's own
+      text untouched (historical record; root M5 annotates the index).
+- [x] 2026-09-08 — F3 ripple fixed (see Surprises): two test-support
+      `new URL` call sites given a base so relative request paths parse;
+      all four affected suites re-verified green.
+- [x] 2026-09-08 — checkpoint green: `pnpm turbo test --filter @cambio/web`
+      exit 0 — 21 files, 282 tests passed. **Full gate green:**
+      `pnpm turbo build typecheck lint test` (bare, docker services up)
+      exit 0 — "Tasks: 25 successful, 25 total", api suite 130/130 with
+      `RealtimeIntegration.test.ts` executing (2 tests), web 282/282.
+      Closes M2 for the frontend lane. Contract coverage rows C5/C7/C10/
+      C11/C13 filled via `fill-coverage-row.mjs`.
+
+- [x] 2026-09-08 23:30 — review fix cycle: F3 (new realtime.test.ts case
+      pinning the rename code-side), F5 (failure-mechanism claim corrected
+      here and in `api.ts`), F7 (C5/C10 coverage rows updated; stale SSR
+      comments in `realtime.ts`/`router.tsx` rewritten for the SPA reality).
+      Fresh `pnpm turbo test --filter @cambio/web --force`: 283/283.
 
 ## Surprises & notes for the root plan
 
@@ -443,3 +499,40 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 - **Shell path coupling:** F1's catch-all destination `/_shell.html`
   and F2's default `spa.prerender.outputPath` (`/_shell`) are two files
   in two lanes pointing at one name — if either changes, both must.
+- 2026-09-08 (implementation) — **prerender behaved exactly as
+  predicted, no surprise to record**: the build booted the server build
+  once, logged `[prerender] Crawling: /` then
+  `[prerender] Prerendered 1 pages: /`, and wrote
+  `dist/client/_shell.html`; no I/O was attempted during the shell
+  render (all data fetching is client-side effects; realtime.ts's SSR
+  guard never fired). `dist/server/` exists post-build as the plan
+  documented — build-time machinery, not deployed.
+- 2026-09-08 (implementation) — **`.env.example` reconcile executed as
+  planned**: the backend lane (commit cb3d886) had already rewritten the
+  api section and the SameSite guidance; the frontend lane landed second
+  and edited only the three web VITE\_ blocks in place (`VITE_API_URL`
+  prod note, cloud `VITE_REALTIME_URL` shape, the
+  `VITE_REALTIME_APIKEY` rename with both value flavors) — no clobber.
+- 2026-09-08 (implementation) — **F3 ripple the plan missed: the shared
+  test harness broke, 132 jsdom tests red.** The plan checked the
+  api.test.ts pins (suffix-based, fine) but not
+  `apps/web/test/support/harness.tsx`, whose `stubApi` keyed handlers via
+  `new URL(String(input))` — valid only while `API_URL` made every
+  request absolute. With the C11 fallback `""` (vitest's env carries no
+  `VITE_API_URL`; only turbo injects the repo `.env`), requests became
+  bare relative paths and `new URL("/me")` without a base throws, so
+  every harness-driven suite failed at render (game-screen, room-screen,
+  lobby-screen, slam-expiry-nudge — 132 tests). Evidence: first
+  `pnpm turbo test --filter @cambio/web` run,
+  "TestingLibraryElementError: Unable to find an element with the text:
+  Nadia" with `TypeError: Invalid URL: /me` upstream. Fix: give
+  `new URL` a base — `new URL(String(input), "http://localhost")` —
+  absolute URLs ignore the base, so both request shapes key on pathname;
+  two call sites (`test/support/harness.tsx` `stubApi`, and
+  `test/game-screen.test.tsx` `postedCommands`), no production code
+  changed. All four suites green after (game-screen 103/103).
+  `realtime.test.ts` stays green under either var name (its whitespace
+  URL stub trips the guard regardless of the apikey var), so the
+  red-first proof of the rename rode the env-declaration test's
+  `VITE_VARS` flip (2 red cases: both turbo.json slots), which is
+  exactly the "partial rename = red gate" property F4 wanted.

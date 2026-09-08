@@ -16,6 +16,7 @@ const jsonResponse = (status: number, body: unknown) =>
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe("apiRequest (W1)", () => {
@@ -94,6 +95,30 @@ describe("apiRequest (W1)", () => {
     expect(apiError.status).toBe(409)
     expect(apiError.tag).toBe("LobbyFull")
     expect(apiError.message).toBe("conflict")
+  })
+
+  it("issues bare same-origin relative requests when VITE_API_URL is missing (C11)", async () => {
+    // API_URL is computed at module scope, so the stubbed env must be seen by
+    // a FRESH module instance: stub, reset the module registry, re-import.
+    // The suite-startup import at the top of this file saw the original env.
+    vi.stubEnv("VITE_API_URL", undefined)
+    vi.stubEnv("VITE_TUNNEL_HOST", undefined)
+    vi.resetModules()
+    const freshApi = await import("../src/services/api.js")
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(200, { userId: "0b8f8dc1-6be5-4de1-a53c-01e8b38190b0", name: "Nadia" }),
+      )
+    vi.stubGlobal("fetch", fetchMock)
+
+    await freshApi.apiRequest("/me", { decode: decodeSessionUser })
+
+    const [url] = fetchMock.mock.calls[0] as [string]
+    // The bare relative path — never a localhost-prefixed absolute URL baked
+    // into a prod bundle (today's silent-failure shape, CAM-32 C11).
+    expect(url).toBe("/me")
   })
 
   it("falls back to a generic ApiError when the error body is undecodable", async () => {

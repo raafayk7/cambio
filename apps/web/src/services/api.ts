@@ -36,7 +36,17 @@ export class ApiError extends Error {
 // survive a direct cross-tunnel fetch. Unset (the default): byte-identical
 // to before, a plain cross-origin call to VITE_API_URL.
 const TUNNEL_MODE: boolean = Boolean(import.meta.env.VITE_TUNNEL_HOST?.trim())
-const API_URL: string = TUNNEL_MODE ? "" : (import.meta.env.VITE_API_URL ?? "http://localhost:3001")
+// Missing VITE_API_URL falls back to "" — same-origin relative requests
+// (CAM-32 C11). A prod build missing the var then fails loudly, not through
+// the ApiError branch (review F5): behind the Vercel proxy a relative /me
+// misses the /api rewrite, the SPA catch-all serves _shell.html with HTTP
+// 200, so response.ok is true and response.json() below throws a raw
+// SyntaxError on the HTML — ugly but visible, and never a silently baked
+// http://localhost:3001 in the bundle. "" is already a legitimate value
+// here (tunnel mode), and same-origin is exactly what the Vercel /api proxy
+// topology wants. Local dev is unaffected: .env.example ships
+// VITE_API_URL=http://localhost:3001.
+const API_URL: string = TUNNEL_MODE ? "" : (import.meta.env.VITE_API_URL ?? "")
 
 export interface ApiRequestOptions<A> {
   method?: "GET" | "POST"
