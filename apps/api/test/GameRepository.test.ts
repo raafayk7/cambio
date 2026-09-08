@@ -360,4 +360,27 @@ describe("GameRepositoryLive (C3)", () => {
     )
     expect(indices.map((r) => r.index)).toStrictEqual([0, 2, 3])
   })
+
+  it("a freshly dealt game round-trips an empty discard_pile (C3.3, ADR-0039)", async () => {
+    const dealt = Either.getOrThrow(dealGame([uid(0), uid(1)], 13, config, ts(0)))
+    const [state, events] = dealt
+    expect(state.discard).toStrictEqual([])
+    const gameId = gid(10)
+    const loaded = await runtime.runPromise(
+      Effect.gen(function* () {
+        const games = yield* GameRepository
+        const version = yield* games.save({
+          gameId,
+          state,
+          expectedVersion: v(0),
+          newEvents: events,
+          at: ts(1),
+        })
+        expect(version).toBe(1)
+        return yield* games.load(gameId)
+      }),
+    )
+    expect(loaded.state.discard).toStrictEqual([])
+    expect(loaded.state).toStrictEqual(state)
+  })
 })

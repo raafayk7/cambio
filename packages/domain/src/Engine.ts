@@ -49,23 +49,16 @@ const advanceTurn = (state: GameState, fromPlayerId: UserId): Step => {
 }
 
 /**
- * Open the slam window against the top discard (§1.5) — or, when the pile is
- * empty (a zero-card keep took its last card), skip the window entirely and
- * advance the turn (ADR-0012).
+ * Reshuffle the pile minus its top into a new deck the moment the state
+ * allows it — deck empty, discard reshufflable (§1.7, ADR-0040: eager,
+ * single mechanism). No-op otherwise. Composed at every site that can leave
+ * the deck empty: right after each of the three draw sites (below), and at
+ * the discard-landing sites — `openWindowOrAdvance`'s entry (covering the
+ * five handlers that funnel through it) and the slam's two non-window
+ * returns. Idempotent by construction: a reshuffle never leaves the deck
+ * empty, so composing it twice on one path cannot double-fire.
  */
-const openWindowOrAdvance = (state: GameState, turnPlayerId: UserId, now: Timestamp): Step => {
-  const top = state.discard[0]
-  if (top === undefined) return advanceTurn(state, turnPlayerId)
-  const closesAt = Timestamp.make(now + state.config.slamWindowMs)
-  const windowRank = rank(top)
-  return [
-    { ...state, phase: { _tag: "SlamWindow", turnPlayerId, closesAt, rank: windowRank } },
-    [{ _tag: "SlamWindowOpened", turnPlayerId, closesAt, rank: windowRank }],
-  ]
-}
-
-/** Reshuffle the pile minus its top into a new deck when empty (§1.7). */
-const reshuffleIfEmpty = (state: GameState): Step => {
+const eagerReshuffle = (state: GameState): Step => {
   if (state.deck.length > 0 || !drawable(state)) return [state, []]
   const [deck, prng] = shuffle(state.discard.slice(1), state.prng)
   return [
@@ -75,17 +68,39 @@ const reshuffleIfEmpty = (state: GameState): Step => {
 }
 
 /**
- * Take the top deck card, reshuffling first if needed. Returns `None` when
- * no card exists anywhere even after reshuffle — callers decide whether that
- * skips a penalty (ADR-0011) or was already ruled out by legality (C6.2).
+ * Open the slam window against the top discard (§1.5) — or, when the pile is
+ * empty (a zero-card keep took its last card), skip the window entirely and
+ * advance the turn (ADR-0012). Reshuffles eagerly first (ADR-0040): a card
+ * that just landed on the pile may re-arm a deck that emptied earlier with
+ * nothing to reshuffle — the retained top is unchanged, so the window rank
+ * this reads is unaffected.
  */
-const drawOne = (
-  state: GameState,
-): Option.Option<readonly [GameState, ReadonlyArray<GameEvent>, GameState["deck"][number]]> => {
-  const [reshuffled, events] = reshuffleIfEmpty(state)
-  const top = reshuffled.deck[0]
+const openWindowOrAdvance = (state: GameState, turnPlayerId: UserId, now: Timestamp): Step => {
+  const [reshuffled, reshuffleEvents] = eagerReshuffle(state)
+  const top = reshuffled.discard[0]
+  if (top === undefined) {
+    const [advanced, events] = advanceTurn(reshuffled, turnPlayerId)
+    return [advanced, [...reshuffleEvents, ...events]]
+  }
+  const closesAt = Timestamp.make(now + reshuffled.config.slamWindowMs)
+  const windowRank = rank(top)
+  return [
+    { ...reshuffled, phase: { _tag: "SlamWindow", turnPlayerId, closesAt, rank: windowRank } },
+    [...reshuffleEvents, { _tag: "SlamWindowOpened", turnPlayerId, closesAt, rank: windowRank }],
+  ]
+}
+
+/**
+ * Take the top deck card. Returns `None` when the deck is empty — callers
+ * decide whether that skips a penalty (ADR-0011) or was already ruled out by
+ * legality (C6.2). No reshuffle here (single mechanism, ADR-0040): a draw
+ * that empties the deck reshuffles *after*, composed explicitly by each call
+ * site once its own event is built — see the three sites below.
+ */
+const drawOne = (state: GameState): Option.Option<readonly [GameState, CardSlug]> => {
+  const top = state.deck[0]
   if (top === undefined) return Option.none()
-  return Option.some([{ ...reshuffled, deck: reshuffled.deck.slice(1) }, events, top])
+  return Option.some([{ ...state, deck: state.deck.slice(1) }, top])
 }
 
 // ---------------------------------------------------------------------------
@@ -117,23 +132,29 @@ const takeDiscard = (state: GameState, playerId: UserId): Step => {
 
 const drawFromDeck = (state: GameState, playerId: UserId, now: Timestamp): Step => {
   // Legality (C6.2) guarantees a card exists, so the None branch is unreachable.
-  const [drawn, events, card] = Option.getOrThrow(drawOne(state))
-  const drawEvents: ReadonlyArray<GameEvent> = [...events, { _tag: "CardDrawn", playerId, card }]
+  const [drawn, card] = Option.getOrThrow(drawOne(state))
+  // Eager (ADR-0040): a draw that takes the last deck card reshuffles right
+  // after, so CardDrawn always precedes DeckReshuffled in the batch.
+  const [reshuffled, reshuffleEvents] = eagerReshuffle(drawn)
+  const drawEvents: ReadonlyArray<GameEvent> = [
+    { _tag: "CardDrawn", playerId, card },
+    ...reshuffleEvents,
+  ]
   const cardRank = rank(card)
 
   if (!isPowerRank(cardRank)) {
     return [
-      { ...drawn, phase: { _tag: "HoldingCard", playerId, card, source: "deck" } },
+      { ...reshuffled, phase: { _tag: "HoldingCard", playerId, card, source: "deck" } },
       drawEvents,
     ]
   }
 
-  if (powerHasValidTarget(cardRank, drawn, playerId)) {
-    return [{ ...drawn, phase: { _tag: "ResolvingPower", playerId, card } }, drawEvents]
+  if (powerHasValidTarget(cardRank, reshuffled, playerId)) {
+    return [{ ...reshuffled, phase: { _tag: "ResolvingPower", playerId, card } }, drawEvents]
   }
 
   // No valid target: the obligatory power fizzles straight to the pile (ADR-0010).
-  const fizzled: GameState = { ...drawn, discard: [card, ...drawn.discard] }
+  const fizzled: GameState = { ...reshuffled, discard: [card, ...reshuffled.discard] }
   const [windowState, windowEvents] = openWindowOrAdvance(fizzled, playerId, now)
   return [
     windowState,
@@ -252,18 +273,20 @@ const slam = (
     const failed: GameEvent = { _tag: "SlamFailed", slammerId: playerId, target, card: targetCard }
     const drawn = drawOne(state)
     if (Option.isNone(drawn)) {
-      // No card exists anywhere, even after reshuffle: penalty skipped (ADR-0011).
+      // No card exists anywhere: penalty skipped (ADR-0011).
       return [state, [failed, { _tag: "DrawSkipped", playerId, kind: "penalty" }]]
     }
-    const [drawnState, drawEvents, penalty] = drawn.value
+    const [drawnState, penalty] = drawn.value
     const slotIndex = lowestFreeSlot(Option.getOrElse(handOf(drawnState, playerId), () => []))
     const penalized = withHand(drawnState, playerId, (hand) => [
       ...hand,
       { slotIndex, card: penalty },
     ])
+    // Eager (ADR-0040): reshuffle after the penalty draw, not before.
+    const [reshuffled, reshuffleEvents] = eagerReshuffle(penalized)
     return [
-      penalized,
-      [failed, ...drawEvents, { _tag: "PenaltyDrawn", playerId, slotIndex, card: penalty }],
+      reshuffled,
+      [failed, { _tag: "PenaltyDrawn", playerId, slotIndex, card: penalty }, ...reshuffleEvents],
     ]
   }
 
@@ -277,12 +300,15 @@ const slam = (
     card: targetCard,
   }
   const slammed: GameState = { ...removed, discard: [targetCard, ...removed.discard] }
+  // Eager (ADR-0040): slams don't open a window, so the re-arm reshuffle
+  // this landing may trigger is composed here, not via openWindowOrAdvance.
+  const [reshuffled, reshuffleEvents] = eagerReshuffle(slammed)
 
-  if (target.playerId === playerId) return [slammed, [succeeded]]
+  if (target.playerId === playerId) return [reshuffled, [succeeded, ...reshuffleEvents]]
 
   if (giveSlot !== null) {
-    const giveCard = Option.getOrThrow(slotCard(slammed, { playerId, slotIndex: giveSlot }))
-    const taken = withHand(slammed, playerId, (hand) =>
+    const giveCard = Option.getOrThrow(slotCard(reshuffled, { playerId, slotIndex: giveSlot }))
+    const taken = withHand(reshuffled, playerId, (hand) =>
       hand.filter((s) => s.slotIndex !== giveSlot),
     )
     const given = withHand(taken, target.playerId, (hand) => [
@@ -293,18 +319,24 @@ const slam = (
       given,
       [
         succeeded,
+        ...reshuffleEvents,
         { _tag: "CardGivenFromHand", slammerId: playerId, fromSlot: giveSlot, to: target },
       ],
     ]
   }
 
   // Zero-card slammer: draw-then-give, unseen (ADR-0009).
-  const drawn = drawOne(slammed)
+  const drawn = drawOne(reshuffled)
   if (Option.isNone(drawn)) {
-    return [slammed, [succeeded, { _tag: "DrawSkipped", playerId, kind: "give" }]]
+    return [
+      reshuffled,
+      [succeeded, ...reshuffleEvents, { _tag: "DrawSkipped", playerId, kind: "give" }],
+    ]
   }
-  const [drawnState, drawEvents, giveCard] = drawn.value
-  const given = withHand(drawnState, target.playerId, (hand) => [
+  const [drawnState, giveCard] = drawn.value
+  // The give-draw can itself empty the deck; reshuffle after it too.
+  const [reshuffledAfterGive, reshuffleAfterGiveEvents] = eagerReshuffle(drawnState)
+  const given = withHand(reshuffledAfterGive, target.playerId, (hand) => [
     ...hand,
     { slotIndex: target.slotIndex, card: giveCard },
   ])
@@ -312,8 +344,9 @@ const slam = (
     given,
     [
       succeeded,
-      ...drawEvents,
+      ...reshuffleEvents,
       { _tag: "CardGivenFromDeck", slammerId: playerId, to: target, card: giveCard },
+      ...reshuffleAfterGiveEvents,
     ],
   ]
 }

@@ -78,6 +78,19 @@ export const handIntegrityViolations = (
   return violations
 }
 
+/**
+ * §1.7, ADR-0040: the eager reshuffle is the single mechanism, so a resting
+ * state (between commands) can never have an empty deck alongside a
+ * reshufflable pile — that would mean the trigger failed to fire. `≤ 1`
+ * because the top is always retained even when nothing was reshuffled.
+ */
+export const deckRestingInvariantViolations = (state: GameState): ReadonlyArray<string> =>
+  state.deck.length === 0 && state.discard.length > 1
+    ? [
+        `deck empty with a ${state.discard.length}-card discard (ADR-0040): the eager reshuffle should have fired`,
+      ]
+    : []
+
 /** The per-transition bundle the driver runs after every accepted command. */
 export const stepViolations = (
   state: GameState,
@@ -86,6 +99,7 @@ export const stepViolations = (
 ): ReadonlyArray<string> => [
   ...cardPartitionViolations(state, baselineSorted),
   ...handIntegrityViolations(state, roster),
+  ...deckRestingInvariantViolations(state),
 ]
 
 /**

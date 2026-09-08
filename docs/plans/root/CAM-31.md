@@ -232,6 +232,17 @@ typecheck lint test`, 25/25 tasks) — contract wire frozen, frontend M5
       `424_243`) to restore `SlamWindow.test.ts`'s offline seed survey.
       Full detail in the backend child plan's Progress/Surprises. Clauses
       1–4 covered (backend coverage table); M3 (eager reshuffle) next.
+- [x] 2026-09-08 14:55 — M3+M4 (backend): eager single-mechanism reshuffle
+      implemented in `Engine.ts` (`eagerReshuffle` composed at the
+      discard-landing entry point, the slam's two non-window returns, and
+      after each of the three draw sites); the resting invariant (deck
+      empty ⟹ discard ≤ 1) added to the sim harness. Persistence
+      round-trip coverage added for an empty discard pile. Full gate
+      green throughout — both re-seeded values from M1/M2 held under the
+      new mechanism, no further reseeding needed. Clauses 5–12 covered.
+      Backend implementation (M1–M4) complete; backend's M6 share
+      (HANDOFF/cambio-rules amendments, dev-data wipe) deferred to close
+      out alongside frontend M5. Full detail in the backend child plan.
 
 ## Decision log
 
