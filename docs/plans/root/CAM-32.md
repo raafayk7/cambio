@@ -267,8 +267,23 @@ timestamp each entry)_
       → HTTP 200 through the proxy; `/api/nonexistent` → api JSON 404 (the
       wildcard forwards, prefix stripped); `/` → 404 as predicted pre-release
       (no `_shell.html` on the scaffold). C8-partial — prod
-      `_cambio_migrations` = exactly `0001_init.sql`. C4 — migrate-job rerun
-      evidence in the entry below once complete.
+      `_cambio_migrations` = exactly `0001_init.sql`. C4 — the migrate job
+      rerun against the already-migrated database (run 34249417948, job 102174350020) logged `no pending migrations (1 applied)` and the
+      whole run went green — a no-op success. _(This sentence originally
+      read "evidence in the entry below once complete" — a patch-script
+      no-op left the dangling reference while the acceptance box was
+      already checked; review F4, closed in the fix cycle.)_
+
+- [x] 2026-09-08 23:30 — **Review fix cycle**: F1 (config blank-as-absent
+      filter + commented-out `.env.example` line + empty/whitespace Config
+      test), F2 (`nodeEnv` literal union + typo test), F3 (apikey-term guard
+      test naming `VITE_REALTIME_APIKEY`, old-name-stubbed-valid to kill the
+      surgical revert mutant), F4 (C4 evidence written properly this time,
+      swept), F5 (claim corrected in `api.ts` + frontend plan, swept), F6
+      (ADR-0042 wording amended), F7 (coverage rows filled via script,
+      compose-form note, `WEB_ORIGIN` prod flavor, SSR-rationale comments
+      updated in `realtime.ts`/`router.tsx`). Suites fresh: api 132/132,
+      web 283/283.
 
 ## Decision log
 
@@ -400,6 +415,22 @@ consistent.
    `apps/web/src/services/realtime.ts` and `apps/web/src/router.tsx`
    justify the per-call QueryClient invariant with a deployment model
    this task removed.
+
+**Fix cycle 2026-09-08 — all findings RESOLVED:** F1 both branches taken
+(claim-side: line commented out; code-side: blank-as-absent filter in
+`config.ts` + test). F2 test-strengthened + code fixed (literal union;
+typo now fails boot, pinned by the new Config case). F3
+test-strengthened (new realtime.test.ts case; kills wholesale and
+surgical rename-revert mutants — see the case's comment). F4 claim made
+true (evidence written into the M4 Progress entry; sweep of all C4
+phrasings found the backend coverage row as the only other stale
+instance, now filled). F5 claim amended in both known instances plus a
+repo-wide sweep for "ApiError path"/"decode/ApiError"/"non-JSON"
+(remaining hits are this retrospective and an unrelated CAM-3 doc). F6
+ADR-0042 Decision reworded with an inline amendment note. F7 all four
+items done (rows filled via fill-coverage-row.mjs, compose-form
+resolution in backend Surprises, WEB_ORIGIN prod flavor, SSR comments
+updated to the SPA/prerender reality while keeping the invariant).
 
 **Advisory (recorded, no action owed this cycle):** `deploy-api` green
 proves hook acceptance, not a live Render deploy (observability gap);

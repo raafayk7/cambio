@@ -108,6 +108,30 @@ describe("subscribeTopic (W3)", () => {
     stopListening()
   })
 
+  it("names VITE_REALTIME_APIKEY when only the apikey is blank — pins the rename code-side (review F3)", () => {
+    setRealtimeClientForTests(null)
+    // Valid URL so the guard's URL term passes and the APIKEY term is the one
+    // that trips — the previous case short-circuits on the URL and would stay
+    // green if realtime.ts silently read the old var name. The old name is
+    // stubbed VALID on purpose: a surgical revert to reading
+    // VITE_REALTIME_ANON_JWT would sail past the guard here (and then fail
+    // this test's single-legible-error assertions), so both the wholesale and
+    // the surgical rename-revert mutants go red.
+    vi.stubEnv("VITE_REALTIME_URL", "ws://realtime-dev.localhost:4000/socket")
+    vi.stubEnv("VITE_REALTIME_APIKEY", "   ")
+    vi.stubEnv("VITE_REALTIME_ANON_JWT", "old-name-still-valid")
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    expect(() => {
+      subscribeTopic("room:secret:g2", { onEvent: vi.fn() })
+    }).not.toThrow()
+
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    const logged = String(errorSpy.mock.calls[0]![0])
+    expect(logged).toContain("VITE_REALTIME_APIKEY")
+    expect(logged).not.toContain("room:secret:g2")
+  })
+
   it("resets to connected when the last subscription is dropped — no stale banner on idle screens", () => {
     const fake = new FakeRealtimeClient()
     setRealtimeClientForTests(fake)

@@ -47,10 +47,12 @@ let injected: RealtimeClientLike | null = null
 
 function getClient(): RealtimeClientLike {
   if (injected !== null) return injected
-  // The singleton must never construct server-side: TanStack Start SSRs the
-  // first render, and a server-built socket would outlive the request and be
-  // shared across users. Subscriptions live in effects, which never run on
-  // the server — reaching this guard means that discipline broke.
+  // The singleton must never construct server-side. Since CAM-32 the only
+  // server-side render is the one-shot build-time SPA prerender (ADR-0041),
+  // so this is now a prerender guard — a socket opened there would hang the
+  // build; under any future per-request SSR it would be shared across users.
+  // Subscriptions live in effects, which never run server-side — reaching
+  // this guard means that discipline broke.
   if (typeof window === "undefined") {
     throw new Error("realtime client requested during SSR — subscribe from browser effects only")
   }

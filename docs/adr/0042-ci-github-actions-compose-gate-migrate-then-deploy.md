@@ -24,7 +24,12 @@ guarantee.
 
 ## Decision
 
-**One workflow, two triggers, in `.github/workflows/`:**
+**Two workflow files in `.github/workflows/`** — a reusable gate
+(`gate.yml`, triggered by `pull_request` and callable via `workflow_call`)
+and a deploy caller (`deploy.yml`) that `uses:` it — so "the same gate" is
+byte-identical by construction rather than by convention _(wording amended
+in the CAM-32 review fix cycle; originally "one workflow, two triggers",
+which the shipped, stronger shape contradicted — review F6)_:
 
 **PR gate** (`pull_request`, every target branch): checkout → Node 22
 (`.nvmrc`) + pnpm 9 (corepack) → `pnpm install --frozen-lockfile` → append

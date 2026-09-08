@@ -122,6 +122,25 @@ describe("AppConfig cloud realtime key (CAM-32, C9)", () => {
       }
     }
   })
+
+  it("blank or whitespace REALTIME_SECRET_KEY loads as none — a stray empty .env line must not flip cloud mode (review F1)", () => {
+    // `cp .env.example .env` with a blank assignment yields "" in process.env;
+    // without the blank-as-absent filter that is Some("") and the transport
+    // sends `apikey: ""` at the local container, dying silently.
+    for (const blank of ["", "   "]) {
+      const result = load([
+        DB,
+        REALTIME,
+        TOPIC,
+        ["SESSION_SECRET", "s3cret"],
+        ["REALTIME_SECRET_KEY", blank],
+      ])
+      expect(Either.isRight(result)).toBe(true)
+      if (Either.isRight(result)) {
+        expect(Option.isNone(result.right.realtimeSecretKey)).toBe(true)
+      }
+    }
+  })
 })
 
 describe("AppConfig production cookie guard (CAM-32, C12)", () => {
@@ -141,6 +160,17 @@ describe("AppConfig production cookie guard (CAM-32, C12)", () => {
     if (Either.isRight(result)) {
       expect(result.right.nodeEnv).toBe("production")
       expect(result.right.sessionCookieSecure).toBe(true)
+    }
+  })
+
+  it("a NODE_ENV typo fails config load naming NODE_ENV — the guard must fail closed, not open (review F2)", () => {
+    // With nodeEnv as a bare string, `Production` (capital P) would compare
+    // unequal to "production" and skip the guard vacuously — booting with
+    // insecure cookies. The literal union turns the typo into a boot failure.
+    const result = load([...base, ["NODE_ENV", "Production"]])
+    expect(Either.isLeft(result)).toBe(true)
+    if (Either.isLeft(result)) {
+      expect(String(result.left)).toContain("NODE_ENV")
     }
   })
 
