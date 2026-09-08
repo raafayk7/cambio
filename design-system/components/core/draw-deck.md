@@ -30,7 +30,10 @@ The face-down stock. Class: **Game object**.
   occupancy-independent (r2's original claim), rendering its motion over
   the `empty` dashed outline exactly as it does over a populated stack.
 - `draw` — top card flights to the active player at `duration.track`,
-  face-down for everyone except the drawer.
+  face-down for everyone except the drawer. Occupancy-independent like
+  `reshuffling` (r5): its pulse renders over the `empty` dashed outline
+  too — the as-built component treats both choreography states
+  identically on every count branch.
 - `slam-window` — the slam window is open: the stack carries the
   `accent.alarm` frame + soft pulse (the same idiom `discard-pile.md`'s
   `slam-target` echoes from `playing-card.md`'s `slamEligible`), so the
@@ -94,8 +97,9 @@ None.
   empty-branch previously rendered no motion during `reshuffling` (a latent
   gap, now the guaranteed path since a resting empty deck is always
   mid-reshuffle-or-nothing); the empty stack now carries the same
-  `--animate-pulse-soft` treatment the populated branch already had, no new
-  tokens. The click-affordance formula simplifies to `deckCount > 0`.
+  `--animate-pulse-soft` treatment the populated branch already had — for
+  both choreography states, `reshuffling` and `draw` — no new tokens. The
+  click-affordance formula simplifies to `deckCount > 0`.
   Pre-authorized through the creation gate by the CAM-31 root plan's
   Decision Log (2026-09-08): "the empty-branch reshuffle-motion fix and
   canon r-bumps are in scope for CAM-31, not deferred."

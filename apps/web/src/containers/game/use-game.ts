@@ -458,7 +458,15 @@ export function useGame(gameId: string) {
     flights.enqueue({
       ...spec,
       onDone: () => {
-        if (causeFlightIdRef.current === spec.id) causeFlightIdRef.current = null
+        // Drain only when THIS flight is the armed cause (review F1): the
+        // latch always holds the last-armed cause, which is the event that
+        // immediately preceded `DeckReshuffled` in the batch — its true
+        // cause. An earlier cause settling first (e.g. the fizzle batch's
+        // CardDrawn ahead of the PowerDiscarded that actually re-armed the
+        // pile) must NOT release the reshuffle early. Liveness is intact:
+        // the armed cause's own onDone still fires on every outcome.
+        if (causeFlightIdRef.current !== spec.id) return
+        causeFlightIdRef.current = null
         const pending = pendingAfterCauseRef.current
         pendingAfterCauseRef.current = []
         pending.forEach((thunk) => thunk())
@@ -481,8 +489,9 @@ export function useGame(gameId: string) {
   // CH2/ADR-0040: sites that can leave the deck empty (draws, and
   // discard-landings) enqueue through `enqueueCausingFlight` instead of
   // `flights.enqueue` directly, arming the reshuffle sequencing gate above.
-  // Endgame tags (M6) fall through to `default`: out of this milestone's
-  // scope, so the generic refetch is their entire handling for now.
+  // `GameStarted`, `SlamWindowOpened`, and `TurnAdvanced` fall through to
+  // `default`: no choreography of their own, so the generic refetch is
+  // their entire handling.
   function handleRoomEvent(event: RoomGameEvent) {
     switch (event._tag) {
       case "CardDrawn":
@@ -709,10 +718,13 @@ export function useGame(gameId: string) {
         // construction: broadcasts never touch the snapshot (ADR-0033), so
         // `view.discard[0]` is untouched until the refetch lands. ADR-0040:
         // this always follows its causing event in the batch, so the flight
-        // is sequenced behind the reveal gate AND the cause gate — composing
-        // both is what makes a slam batch's penalty/give-then-reshuffle
-        // order correct (the causing thunk queues ahead of this one behind
-        // the same reveal, so it enqueues and arms the cause latch first).
+        // is sequenced behind the reveal gate AND the cause gate. Composing
+        // both keeps the batch order: causing thunks queue ahead of this
+        // one behind the same reveal, so they enqueue and arm the latch
+        // first, and the latch-guarded drain releases this flight only when
+        // the LAST armed cause settles — in the zero-card batch that means
+        // after the give flight too, which is later than the reshuffle's
+        // own cause strictly requires but never concurrent with any cause.
         runAfterReveal(() => {
           runAfterCausingFlight(() => {
             flights.enqueue({

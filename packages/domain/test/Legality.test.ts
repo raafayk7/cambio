@@ -161,13 +161,15 @@ describe("powerHasValidTarget (ADR-0010)", () => {
 
 describe("drawable (§1.7, CAM-10 — DrawFromDeck legality; ADR-0040 note below)", () => {
   // Under ADR-0040's resting invariant (deck empty ⟹ discard ≤ 1), a
-  // deck-empty-with-reshufflable-discard state is unreachable at rest, so
-  // the `deck > 0 || discard > 1` disjunction is equivalent to `deck > 0`
-  // for every state the engine can actually produce. `drawable` stays
-  // as-is regardless (root plan Decision Log) — it is still the correct
-  // legality predicate for hand-built states, and the eager reshuffle is
-  // no longer sourced from it (that mechanism moved into Engine.ts's
-  // `eagerReshuffle`, composed at the sites named in ADR-0040).
+  // deck-empty-with-reshufflable-discard state is unreachable at rest.
+  // `drawable` keeps its `deck > 0 || discard > 1` disjunction anyway
+  // (root plan Decision Log): it is the legality answer to "can a draw
+  // succeed", including for hand-built states, and it is deliberately
+  // NOT the eager-reshuffle trigger — Engine.ts's `eagerReshuffle` guards
+  // with its own inline predicate ("deck empty AND discard reshufflable").
+  // Do not collapse either predicate into the other: "simplifying"
+  // `drawable` to `deck > 0` reads as safe from the invariant but the two
+  // predicates answer different questions (see the Engine.ts docstring).
   it("is true when the deck has a card, regardless of discard length", () => {
     expect(drawable({ ...base, deck: [card("2S")], discard: [] })).toBe(true)
     expect(drawable({ ...base, deck: [card("2S")], discard: [card("4S")] })).toBe(true)

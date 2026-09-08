@@ -127,8 +127,19 @@ describe("hand & seat integrity checker (C2.2, §4.5 restated)", () => {
   it("stepViolations combines all three checkers", () => {
     const state = healthy()
     expect(stepViolations(state, players3, FULL_DECK_SORTED)).toStrictEqual([])
-    const corrupt: GameState = { ...state, deck: [state.deck[0]!, ...state.deck] }
-    expect(stepViolations(corrupt, players3, FULL_DECK_SORTED)).not.toStrictEqual([])
+    // One trip per checker, so the title is earned (review F5b): partition…
+    const badPartition: GameState = { ...state, deck: [state.deck[0]!, ...state.deck] }
+    expect(stepViolations(badPartition, players3, FULL_DECK_SORTED).join(" ")).toContain(
+      "card partition broken",
+    )
+    // …hand integrity (roster shrunk below 2)…
+    const badRoster: GameState = { ...state, players: state.players.slice(0, 1) }
+    expect(stepViolations(badRoster, players3.slice(0, 1), FULL_DECK_SORTED).join(" ")).toContain(
+      "outside 2–4",
+    )
+    // …and the ADR-0040 resting invariant.
+    const badResting: GameState = { ...state, deck: [], discard: [card("4S"), card("5S")] }
+    expect(stepViolations(badResting, players3, FULL_DECK_SORTED).join(" ")).toContain("ADR-0040")
   })
 })
 

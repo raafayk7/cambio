@@ -3,7 +3,7 @@ import * as React from "react"
 import { cn } from "@cambio/ui"
 
 /**
- * DrawDeck — design-system/components/core/draw-deck.md (r4, CAM-29).
+ * DrawDeck — design-system/components/core/draw-deck.md (r5, CAM-31).
  * Class: Game object.
  *
  * The face-down stock: a 2–3 offset stack of card backs. Deck count is
@@ -35,6 +35,12 @@ import { cn } from "@cambio/ui"
  * (button `aria-label` stays "Draw a card" so it keeps naming the action,
  * not the state); on the static stack (no `onClick`) it's the `role="img"`
  * wrapper's `aria-label` directly, since there's no action name to protect.
+ *
+ * r5 (CAM-31, ADR-0040): the empty dashed outline carries the same
+ * `animate-pulse-soft` motion as the populated stack during `draw`/
+ * `reshuffling` — r2's "occupancy-independent" claim, made actually true
+ * (the eager re-arm reshuffle plays over a snapshot that still says zero,
+ * so the empty branch is the guaranteed render path for that beat).
  */
 export interface DrawDeckProps {
   count: number

@@ -13,7 +13,7 @@ import {
 } from "./GameState.js"
 import { Timestamp, type UserId } from "./Ids.js"
 import { shuffle } from "./Prng.js"
-import { checkCommand, drawable, powerHasValidTarget } from "./Legality.js"
+import { checkCommand, powerHasValidTarget } from "./Legality.js"
 import { gameScores, winnersOf } from "./Scoring.js"
 
 /**
@@ -52,14 +52,21 @@ const advanceTurn = (state: GameState, fromPlayerId: UserId): Step => {
  * Reshuffle the pile minus its top into a new deck the moment the state
  * allows it — deck empty, discard reshufflable (§1.7, ADR-0040: eager,
  * single mechanism). No-op otherwise. Composed at every site that can leave
- * the deck empty: right after each of the three draw sites (below), and at
- * the discard-landing sites — `openWindowOrAdvance`'s entry (covering the
- * five handlers that funnel through it) and the slam's two non-window
- * returns. Idempotent by construction: a reshuffle never leaves the deck
- * empty, so composing it twice on one path cannot double-fire.
+ * the deck empty: right after each of the three draw sites (below), at
+ * `openWindowOrAdvance`'s entry (covering the five handlers that funnel
+ * through it), and once in the slam handler at its discard-landing — shared
+ * by all three slam returns, with a second post-give-draw composition on
+ * the zero-card path. Idempotent by construction: a reshuffle never leaves
+ * the deck empty, so composing it twice on one path cannot double-fire.
+ * The guard is its own inline predicate, deliberately not `Legality.ts`'s
+ * `drawable`: that one answers "can a draw succeed" and must keep its
+ * disjunction, while this one answers "must we reshuffle right now" —
+ * collapsing either into the other would break the mechanism (a
+ * `drawable === deck > 0` "simplification" would make this a permanent
+ * no-op).
  */
 const eagerReshuffle = (state: GameState): Step => {
-  if (state.deck.length > 0 || !drawable(state)) return [state, []]
+  if (state.deck.length > 0 || state.discard.length <= 1) return [state, []]
   const [deck, prng] = shuffle(state.discard.slice(1), state.prng)
   return [
     { ...state, deck, discard: [state.discard[0]!], prng },
@@ -131,7 +138,11 @@ const takeDiscard = (state: GameState, playerId: UserId): Step => {
 }
 
 const drawFromDeck = (state: GameState, playerId: UserId, now: Timestamp): Step => {
-  // Legality (C6.2) guarantees a card exists, so the None branch is unreachable.
+  // The None branch is unreachable for engine-produced states: ADR-0040's
+  // resting invariant (deck empty ⟹ discard ≤ 1) means legality's
+  // `drawable` admits this command only when the deck actually has a card.
+  // (Legality alone no longer guarantees it — a hand-built state with an
+  // empty deck and a fat discard passes C6.2 but has nothing to take.)
   const [drawn, card] = Option.getOrThrow(drawOne(state))
   // Eager (ADR-0040): a draw that takes the last deck card reshuffles right
   // after, so CardDrawn always precedes DeckReshuffled in the batch.

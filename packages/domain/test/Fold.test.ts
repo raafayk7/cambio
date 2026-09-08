@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import { beforeAll } from "vitest"
 import { Either } from "effect"
 import { dealGame } from "../src/Deal.js"
+import { applyCommand } from "../src/Engine.js"
 import { foldEvents, type FoldError } from "../src/Fold.js"
 import { decodeGameConfig } from "../src/GameConfig.js"
 import { type GameEvent } from "../src/GameEvent.js"
@@ -12,8 +13,11 @@ import { card, slot, ts, uid } from "./fixtures.js"
 /**
  * `foldEvents` (C2.2, C5.1, ADR-0014): the pure event-log fold. Error cases
  * and the transcription proof are unit-shaped; the equivalence property runs
- * over the same seeded batch as the simulation suite (shared SIM_GAMES /
- * SIM_SEED knobs, declared in turbo.json's test-task env).
+ * over its own seeded batch (SIM_GAMES / SIM_SEED knobs, declared in
+ * turbo.json's test-task env). The default seed here (20260831) is
+ * deliberately distinct from Simulation.test.ts's (20260908, re-chosen in
+ * CAM-31 for C5.2 rare-case reachability, which this suite doesn't assert)
+ * — two seeds fold twice the game shapes.
  */
 const config = decodeGameConfig({ slamWindowMs: 4000 })
 
@@ -102,6 +106,47 @@ describe("transcription, not recomputation (C2.2, ADR-0014)", () => {
     )
     expect(folded.deck).toStrictEqual(impossibleDeck)
     expect(folded.prng).toStrictEqual(impossiblePrng)
+  })
+
+  it("folds the eager re-arm batch at its position — HeldDiscarded, DeckReshuffled, SlamWindowOpened (C9, ADR-0040)", () => {
+    // Review F5a: neither 250-game batch ever produces a DeckReshuffled
+    // followed by SlamWindowOpened (the re-arm needs most cards in hands —
+    // ADR-0011's near-impossible territory), so this position was pinned by
+    // engine event-order tests only, never through the fold. Reach the
+    // pre-state ("deck empty, one-card discard, next player holding") via a
+    // fold-consistent script: two real non-power draws (seed 42's deck
+    // starts AS, 5C) plus one synthetic DeckReshuffled that jumps the deck
+    // to empty — the same transcription license as the impossible-deck test
+    // above; the fold transcribes payloads verbatim by design (ADR-0014).
+    const [, events] = dealt()
+    const prefix: ReadonlyArray<GameEvent> = [
+      ...events,
+      { _tag: "CardDrawn", playerId: uid(0), card: card("AS") },
+      { _tag: "HeldDiscarded", playerId: uid(0), card: card("AS") },
+      { _tag: "SlamWindowOpened", turnPlayerId: uid(0), closesAt: ts(4000), rank: "A" },
+      { _tag: "SlamWindowClosed" },
+      { _tag: "TurnAdvanced", playerId: uid(1) },
+      { _tag: "CardDrawn", playerId: uid(1), card: card("5C") },
+      { _tag: "DeckReshuffled", deck: [], prng: [1, 2, 3, 4] as const },
+    ]
+    const before = Either.getOrThrow(foldEvents(prefix))
+    expect(before.deck).toStrictEqual([])
+    expect(before.discard).toStrictEqual([card("AS")])
+
+    const [after, batch] = Either.getOrThrow(
+      applyCommand(before, { _tag: "DiscardHeld", playerId: uid(1) }, ts(10_000)),
+    )
+    expect(batch.map((e) => e._tag)).toStrictEqual([
+      "HeldDiscarded",
+      "DeckReshuffled",
+      "SlamWindowOpened",
+    ])
+    // The reshuffle retained the landing pile's top and the window rank
+    // matches it (clause 9), and the fold lands exactly the live state.
+    expect(after.discard).toStrictEqual([card("5C")])
+    expect(after.phase._tag).toBe("SlamWindow")
+    const refolded = Either.getOrThrow(foldEvents([...prefix, ...batch]))
+    expect(refolded).toStrictEqual(after)
   })
 
   it("the folded deal carries GameStarted's payload verbatim — hands, deck, discard, prng", () => {

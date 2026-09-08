@@ -459,6 +459,18 @@ test` — 25/25 tasks green (contract wire frozen; frontend M5 unblocked).
       applied clean against the fresh `_cambio_migrations`). Full gate
       re-run against the fresh database: green, 25/25.
 
+- [x] 2026-09-08 15:30 — review fix cycle (backend share): `eagerReshuffle`
+      guards with its own inline predicate (F4a — the `drawable` import is
+      gone from Engine.ts; the docstring now warns against collapsing the
+      two predicates and describes the real slam-path composition, F4g);
+      `drawFromDeck`'s unreachability comment restated on the ADR-0040
+      resting invariant (F4b); Fold.test.ts's shared-seed header corrected
+      (F4c); new fold pin for the re-arm batch position (landing, then
+      reshuffle, then window) via a crafted fold-consistent log
+      (F5a — the give-draw position stays engine-order-pinned only,
+      declined as disproportionate); Invariants.test's "all three checkers"
+      now trips each checker distinctly (F5b). Domain suite 209/209.
+
 ## Surprises & notes for the root plan
 
 - (plan-time) The cross-package `firstDiscard` removal has no

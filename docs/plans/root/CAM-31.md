@@ -175,8 +175,16 @@ completed command application.
       staleness check: curl a changed module through Vite before trusting
       any rendered verification).
 - [x] Rendered walkthrough: game start shows empty discard with correct
-      affordances; a deck-emptying draw shows draw flight → reshuffle
-      flight in sequence with visible reshuffle motion.
+      affordances (observed rendered); the deck-emptying draw's
+      draw-then-reshuffle behavior verified over HTTP (deckCount 1→42 in
+      one command response) with the flight sequencing pinned by the jsdom
+      gate tests and the reshuffle motion confirmed on the gallery card.
+      _(Amended in the review fix cycle, F2: the original wording claimed
+      the draw flight → reshuffle flight sequence was itself observed
+      rendered — it was not, and for non-acting players the draw flight
+      cancels on a missing anchor pre-refetch, so the visual observer-side
+      read of that batch remains an open observation for a future
+      two-browser walkthrough.)_
 
 ## Plan of work
 
@@ -283,9 +291,23 @@ typecheck lint test`, 25/25 tasks) — contract wire frozen, frontend M5
       running dev server — direct confirmation of clause 6 (draw-then-
       reshuffle, same batch) outside the test suite. Full gate re-run
       after the wipe: green, 25/25. All four root-plan acceptance criteria
-      checked off. Backend/frontend implementation complete; only
+      checked off. _(Amended in the review fix cycle, F2: criterion 4's
+      visual draw-flight→reshuffle-flight sequence was verified over HTTP
+      and via the jsdom sequencing pins, not observed rendered — see the
+      amended criterion.)_ Backend/frontend implementation complete; only
       close-out (plan reconciliation, commit, push, Linear comment)
       remains.
+
+- [x] 2026-09-08 15:30 — review fix cycle: F1 latch-guarded drain landed in
+      `use-game.ts` with a distinguishing test (mutant-verified — the test
+      fails against the unguarded drain); F2 claim amendments at all three
+      instances; F3 liveness test strengthened to observe the gate flush;
+      F4's seven false comments corrected (Engine.ts's `eagerReshuffle` now
+      guards with its own inline predicate, `drawable` import dropped);
+      F5a fold pin added for the re-arm batch position, F5b invariant test
+      trips all three checkers; F6 quick wins (row 15, canon r5 draw-state
+      text, refetch settles). Domain 209/209, full re-review gate pending
+      in this entry's commit.
 
 ## Decision log
 
@@ -386,7 +408,13 @@ SlamWindowOpened` (Engine.ts fizzle path), where `CardDrawn` arms A,
   actually clears (reshuffle then waits for the last armed cause — still
   "after its causing flight settles", and it also removes the documented
   clause-8 give/reshuffle concurrency residual); pin the fizzle batch in
-  a test. **OPEN.**
+  a test. **RESOLVED (fix cycle 2026-09-08): fix applied** — the drain now
+  runs only when the settling flight IS the armed cause; a distinguishing
+  test pins it (early-settling non-cause holds the reshuffle, the last
+  armed cause releases it) and was verified to FAIL against the unguarded
+  drain (mutant run). The handler comment was rewritten; the clause-8
+  give/reshuffle concurrency residual is gone as a side effect (the
+  reshuffle now follows the give — frontend plan Surprises updated).
 - **F2 — acceptance-criterion overclaim, 3 instances**: AC4's "deck-
   emptying draw shows draw flight → reshuffle flight in sequence" was
   never visually observed — the M6 walkthrough verified clause 6 over
@@ -397,67 +425,90 @@ SlamWindowOpened` (Engine.ts fizzle path), where `CardDrawn` arms A,
   on a missing anchor pre-refetch — pre-existing characteristic, logged
   in the frontend plan's deviation note). Instances: root AC4 checkbox
   (:177), root M6 progress "all four … checked off", frontend step-5
-  walkthrough item 2. **OPEN** — fix is a claim amendment at all three
-  instances (state the HTTP verification honestly; record the visual
-  observer-side read as an open observation, not a met criterion).
+  walkthrough item 2. **RESOLVED (fix cycle): claim amended** at all three instances (root AC4,
+  the root M6 progress claim, frontend step-5 item 2), each with an inline
+  amendment note; the observer-side visual read is recorded as an open
+  observation for a future two-browser walkthrough, not a met criterion.
+  Sweep re-run: `grep -rn "draw flight"` across all three plan docs — no
+  further instances beyond the three amended and the test-plan rows that
+  describe the jsdom pins accurately.
 - **F3 — vacuous liveness test**: the gate's "is live under jsdom's
   default auto-cancelling measure" test asserts only the refetched view,
   which the unconditional `scheduleRefetch` guarantees even with a wedged
   gate; the child plan's sketch asked for "the reshuffle choreography is
-  enqueued" too. **OPEN** — strengthen the test to assert the reshuffle
-  flight is enqueued (gate flushed) under auto-cancel.
+  enqueued" too. **RESOLVED (fix cycle): test strengthened** — a new case cancels the cause
+  on its missing `held` anchor while stubbing rects so the flushed
+  reshuffle flight observably animates (`data-state="reshuffling"`); the
+  original refetch-outcome case is kept for the degenerate-measure pathway.
 - **F4 — false-comment cluster** (each a one-line fix; all verified
   against code):
   - a. `Legality.test.ts` drawable-describe comment claims the eager
     reshuffle "is no longer sourced from" `drawable` — `Engine.ts`'s
     `eagerReshuffle` guard literally reads `drawable`, and the adjoining
     "equivalent to `deck > 0`" note invites a simplification that would
-    no-op the entire ADR-0040 mechanism. **OPEN** — rewrite the comment,
-    and/or give `eagerReshuffle` its own inline predicate so the
-    decoupling claim becomes true.
+    no-op the entire ADR-0040 mechanism. **RESOLVED (fix cycle): both** —
+    `eagerReshuffle` now guards with its own inline predicate (the
+    `drawable` import is gone from Engine.ts) and both the Engine
+    docstring and the Legality.test comment now state why the two
+    predicates must never collapse into each other.
   - b. `Engine.ts` `drawFromDeck` comment attributes `getOrThrow` safety
     to C6.2 legality; post-diff it rests on ADR-0040's resting invariant
     (legality still admits `deck 0 / discard > 1`, which `drawOne` can no
-    longer serve). **OPEN** — restate the comment on the invariant.
+    longer serve). **RESOLVED (fix cycle): claim amended** — the comment now
+    rests the unreachability on ADR-0040's resting invariant and names the
+    hand-built-state gap explicitly.
   - c. `Fold.test.ts` header claims the batch shares the simulation
     suite's `SIM_SEED` — defaults diverged in this diff (20260831 vs
-    20260908). **OPEN** — correct the comment.
+    20260908). **RESOLVED (fix cycle): claim amended** — the header now
+    records the deliberately distinct defaults and why.
   - d. `use-game.ts` handler preamble: "Endgame tags (M6) fall through to
-    `default`" — false; `CambioCalled`/`GameEnded` have explicit cases. **OPEN** — name the
-    actual default tags (`GameStarted`, `SlamWindowOpened`,
-    `TurnAdvanced`).
+    `default`" — false; `CambioCalled`/`GameEnded` have explicit cases. **RESOLVED (fix cycle): claim amended** — the comment names the actual
+    default tags (`GameStarted`, `SlamWindowOpened`, `TurnAdvanced`).
   - e. `discard-pile.tsx` JSDoc still framed `empty` as "a zero-card keep
-    took the last card" — its own canon r3 superseded that. **OPEN** — update the JSDoc to the
-    r3 framing.
+    took the last card" — its own canon r3 superseded that. **RESOLVED (fix cycle): claim
+    amended** — the JSDoc now carries the r3 framing (opening state per
+    ADR-0039, zero-card keep as the mid-game route).
   - f. `draw-deck.tsx` header cited canon "(r4, CAM-29)" while canon is
     r5, and the file's inline revision-note convention lacked an r5
-    paragraph. **OPEN** — bump the header, add the r5 note.
+    paragraph. **RESOLVED (fix cycle)** — header bumped to (r5, CAM-31),
+    r5 paragraph added in the file's inline-revision convention.
   - g. `Engine.ts` `eagerReshuffle` docstring miscounted the slam-path
-    composition ("two non-window returns" vs the actual sites). **OPEN** —
-    correct the docstring.
+    composition ("two non-window returns" vs the actual sites). **RESOLVED
+    (fix cycle): claim amended** — the docstring now describes the shared
+    slam-landing composition plus the post-give-draw second composition.
 - **F5 — coverage gaps**:
   - a. The clause-9 (`…, DeckReshuffled, SlamWindowOpened`) and clause-8
     give-draw (`…, CardGivenFromDeck, DeckReshuffled`) event positions
     never pass through the fold in any suite (probed: zero instances in
-    both 250-game batches). **OPEN** — add targeted `foldEvents`
-    assertions over the hand-built engine batches.
+    both 250-game batches). **RESOLVED (fix cycle): test added** — a crafted
+    fold-consistent log reaches the re-arm pre-state (two real draws plus
+    one synthetic transcription-jump `DeckReshuffled`, same license as the
+    impossible-deck test), then asserts the live `DiscardHeld` batch is
+    `HeldDiscarded, DeckReshuffled, SlamWindowOpened` AND that refolding
+    the extended log deep-equals the live state. The give-draw position
+    stays engine-order-pinned only (crafting a zero-card slam through the
+    fold needs four slam rounds of scaffolding — declined as
+    disproportionate; noted in the backend coverage table).
   - b. `Invariants.test.ts` "combines all three checkers" corrupts only
-    the deck. **OPEN** — strengthen it to trip the resting-invariant
-    checker through `stepViolations` as well.
+    the deck. **RESOLVED (fix cycle): test strengthened** — it now trips
+    each of the three checkers distinctly (partition, hand-integrity,
+    resting invariant), asserting each checker's message substring.
   - c. `powerPeek`/`powerSwap` landing sites have no dedicated trigger
     test — accepted on the shared-helper argument (all five funnel
     through `openWindowOrAdvance`'s entry); noted, not fixed.
-- **F6 — advisory (all OPEN unless deliberately declined)**:
-  coverage-table row 15's malformed extra cell (escape the pipe);
-  HANDOFF §4.5's invariant list doesn't name the new resting invariant
-  (arguably fine — §4.5 lists persistence-level invariants; decline or
-  extend); ADR-0014's Context still names `firstDiscard` (historical
-  record — leaving it as history is defensible, ADR-0039 is indexed);
-  canon draw-deck r5 documents the empty-branch motion for `reshuffling`
-  while code/test also cover `draw` (extend the r5 text); the sequencing
-  test ends with an in-flight debounced refetch (flake risk — settle
-  it); `FlightLayer`'s null-root caveat and the affordance-mirror/
-  `drawable` decoupling noted for the record.
+- **F6 — advisory**: coverage-table row 15's malformed extra cell —
+  RESOLVED (fix cycle): row repaired. Canon draw-deck r5 documented the
+  empty-branch motion for `reshuffling` only — RESOLVED (fix cycle): r5
+  text extended to cover `draw` too (same-revision clarification, matching
+  the as-built component). The sequencing test's in-flight debounced
+  refetch — RESOLVED (fix cycle): both gate tests now settle the flight
+  and await the refetched view. DECLINED, deliberately: HANDOFF §4.5's
+  invariant list stays persistence-level (the engine-level resting
+  invariant lives in ADR-0040 and the harness); ADR-0014's Context keeps
+  its historical `firstDiscard` mention (history is the point; ADR-0039
+  is indexed as the superseding decision). Noted for the record, no
+  action: `FlightLayer`'s null-root caveat, the affordance-mirror/
+  `drawable` decoupling having no coupling test.
 
 **What was run**: `pnpm turbo build typecheck lint test` (bare);
 `pnpm turbo test --filter … --force` for domain/application/api/web

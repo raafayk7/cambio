@@ -289,7 +289,12 @@ Walkthrough (root acceptance criteria):
 2. Play until the deck runs out: the draw flight lands, **then** the
    reshuffle flight (discard→deck) plays — in sequence, with visible
    motion on the deck through both, including the empty-branch pulse when
-   the snapshot still shows zero.
+   the snapshot still shows zero. _(Amended in the review fix cycle, F2:
+   as executed, this step verified the behavior over HTTP plus the
+   gallery's empty+reshuffling card; the live two-flight sequence was not
+   observed rendered — for non-actors the draw flight cancels on a
+   missing `held` anchor pre-refetch, so an observer-side visual read
+   stays an open item.)_
 3. Confirm the retained discard top visibly stays put through the
    reshuffle.
 
@@ -336,7 +341,7 @@ gate's ordering assumption).
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 13 — planned: pure affordance case (opening state: take off, draw on, call on) replacing the unreachable "reshuffle fuel" pin, plus a game-start integration render (empty dashed discard, Draw present, no Take)                                                                                                                                               | apps/web/test/affordances.test.ts "holder: opening state — empty discard, Take off, Draw on, Call on (ADR-0039)"; apps/web/test/game-screen.test.tsx "game start (ADR-0039): empty discard, Draw present, no Take, Call Cambio present"                                                                                                                                                                                           | pure affordance mapping for the opening state; integration render shows the dashed empty discard, Draw present, no Take button, Call Cambio present                                                                     |
 | 14 — planned: sequencing pin with stubbed non-degenerate rects + fake timers (draw flight active first, reshuffle flight only after its settle), plus a liveness case under jsdom auto-cancel; existing CH2 retained-top and one-refetch-per-batch pins stay green                                                                                              | apps/web/test/game-screen.test.tsx describe "reshuffle sequencing gate (C14, ADR-0040)": "defers the reshuffle flight behind its causing discard-landing flight — never simultaneously active" and "is live under jsdom's default auto-cancelling measure — the batch still resolves to the refetched state"; existing CH2 "keeps the discard top visibly unchanged..." and "fires exactly one refetch..." stayed green unchanged | with non-degenerate rects, the deck shows neither draw nor reshuffling until the causing flight settles, then reshuffling; with the default degenerate measure the batch still resolves to the refetched view (no hang) |
-| 15 — planned: draw-deck component case — `count 0` + `state="reshuffling"` renders the reshuffling data-state **and** the motion treatment on the dashed outline; canon r-bumps (draw-deck.md r5, discard-pile.md r3) reconciled at review, not test-pinned                                                                                                     | apps/web/test/draw-deck.test.tsx "shows reshuffle motion over the empty dashed outline too (ADR-0040: the eager reshuffle re-arms a visibly empty deck)"                                                                                                                                                                                                                                                                          | count=0 + state=reshuffling                                                                                                                                                                                             | draw renders the dashed outline with animate-pulse-soft; count=0 with no state renders it without the class |
+| 15 — planned: draw-deck component case — `count 0` + `state="reshuffling"` renders the reshuffling data-state **and** the motion treatment on the dashed outline; canon r-bumps (draw-deck.md r5, discard-pile.md r3) reconciled at review, not test-pinned                                                                                                     | apps/web/test/draw-deck.test.tsx "shows reshuffle motion over the empty dashed outline too (ADR-0040: the eager reshuffle re-arms a visibly empty deck)"                                                                                                                                                                                                                                                                          | count=0 + state=reshuffling/draw renders the dashed outline with animate-pulse-soft; count=0 with no state renders it without the class (row repaired in the review fix cycle — an unescaped pipe had split it)         |
 | 16 — planned: fixture/comment/label sweep — `gameStartedPayload()` sheds `firstDiscard`, the use-game CH1 comment stops claiming reshuffle falls through, the gallery empty-deck label stops promising an imminent reshuffle; pinned by the suite staying green against the frozen wire shape (no dedicated test — comment and label changes aren't assertable) | apps/web/test/room-screen.test.tsx gameStartedPayload() (no dedicated test — the fixture sheds firstDiscard and the suite stays green against the frozen wire shape); apps/web/src/components/gallery/game.tsx label sweep; apps/web/src/containers/game/use-game.ts CH1 comment rewrite                                                                                                                                          | no assertable pin for comment/label prose — the fixture change is proven by the suite staying green with no firstDiscard reference anywhere in apps/web                                                                 |
 
 ## Progress
@@ -380,6 +385,20 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
       not CAM-31-introduced) anchor-availability characteristic of the
       flight layer, not a change to the gate's own logic.
 
+- [x] 2026-09-08 15:30 — review fix cycle (frontend share): the cause
+      gate's drain is now latch-guarded (F1) — an early-settling non-cause
+      no longer releases the reshuffle; distinguishing test added and
+      mutant-verified, and the clause-8 give/reshuffle concurrency residual
+      is gone as a side effect (Surprises note superseded below). Liveness
+      test strengthened to observe the gate flush via a cancelled cause +
+      stubbed rects (F3). Comments corrected: DeckReshuffled handler's
+      composition claim, the handler preamble's default-tags list (F4d),
+      `discard-pile.tsx`'s retired empty-state framing (F4e),
+      `draw-deck.tsx`'s r4 header + missing r5 note (F4f). Canon
+      `draw-deck.md` r5 text extended to the `draw` state's empty-branch
+      motion. Both gate tests now settle their flights and refetch before
+      ending (F6 flake risk). Coverage row 15's split cell repaired.
+
 ## Surprises & notes for the root plan
 
 - (planning) **Correction of record for CAM-18:**
@@ -401,6 +420,11 @@ CardGivenFromDeck` (root clause 8), the gate defers only the reshuffle
   flight. Sequencing the give behind the reshuffle would be a flight
   _chain_, a new mechanism class the interview decision explicitly
   declined. Surface at review if it reads badly in the walkthrough.
+  **Superseded by the review fix cycle (F1):** the latch-guarded drain now
+  releases the reshuffle only when the LAST armed cause settles, so in
+  this batch the give flight plays first and the reshuffle follows it —
+  ahead-of is now the designed order and the concurrency is gone, with no
+  flight chain introduced.
 - (planning) The clause-13 simplification makes the affordance mirror
   strictly narrower than the domain's `drawable` predicate (which keeps
   its disjunction — root Decision Log). That asymmetry is intentional;
