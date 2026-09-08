@@ -50,6 +50,15 @@ const LAYER_RATIONALE = {
 }
 
 /**
+ * Layers whose §3.1 rule caps *external* (non-workspace, npm) imports at
+ * `effect` only. Restricted to `src/**` — each of these layers' `test/**`
+ * legitimately imports test tooling (`vitest`, `@effect/vitest`) that isn't
+ * `effect`, so the check must not reach test files (ADR-0017).
+ */
+const EFFECT_ONLY_EXTERNAL_LAYERS = ["domain", "contracts", "application"]
+const EFFECT_ONLY_ALLOWED_EXTERNAL = ["effect"]
+
+/**
  * Shared flat ESLint config for every package in the monorepo.
  *
  * @param {{
@@ -62,7 +71,7 @@ const LAYER_RATIONALE = {
 export function cambioConfig(options) {
   const {
     layer,
-    files = ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"],
+    files,
     // boundaries element patterns match FOLDERS, not files. Every package in
     // this repo keeps its sources under src/ (and tests under test/), so the
     // whole package is one element whose type is its layer.
@@ -75,7 +84,131 @@ export function cambioConfig(options) {
       `Unknown layer "${layer}". Expected one of: ${Object.keys(MAY_IMPORT).join(", ")}`,
     )
   }
-  const denied = WORKSPACE_PACKAGES.filter((pkg) => !allowed.includes(pkg))
+  // Every denied workspace package is matched both bare and via any subpath
+  // (`@cambio/foo/**`) — micromatch does not treat a bare pattern as a
+  // subpath prefix, so without the `/**` variant an export subpath (e.g.
+  // `@cambio/domain/testing`, ADR-0016) would silently bypass the deny-list.
+  const denied = WORKSPACE_PACKAGES.filter((pkg) => !allowed.includes(pkg)).flatMap((pkg) => [
+    pkg,
+    `${pkg}/**`,
+  ])
+
+  const workspacePolicies =
+    denied.length > 0
+      ? [
+          {
+            from: { element: { type: layer } },
+            disallow: { to: { module: { origin: "external", source: denied } } },
+            message: LAYER_RATIONALE[layer],
+          },
+        ]
+      : []
+
+  // §3.1 caps some layers' *external* (npm) imports at `effect` only. The
+  // policies array is evaluated last-write-wins (ADR-0017), so the blanket
+  // disallow must come before the `effect` carve-out for the carve-out to
+  // win. `!@cambio/**` excludes workspace packages so this pair doesn't
+  // fight `workspacePolicies` above over the same import.
+  //
+  // Node builtins (`node:crypto`, or the bare form `crypto`) are a THIRD
+  // origin, `"core"` — distinct from `"external"` — that eslint-plugin-
+  // boundaries never matches against the pair above (ADR-0017 amendment,
+  // CAM-12). The `origin: "core"` disallow below omits `source` entirely:
+  // boundaries' selector matcher treats an absent key as "match anything",
+  // so this one policy catches every builtin, in either specifier form,
+  // via Node's own builtin-module list — no name enumeration to go stale.
+  // It has no `allow` counterpart: unlike `effect` among externals, no
+  // builtin is ever legitimate in these layers' `src/**`. Origins are
+  // mutually exclusive per import, so this never competes with the
+  // external pair above.
+  const effectOnlyExternalPolicies = EFFECT_ONLY_EXTERNAL_LAYERS.includes(layer)
+    ? [
+        {
+          from: { element: { type: layer } },
+          disallow: { to: { module: { origin: "external", source: ["!@cambio/**"] } } },
+          message: LAYER_RATIONALE[layer],
+        },
+        {
+          from: { element: { type: layer } },
+          allow: { to: { module: { origin: "external", source: EFFECT_ONLY_ALLOWED_EXTERNAL } } },
+        },
+        {
+          from: { element: { type: layer } },
+          disallow: { to: { module: { origin: "core" } } },
+          message: LAYER_RATIONALE[layer],
+        },
+      ]
+    : []
+
+  const settings = {
+    "boundaries/elements": [{ type: layer, pattern: [...elementFolders] }],
+    "boundaries/dependency-nodes": ["import", "dynamic-import", "require", "export"],
+  }
+
+  const sharedRules = {
+    // Zod is banned outright — validation is Effect Schema (§2).
+    "no-restricted-imports": [
+      "error",
+      {
+        paths: [
+          {
+            name: "zod",
+            message: "Validation is Effect Schema, not Zod (§2). Do not add Zod for any reason.",
+          },
+        ],
+      },
+    ],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+    ],
+    "@typescript-eslint/consistent-type-imports": [
+      "error",
+      { prefer: "type-imports", fixStyle: "inline-type-imports" },
+    ],
+  }
+
+  const boundariesBlock = (blockFiles, policies) => ({
+    files: [...blockFiles],
+    plugins: { boundaries },
+    settings,
+    rules: {
+      ...sharedRules,
+      ...(policies.length > 0
+        ? {
+            "boundaries/dependencies": [
+              "error",
+              {
+                default: "allow",
+                // Workspace packages resolve through node_modules symlinks, so
+                // they are "external" from any single package's point of view.
+                checkAllOrigins: true,
+                policies,
+              },
+            ],
+          }
+        : {}),
+    },
+  })
+
+  // A caller-supplied `files` override always gets one combined block (no
+  // src/test split — nothing in the repo overrides `files` today). Layers
+  // with an effect-only-external rule get two *mutually-exclusive* blocks
+  // (src/** vs test/**) rather than one block carrying both policy sets,
+  // because `boundaries/dependencies` policies replace wholesale rather than
+  // merge if two config blocks both declare the rule for overlapping files
+  // (ADR-0017) — mutually-exclusive globs sidestep that hazard entirely.
+  const ruleBlocks = files
+    ? [boundariesBlock(files, workspacePolicies)]
+    : effectOnlyExternalPolicies.length > 0
+      ? [
+          boundariesBlock(
+            ["src/**/*.{ts,tsx}"],
+            [...workspacePolicies, ...effectOnlyExternalPolicies],
+          ),
+          boundariesBlock(["test/**/*.{ts,tsx}"], workspacePolicies),
+        ]
+      : [boundariesBlock(["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"], workspacePolicies)]
 
   return tseslint.config(
     {
@@ -95,57 +228,7 @@ export function cambioConfig(options) {
     },
     js.configs.recommended,
     ...tseslint.configs.recommended,
-    {
-      files: [...files],
-      plugins: { boundaries },
-      settings: {
-        "boundaries/elements": [{ type: layer, pattern: [...elementFolders] }],
-        "boundaries/dependency-nodes": ["import", "dynamic-import", "require", "export"],
-      },
-      rules: {
-        // Zod is banned outright — validation is Effect Schema (§2).
-        "no-restricted-imports": [
-          "error",
-          {
-            paths: [
-              {
-                name: "zod",
-                message:
-                  "Validation is Effect Schema, not Zod (§2). Do not add Zod for any reason.",
-              },
-            ],
-          },
-        ],
-        "@typescript-eslint/no-unused-vars": [
-          "error",
-          { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
-        ],
-        "@typescript-eslint/consistent-type-imports": [
-          "error",
-          { prefer: "type-imports", fixStyle: "inline-type-imports" },
-        ],
-        ...(denied.length > 0
-          ? {
-              "boundaries/dependencies": [
-                "error",
-                {
-                  default: "allow",
-                  // Workspace packages resolve through node_modules symlinks, so
-                  // they are "external" from any single package's point of view.
-                  checkAllOrigins: true,
-                  policies: [
-                    {
-                      from: { element: { type: layer } },
-                      disallow: { to: { module: { origin: "external", source: denied } } },
-                      message: LAYER_RATIONALE[layer],
-                    },
-                  ],
-                },
-              ],
-            }
-          : {}),
-      },
-    },
+    ...ruleBlocks,
   )
 }
 

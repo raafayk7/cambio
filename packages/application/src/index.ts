@@ -9,9 +9,25 @@
  *     logger) live here.
  *   - Implementations of both live in `apps/api/src/infra`.
  *
- * Task 1 is scaffolding only, so there are no use cases yet — just the two
- * infrastructure ports needed to prove the layering compiles. The realtime
- * publisher port arrives with the event types it publishes.
+ * Contents: the clock, id-generation, seed, and realtime-publisher ports;
+ * CAM-4's session signer port; the user/session use cases (ADR-0018); and
+ * CAM-5's game lifecycle — lobby use cases, `executeGameCommand`, and the
+ * per-room actor registry (ADR-0019/0020).
  */
 export * from "./ports/Clock.js"
+export * from "./projection/CommandMapping.js"
+export * from "./projection/EventProjection.js"
+export * from "./projection/PlayerNames.js"
+export * from "./projection/ViewFor.js"
 export * from "./ports/IdGenerator.js"
+export * from "./ports/RealtimePublisher.js"
+export * from "./ports/Seed.js"
+export * from "./ports/SessionSigner.js"
+export * from "./room/RoomRegistry.js"
+export * from "./use-cases/CreateLobby.js"
+export * from "./use-cases/CreateTemporaryUser.js"
+export * from "./use-cases/ExecuteGameCommand.js"
+export * from "./use-cases/JoinLobby.js"
+export * from "./use-cases/LeaveLobby.js"
+export * from "./use-cases/StartGame.js"
+export * from "./use-cases/VerifySession.js"

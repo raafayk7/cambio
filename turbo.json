@@ -9,12 +9,22 @@
   // invalidate every build artifact in the repo.
   "globalPassThroughEnv": [
     "DATABASE_URL",
+    "TEST_DATABASE_URL",
     "PORT",
     "HOST",
     "LOG_LEVEL",
     "PRETTY_LOGS",
     "WEB_ORIGIN",
-    "WEB_PORT"
+    "WEB_PORT",
+    "SESSION_SECRET",
+    "SESSION_TTL_SECONDS",
+    "SESSION_COOKIE_SECURE",
+    "SESSION_COOKIE_SAMESITE",
+    "SLAM_WINDOW_MS",
+    "REALTIME_URL",
+    "REALTIME_JWT_SECRET",
+    "REALTIME_SECRET_KEY",
+    "TOPIC_SECRET"
   ],
   "tasks": {
     "build": {
@@ -39,13 +49,19 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": []
+      "outputs": [],
+      // CAM-2 simulation knobs (packages/domain/test/sim/Simulation.test.ts),
+      // CAM-3 round-trip knobs (apps/api/test/RoundTrip.test.ts), and CAM-6
+      // adversarial-projection knobs (packages/application/test/AdversarialProjection.test.ts).
+      // Hashed, not passed through: a different game count or seed is a genuinely
+      // different test run and must miss the cache.
+      "env": ["SIM_GAMES", "SIM_SEED", "RT_GAMES", "RT_SEED", "VIEW_GAMES", "VIEW_SEED"]
     },
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
       "persistent": true,
-      "passThroughEnv": ["VITE_API_URL"]
+      "passThroughEnv": ["VITE_API_URL", "VITE_REALTIME_URL", "VITE_REALTIME_APIKEY"]
     },
     "@cambio/web#build": {
       "dependsOn": ["^build"],
@@ -56,7 +72,7 @@
       "outputs": ["dist/**", ".output/**", ".tanstack/**", "src/routeTree.gen.ts"],
       // Hashed, not passed through: VITE_ vars are baked into the client bundle,
       // so a change genuinely must produce a different build.
-      "env": ["VITE_API_URL"]
+      "env": ["VITE_API_URL", "VITE_REALTIME_URL", "VITE_REALTIME_APIKEY"]
     }
   }
 }

@@ -1,0 +1,141 @@
+import * as React from "react"
+
+import { MarkCheck } from "../lib/marks.js"
+import { cn } from "../lib/utils.js"
+
+/**
+ * Toast — design-system/components/core/toast.md (r1). Class: Overlay.
+ *
+ * Transient notice for APP PLUMBING only (copy result, connection events,
+ * setting saved) — game-state events never arrive as toasts. Copy is
+ * completed events in plain past tense ("Link copied"); never questions,
+ * never actions. Compact panel at elevation.float, docked bottom-center
+ * (compact) / bottom-left (regular+), snapping in from the dock edge.
+ *
+ * ToastStack owns the clock: 4s default dwell, hover/focus pauses, max 3
+ * stacked with the oldest collapsing first. State (the toast list) lives
+ * with the caller; the stack reports expiry via onExpire.
+ */
+export interface ToastItem {
+  id: string
+  variant?: "info" | "success" | "alarm"
+  message: React.ReactNode
+}
+
+export interface ToastProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: "info" | "success" | "alarm"
+}
+
+export function Toast({ variant = "info", className, children, ...props }: ToastProps) {
+  return (
+    <div
+      role="status"
+      className={cn(
+        "flex items-center gap-2 rounded-md border-frame bg-surface-raised px-3 py-2 font-ui text-base font-medium text-ink-primary shadow-float",
+        "transition duration-snap ease-snap starting:translate-y-4",
+        className,
+      )}
+      {...props}
+    >
+      {variant === "success" ? (
+        <MarkCheck className="size-3 shrink-0 text-accent-action" />
+      ) : variant === "alarm" ? (
+        <span aria-hidden className="font-semibold text-accent-alarm-deep">
+          !
+        </span>
+      ) : null}
+      {children}
+    </div>
+  )
+}
+
+const MAX_STACK = 3
+const DEFAULT_DWELL_MS = 4000
+
+interface Clock {
+  remaining: number
+  handle: number | undefined
+}
+
+export interface ToastStackProps {
+  toasts: ReadonlyArray<ToastItem>
+  /** A toast's dwell ended (or it was collapsed by overflow) — remove it. */
+  onExpire: (id: string) => void
+  durationMs?: number
+  className?: string
+}
+
+export function ToastStack({
+  toasts,
+  onExpire,
+  durationMs = DEFAULT_DWELL_MS,
+  className,
+}: ToastStackProps) {
+  const [paused, setPaused] = React.useState(false)
+  const clocks = React.useRef(new Map<string, Clock>())
+  const expire = React.useRef(onExpire)
+  expire.current = onExpire
+
+  const visible = toasts.slice(-MAX_STACK)
+
+  // Overflow: the oldest collapses first, immediately.
+  React.useEffect(() => {
+    for (const overflowed of toasts.slice(0, Math.max(0, toasts.length - MAX_STACK))) {
+      expire.current(overflowed.id)
+    }
+  }, [toasts])
+
+  React.useEffect(() => {
+    const map = clocks.current
+    for (const toast of visible) {
+      if (!map.has(toast.id)) map.set(toast.id, { remaining: durationMs, handle: undefined })
+    }
+    for (const id of [...map.keys()]) {
+      if (!visible.some((toast) => toast.id === id)) {
+        const clock = map.get(id)
+        if (clock?.handle !== undefined) window.clearTimeout(clock.handle)
+        map.delete(id)
+      }
+    }
+
+    if (paused) {
+      return
+    }
+
+    const startedAt = Date.now()
+    for (const [id, clock] of map) {
+      clock.handle = window.setTimeout(() => expire.current(id), clock.remaining)
+    }
+    return () => {
+      const elapsed = Date.now() - startedAt
+      for (const clock of map.values()) {
+        if (clock.handle !== undefined) {
+          window.clearTimeout(clock.handle)
+          clock.handle = undefined
+          clock.remaining = Math.max(0, clock.remaining - elapsed)
+        }
+      }
+    }
+  }, [visible.map((toast) => toast.id).join(","), paused, durationMs])
+
+  return (
+    <div
+      data-testid="toast-stack"
+      className={cn(
+        "fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 flex-col gap-2",
+        "regular:left-4 regular:translate-x-0",
+        className,
+      )}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+    >
+      {visible.map((toast) => (
+        <Toast key={toast.id} {...(toast.variant !== undefined ? { variant: toast.variant } : {})}>
+          {toast.message}
+        </Toast>
+      ))}
+    </div>
+  )
+}

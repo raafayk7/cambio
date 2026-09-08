@@ -17,7 +17,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run"
   },
   "dependencies": {
     "@cambio/contracts": "workspace:*",
@@ -26,8 +27,10 @@
   },
   "devDependencies": {
     "@cambio/config": "workspace:*",
+    "@effect/vitest": "0.30.0",
     "@types/node": "22.20.1",
     "eslint": "10.8.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
   }
 }

@@ -41,15 +41,18 @@ export const decodeCardSlug = Schema.decodeUnknownSync(CardSlug)
 export const decodeCardSlugEither = Schema.decodeUnknownEither(CardSlug)
 
 /**
- * The ranks that carry a power (§1.4). Exported as a type-level constant only —
- * whether a power *triggers*, and what it does, is game logic and belongs to
- * the rules engine, not here.
+ * The ranks that carry a power (§1.4). Whether a power *triggers*, and what
+ * it does, is game logic and lives in `Engine.ts`/`Legality.ts`, not here.
  */
 export const POWER_RANKS = ["7", "8", "9", "T", "J", "Q"] as const
 export type PowerKindLiteral = (typeof POWER_RANKS)[number]
 
 export const PowerKind = Schema.Literal(...POWER_RANKS)
 export type PowerKind = typeof PowerKind.Type
+
+/** Whether a rank carries a power (§1.4) — a set-membership fact, not game logic. */
+export const isPowerRank = (r: Rank): r is PowerKind =>
+  (POWER_RANKS as ReadonlyArray<Rank>).includes(r)
 
 // ---------------------------------------------------------------------------
 // Pure derivations (§4.1). Score is never stored.

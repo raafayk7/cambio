@@ -1,6 +1,7 @@
 # Cambio
 
-A hidden-information, memory-based card game. Lowest score wins.
+A hidden-information, memory-based card game. Lowest score wins. MIT licensed
+— see [`LICENSE`](LICENSE).
 
 **Read [`docs/HANDOFF.md`](docs/HANDOFF.md) before writing any code.** It is the
 source of truth for the game rules, the architecture, and the data model, and it
@@ -9,13 +10,15 @@ is deliberately not a task list. Decisions live in [`docs/adr/`](docs/adr/)
 agents start at [`AGENTS.md`](AGENTS.md); skills and workflow commands live in
 `.agents/` (symlinked into `.claude/`).
 
-Current state: **scaffold only**. No game logic exists yet, by design.
+Current state: **v0 is live and playable end to end**, deployed via CI/CD to
+production. See [`docs/HANDOFF.md`](docs/HANDOFF.md) for scope and
+[`docs/adr/`](docs/adr/) for what's been decided along the way.
 
 ## Requirements
 
 - Node 22 (`.nvmrc`) — `nvm use`
 - pnpm 9
-- Docker, with the `desktop-linux` context active (`docker context use desktop-linux`)
+- Docker with Compose v2
 
 ## Setup
 
@@ -23,13 +26,13 @@ Current state: **scaffold only**. No game logic exists yet, by design.
 nvm use && pnpm install && cp .env.example .env
 ```
 
-Start Postgres:
+Start Postgres and the self-hosted Realtime container:
 
 ```bash
 docker compose -f docker/docker-compose.yml up -d
 ```
 
-Apply migrations (the only one is empty):
+Apply migrations:
 
 ```bash
 pnpm --filter @cambio/api migrate
@@ -41,9 +44,9 @@ pnpm --filter @cambio/api migrate
 pnpm dev
 ```
 
-Web on http://localhost:3000, API on http://localhost:3001. The home page is a
-smoke test: it renders a shadcn primitive from `@cambio/ui` and shows the result
-of a TanStack Query call to the API's `/health`.
+Web on http://localhost:3000, API on http://localhost:3001. The home page is
+the lobby: pick a name, create a room, and share the join link — the full game
+is playable end to end from there.
 
 Both apps read the single `.env` at the repo root — the API via Node's
 `--env-file-if-exists`, Vite via `loadEnv`. There is no per-app `.env` and

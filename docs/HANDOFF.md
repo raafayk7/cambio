@@ -26,9 +26,24 @@ Cambio is a hidden-information, memory-based card game. **Lowest score wins.**
 ### 1.1 Setup
 
 - 2–5 players. Single standard 52-card deck. No jokers.
+
+> **Amended:** [ADR-0036](adr/0036-four-player-cap-bench-anchored-table-layout.md)
+> caps games at **2–4 players**, enforced in the domain (`Deal.ts`'s
+> player-count gate, `Lobby.ts`'s `MAX_LOBBY_MEMBERS`) — the bench-anchored
+> table layout makes the visual metaphor load-bearing, and the rule bends to
+> it. The "2–5 players" line above is superseded; a fifth player is no
+> longer accepted.
+
 - Each player is dealt **4 face-down cards**. Players do **not** look at any of them.
 - **There is no opening peek phase.** This is intentional and differs from most published Cambio variants. Do not add one.
 - One card is turned face up to start the discard pile. The remainder is the face-down draw deck.
+
+> **Amended:** [ADR-0039](adr/0039-game-starts-with-empty-discard-pile.md)
+> removes the opening face-up card — the deal now leaves the discard pile
+> **empty**, and all 52 cards minus the four dealt to each player form the
+> draw deck (`52 − 4n`). The first player's opening options are draw or
+> call Cambio only; no slam is possible until the first discard lands. The
+> "one card is turned face up" line above is superseded.
 
 ### 1.2 Scoring
 
@@ -104,6 +119,13 @@ Every slam attempt, correct or not, **publicly reveals** the slammed card moment
 ### 1.7 Deck exhaustion
 
 When the draw deck empties, reshuffle the discard pile (retaining the current top card as the new top discard) to form a new draw deck.
+
+> **Amended:** [ADR-0040](adr/0040-eager-single-mechanism-deck-reshuffle.md)
+> makes the reshuffle **eager**: it fires the instant a draw empties the
+> deck, or a discard lands on an empty deck making the pile reshufflable —
+> never waiting for the next draw. The engine enforces a resting invariant
+> (deck empty ⟹ discard ≤ 1) from exactly one mechanism; the retain-top
+> rule above is unchanged, only the timing.
 
 ### 1.8 End of game
 
@@ -203,6 +225,10 @@ There are exactly 52 cards. Model them as a domain constant, not a database enti
 - No `Card` table, no card UUIDs. `cardSlug` is the natural key and is unique within a single deck, which also makes it a stable identity for peek and knowledge tracking.
 
 This locks the game to one deck. That's acceptable at a 5-player maximum.
+
+> **Amended:** the maximum is now **4 players** (ADR-0036, see the §1.1
+> amendment) — which only strengthens this conclusion: one deck covers a
+> 4-player game with even more headroom.
 
 ### 4.2 Turn phase is a discriminated union
 
@@ -340,7 +366,8 @@ Two gotchas:
 
 - Computer/AI opponents. Designed for (the domain being pure and the belief model existing make a bot a pure function from redacted view → command) but **not built yet**.
 - Spectator mode, reconnect-mid-game UX polish, match history UI, ranked play, accounts with passwords.
-- Horizontal scaling, Redis, multiple decks, more than 5 players.
+- Horizontal scaling, Redis, multiple decks, more than 5 players (now
+  more than **4** — ADR-0036 capped games at 2–4, see the §1.1 amendment).
 
 ---
 

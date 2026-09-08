@@ -1,0 +1,765 @@
+# CAM-30 — Teach the rules: how-to-play guide + in-game power hints
+
+- **Linear:** [CAM-30](https://linear.app/raafayk7/issue/CAM-30/teach-the-rules-how-to-play-guide-in-game-power-hints)
+- **Scope:** frontend
+- **Child plans:** [frontend](../frontend/CAM-30.md)
+- **ADRs:** none needed — every decision this task forces is a
+  design-system canon change (new mark, AppShell revision, modal-rule
+  amendment, new pattern doc), governed by the creation gate and recorded
+  in the component docs plus this plan's Decision Log. Nothing selects
+  between architectural alternatives, touches a HANDOFF §9 open question,
+  or changes a package boundary.
+
+> This is a **living document** (ExecPlan-style). The implementer updates
+> Progress, Decision Log, and Surprises as work happens — not at the end.
+> Self-containment rule: a reader with zero session context must be able to
+> pick this up and continue.
+
+## Purpose / big picture
+
+After this task, a player on any screen (lobby, room, game) can open a
+complete, canon-faithful how-to-play guide from a help icon-button in the
+app chrome; and during play, drawing a power card shows the active player
+what the power does while everyone else's turn indicator says a power is
+being resolved. Observe it by running `pnpm dev`, opening
+`localhost:3000`, clicking the `?` icon-button top-right, and (in a game)
+drawing a 7–Q.
+
+## Context & orientation
+
+Frontend-only. **No contracts or backend change**: every player's view
+already carries the phase tag unconditionally
+(`packages/contracts/src/GameView.ts:116`, union at `:71-78`;
+`ViewResolvingPower`/`ViewResolvingQueenSwap` both carry `playerId`), and
+the drawn card is projected to the holder only
+(`packages/application/src/projection/ViewFor.ts:47-58` — pinned by
+`packages/application/test/ViewFor.test.ts` "ResolvingPower: value for
+the holder only" / "ResolvingQueenSwap: value for the holder only").
+
+State of the code this touched, **as of plan time (pre-implementation)**
+— see Progress/Outcomes below for what shipped; anchors here are
+corrected post-implementation to their nearest current equivalent, per
+the CAM-4/CAM-7 line-rot lesson, even though the prose describes the
+before-picture:
+
+- **No help UI existed anywhere** (grep-verified across `apps/web/src`,
+  `packages/ui/src`, `design-system/`). Routes were index/room/game only.
+- **AppShell** (`packages/ui/src/components/app-shell.tsx:63-70`, now the
+  `SettingsButton`/`HelpButton` pair) rendered a top-right icon-button —
+  but hard-coded to settings via an `onSettings` prop that no production
+  screen supplied. The slot existed on default chrome and on the game
+  screen's collapsed chrome. **Now implemented**: `onHelp` mirrors it
+  (`:78-85`).
+- **Modal** (`packages/ui/src/components/modal.tsx`) is a native
+  `<dialog>` with pinned header/footer and a scrolling body
+  (`min-h-0 overflow-y-auto`); the gallery's "House rules" overflow demo
+  proves long content works. Width is fixed `max-w-md` (28rem),
+  spec-carried in `design-system/components/core/modal.md`.
+- **Marks** (`packages/ui/src/lib/marks.tsx`) contained only
+  `MarkX`/`MarkCheck`/`MarkSettings` — no `?` mark existed. **Now
+  implemented**: `MarkHelp`.
+- **Turn status** (`apps/web/src/containers/game/game-screen.tsx:104-124`,
+  copy at `:137-160`) collapsed `AwaitingDraw`/`HoldingCard`/
+  `ResolvingPower`/`ResolvingQueenSwap` into `your-turn`/`other-turn`
+  before copy was chosen; `TurnIndicator`'s `state` prop is a closed
+  4-value union (`apps/web/src/components/game/turn-indicator.tsx:16-20`,
+  unchanged by this task). **Now implemented**: `TurnStatus` carries an
+  additional `resolvingPower` flag through to `turnStatusCopy`'s
+  `other-turn` arm — the union itself is untouched (F4.2).
+- **Held card** (`game-screen.tsx:788-800`, label helper `:178-180`)
+  showed "You drew" / "⟨Name⟩ is holding" under the card via
+  `HeldCard`'s single `label` prop
+  (`apps/web/src/components/game/held-card.tsx:19-35`). **Now
+  implemented (as amended)**: a hint line in the chrome band — a `hint`
+  prop was added in M4 (held-card.md r2), then retired by the
+  user-directed live-play relocation (held-card.md r3); `HeldCard`
+  itself ships unchanged apart from its docblock.
+- **Power semantics are already derived client-side**:
+  `apps/web/src/containers/game/affordances.ts:79-99` (unchanged by this
+  task; `targetingForRank`: 7/8 → `peek-own`, 9/10 → `peek-other`, J →
+  `swap-two`, Q → `queen-peek`). The `ResolvingPower` holder affordance
+  carries `card` + `targeting`; the `ResolvingQueenSwap` holder
+  affordance carries `targeting` only, deliberately no `card`.
+- **Governing sources**: `cambio-rules` skill (HANDOFF §1 + amendments),
+  ADRs 0009–0012 (edge-case rules), 0036 (2–4 players), 0039 (empty
+  opening discard), 0040 (eager reshuffle); `design-system/` router,
+  `references/voice.md` (terminology + register),
+  `components/core/modal.md`, `app-shell.md`, `turn-indicator.md`;
+  skills `frontend-architecture`, `design-system`, `hidden-information`.
+
+## Functional contract
+
+Rule-content clauses below assert engine behavior; each cites the domain
+test that already pins it (probe-verify rule). The guide's prose is
+authored from the `cambio-rules` skill and the cited ADRs — never from
+priors; published Cambio/Cabo variants differ deliberately.
+
+### F1 — Help entry point
+
+- **F1.1** `AppShell` accepts an `onHelp` callback; when supplied it
+  renders a help icon-button (new `MarkHelp` "?" mark,
+  `Button variant="icon"`) in the chrome header, with accessible label
+  "How to play", mirroring the existing `onSettings` slot. It renders in
+  both default chrome and the game screen's collapsed (`state="game"`)
+  chrome.
+- **F1.2** The lobby, room, and game screens all supply `onHelp`; the
+  affordance is present in each screen's production render.
+- **F1.3** Activating the entry point opens the how-to-play modal. It is
+  available in every game phase **including the slam window** (per the
+  revised modal rule, Decision Log D3); it is never disabled or hidden by
+  game state, and an open guide is never force-closed by a phase change.
+
+### F2 — How-to-play guide content
+
+- **F2.1** The guide renders in the `Modal` primitive (pinned title,
+  scrolling body) at canon width, titled per `voice.md` register, with
+  sections covering: setup, scoring, taking a turn, power cards,
+  slamming, rare situations (zero cards, fizzles, empty discard,
+  reshuffle), and how the game ends.
+- **F2.2** Every rule statement in the guide matches canon. The load-
+  bearing facts, each with its pin:
+  - Setup: 2–4 players; 4 face-down cards each; **no opening peek**; the
+    discard pile **starts empty** (ADR-0036, ADR-0039; pinned by
+    `packages/domain/test/Deal.test.ts`).
+  - Scoring: A = 0; 2–10 face value; J/Q = 11; K♠/K♣ = −1; K♥/K♦ = −2 —
+    score follows the specific card, not the rank
+    (`packages/domain/test/Card.test.ts` "distinguishes kings by suit,
+    not rank (§1.2)", "scores jacks and queens alike at 11 despite
+    differing rank", "scores pips at face value").
+  - A turn is exactly one of: call Cambio (game ends **immediately** — no
+    final round, no caller bonus/penalty); take the top discard (only if
+    non-power; **must** swap it in, never discard it back); draw (non-
+    power: swap or discard; power: **obligated to play it**)
+    (`packages/domain/test/TurnActions.test.ts`,
+    `packages/domain/test/Legality.test.ts`).
+  - Powers: 7/8 peek one of your own cards; 9/10 peek one of another
+    player's cards; J blind-swap any two player-held cards (may be the
+    same player's); Q peek any one card, then blind-swap any two; powers
+    trigger only when drawn; swaps are visible as slot movements, never
+    values (`packages/domain/test/Powers.test.ts`).
+  - Slamming: after each turn a time-limited window opens; any player may
+    slam any face-down card claiming it matches the top discard **by
+    rank, not score**; the four outcome cases (own/other × correct/
+    incorrect) per the rules table; every attempt publicly reveals the
+    slammed card momentarily (`packages/domain/test/Slam.test.ts`).
+  - Rare situations: a zero-card slammer who slams an opponent correctly
+    draws the deck top and gives it unseen (ADR-0009); J/Q with fewer
+    than two occupied slots fizzles as a no-op (ADR-0010,
+    `Powers.test.ts` fizzle describe); an empty discard pile opens no
+    slam window and cannot be taken from (ADR-0012); an emptied draw deck
+    reshuffles immediately, keeping the top discard (ADR-0040,
+    `packages/domain/test/Fold.test.ts` / sim invariants).
+  - Ending: only a Cambio call ends the game; lowest total wins; zero
+    cards scores 0 and **loses to any negative total**; ties are possible
+    (`packages/domain/test/Scoring.test.ts` "scores an empty hand 0 —
+    beatable by any negative total (§1.6)", "returns every player sharing
+    the minimum — ties are representable").
+- **F2.3** The guide is memory-faithful: it contains no aid for tracking
+  known cards and never suggests one exists; it may state the rule that
+  peeks are brief and remembering is the game.
+- **F2.4** All copy follows `design-system/references/voice.md`: sentence
+  case for functional UI; canonical terminology (**power card**, **peek**,
+  **blind-swap**, **slam window**, **draw deck**/**discard pile**,
+  **slot**, **fizzle** — never "special card"/"reveal"/"trade"); card
+  names as rank + suit symbol where space allows, spelled out in running
+  copy; no over-promise adjectives or triplet taglines.
+
+### F3 — Power hint for the active player
+
+- **F3.1** When the viewer's own view is in `ResolvingPower`, a hint line
+  renders beneath the held card (in the `HeldCard` label region) stating
+  the power by targeting kind: `peek-own` → "Peek at one of your own
+  cards"; `peek-other` → "Peek at one of another player's cards";
+  `swap-two` → "Blind-swap any two held cards"; `queen-peek` → "Peek at
+  any card, then blind-swap any two held cards". (Exact strings are the
+  spec; they use `voice.md` terminology.)
+
+  > **Amended (review fix cycle, 2026-09-08):** the hint renders in the
+  > **chrome band** (`ink.primary`, semibold), not under the held card —
+  > the user-directed live-play round found `ink.muted` on the table
+  > felt near-unreadable and relocated it (supersedes D5; see Surprises;
+  > held-card.md r3). The strings, the targeting-kind derivation, and
+  > the holder-only rule are unchanged; the render is additionally
+  > suppressed once the game has ended.
+
+- **F3.2** During `ResolvingQueenSwap` the holder's hint reads "Now
+  blind-swap any two held cards". The hint derives from the affordance's
+  `targeting` kind alone — never from a `card` field, which the client
+  affordance deliberately omits in this phase (pinned by
+  `apps/web/test/affordances.test.ts`).
+- **F3.3** The hint exists only while its phase does: it appears when the
+  power phase starts and is gone once the phase ends. Nothing about the
+  drawn power persists afterward.
+- **F3.4** Non-holders never render a hint and their payload carries no
+  drawn-card field to leak (pinned by `apps/web/test/affordances.test.ts`
+  "non-holder: nothing (no card field — pinned by ViewFor.test.ts)" and
+  `packages/application/test/ViewFor.test.ts`). The game screen's
+  hidden-information structural sweep (every `[data-face="down"]` has
+  empty text; no extra requests) stays green.
+
+### F4 — Non-active player indication
+
+- **F4.1** For viewers who are not the resolving player, the turn status
+  copy distinguishes power resolution: when the phase is
+  `ResolvingPower` or `ResolvingQueenSwap` and `phase.playerId ≠
+viewerId`, the indicator copy reads "⟨Name⟩ is playing a power card"
+  instead of "⟨Name⟩'s turn".
+- **F4.2** `TurnIndicator`'s `state` union stays exactly its current four
+  values (`your-turn`/`other-turn`/`slam-window`/`game-over`); the change
+  is copy-only — no new visual state, no design-system revision to
+  `turn-indicator.md`'s states list.
+- **F4.3** The non-active copy never names the rank or the specific power
+  — the viewer's payload has no card field to name it from (same pins as
+  F3.4).
+
+### F5 — Design-system canon (ships with the code)
+
+- **F5.1** `MarkHelp` is added to the marks set and canonized in
+  `app-shell.md` (the marks have no doc file of their own; app-shell.md
+  is where the settings mark's rules already live — resolution recorded
+  in the child plan).
+- **F5.2** `app-shell.md` is revised to document the help icon-button
+  slot alongside settings.
+- **F5.3** `modal.md`'s slam-window rule is amended: no **game-action**
+  modal may be required or block during the slam window; an opt-in
+  reference overlay (the guide) is permitted, and missing a slam while
+  reading is the player's own cost. The amendment preserves the original
+  intent (game flow never waits on a modal).
+- **F5.4** The how-to-play guide is documented as a design-system
+  extension (component/pattern doc with `status: draft`) and the
+  extensions index gains its line, per the creation-gate procedure.
+- **F5.5** `held-card.md` gains an r2 Revisions entry documenting the
+  optional hint line (the F3 second label line is a change to a
+  canonical component; approval is Decision Log D5). The entry states
+  explicitly that the hint is instruction copy about the current
+  obligation, not an affordance — held-card.md r1's "nothing here
+  implies an affordance" rule stands.
+
+  > **Amended (review fix cycle, 2026-09-08):** as-built, held-card.md
+  > carries r2 (hint added) **and r3 (hint retired to the chrome band)**
+  > — the canonical record of the F3.1 relocation. The `hint` prop no
+  > longer exists in code; the "not an affordance" characterization now
+  > applies to the chrome-band hint (instruction copy, no control) and
+  > held-card.md r1's rule stands untouched.
+
+### Acceptance criteria
+
+- [x] `pnpm turbo build typecheck lint test` passes (run bare, never
+      piped).
+- [x] Component tests pin every F1–F4 clause per the frontend child
+      plan's contract coverage table (filled as tests land).
+- [ ] The guide's rule copy is reviewed line-by-line against the
+      `cambio-rules` skill + ADRs 0009–0012/0036/0039/0040 (this is the
+      `/review` copy-fidelity pass the issue mandates — left for `/review`,
+      not self-certified here).
+- [x] The existing hidden-information sweep tests in
+      `apps/web/test/game-screen.test.tsx` still pass unchanged.
+- [x] Design-system docs (F5) land in the same milestone as the code they
+      canonize; the rendered design gate / `ai-tells` audit runs on the
+      new surfaces (advisory — audit came back clean, see Outcomes).
+
+## Plan of work
+
+No contracts freeze is needed — the task changes no schemas, so there are
+no parallel lanes to sequence; milestones run in order on one branch.
+
+- **M1 — Canon before code.** Write the design-system doc changes the
+  user approved at plan time (Decision Log D2–D3, D6): the `modal.md`
+  slam-rule amendment, the `app-shell.md` help-slot revision (including
+  the `MarkHelp` mark), and the how-to-play extension doc skeleton +
+  extensions-index line. These are the specs M2–M3 build against.
+- **M2 — Primitives (`packages/ui`).** Add `MarkHelp` to
+  `src/lib/marks.tsx`; add the `onHelp` prop and icon-button to
+  `AppShell` (both chrome states), test-first in
+  `packages/ui/test/app-shell.test.tsx`. Repo compiles and `ui` suite is
+  green at the end of this step.
+- **M3 — The guide (`apps/web`).** Author the rules copy module from the
+  `cambio-rules` skill + ADRs (never from memory), build the guide
+  component hosted in `Modal`, wire `onHelp` + open/close state into the
+  lobby, room, and game containers, and add the gallery entry. Tests:
+  entry-point presence on all three screens, modal opens/closes,
+  copy-fidelity spot pins (king scores, no-opening-peek, obligatory
+  power, rank-not-score slam), slam-window availability (F1.3).
+- **M4 — Power hints + indicator copy (`apps/web`).** Extend the turn-
+  status derivation so the phase tag survives to the copy function
+  (F4.1) within the existing 4-state `TurnIndicator` union; add the hint
+  line to the `HeldCard` label region driven by the holder affordance's
+  `targeting` (F3) _(as amended: final placement is the chrome band —
+  see the F3.1 amendment)_. Tests in `game-screen.test.tsx` for holder hint per
+  rank, queen-swap-step hint, non-active power copy, and
+  hint-disappears-with-phase; hidden-info sweeps untouched.
+- **M5 — Close-out.** Full gate bare; dev-server walkthrough
+  (freshness-check the Vite server per AGENTS.md before any rendered
+  verification); advisory `ai-tells`/gate pass on the guide and hint
+  surfaces; reconcile the child plan's coverage table against as-built
+  tests.
+
+## Validation
+
+- **Automated:** the M2–M4 component tests above, run via
+  `pnpm turbo test --filter @cambio/ui --filter web` (through turbo, per
+  AGENTS.md), then the full gate. Copy-fidelity pins assert exact rule
+  strings the guide must contain (e.g. the king scores row, "no opening
+  peek", rank-not-score slam wording anchors).
+- **Manual:** `pnpm dev`, walk lobby → room → game; open the guide from
+  each screen; in a seeded game draw a power card and observe the hint
+  in the chrome band _(as amended — F3.1)_ and a second browser's
+  indicator copy; open the
+  guide during a slam window and confirm it neither blocks nor closes.
+- **Review:** `/review` performs the line-by-line copy-fidelity diff of
+  the guide against `cambio-rules` + the ADRs, and checks the design-
+  system docs against what shipped.
+
+## Progress
+
+_(updated continuously; append new entries at the BOTTOM — newest last;
+timestamp each entry)_
+
+- [x] 2026-09-08 10:30 — plan written; interview rounds 1–2 complete;
+      explorer report folded in.
+- [x] 2026-09-08 — M1 canon landed: modal.md r2 (slam-rule amendment),
+      app-shell.md r5 (help slot + `MarkHelp`), new
+      `components/extensions/how-to-play-guide.md` + extensions-index
+      line. Commit `03ba123`.
+- [x] 2026-09-08 — M2 landed: `MarkHelp` in `marks.tsx`, `onHelp` +
+      `HelpButton` on `AppShell` in both chrome states, test-first in
+      `packages/ui/test/app-shell.test.tsx`. `pnpm turbo test --filter
+@cambio/ui` green. Commit `9bd8b68`.
+- [x] 2026-09-08 — M3 landed: rules copy module + `HowToPlayGuide`
+      component, wired into lobby/room/game via `onHelp`, gallery entry.
+      Tests cover entry-point presence, open/close, copy spot-pins,
+      memory-faithful sweep, slam-window availability — dialog queries on
+      the game screen needed `name:` disambiguation once two `Modal`s are
+      always mounted there. `pnpm turbo test --filter @cambio/web --filter
+@cambio/ui` green (269 tests). Commit `4fa6ab6`, formatting fix `e7f0ae4`.
+- [x] 2026-09-08 — M4 landed: `turnStatus`'s `resolvingPower` flag reaches
+      `turnStatusCopy`; `HeldCard` gains an optional `hint` prop
+      (held-card.md r2) derived from the holder affordance's `targeting`.
+      Hint assertions scoped to the held-card spot to avoid colliding with
+      the always-mounted guide's powers table (same strings). 281 tests
+      green. Commit `19a91f9`.
+- [x] 2026-09-08 — M5 close-out: full gate green
+      (`build typecheck lint test`, 25/25 tasks); dev-server walkthrough
+      (freshness-checked — `WEB_PORT=3100` overrides the launch.json
+      default, caught before it produced a phantom finding) confirmed the
+      guide on lobby, room, and the gallery's `app-shell`/`how-to-play-
+guide` sections; added `onHelp` to the app-shell gallery demo for
+      parity with app-shell.md r5 (commit `2fcd542`); advisory `ai-tells`
+      audit of the four new surfaces came back clean (see Outcomes); added
+      an F2.1 section-heading sweep to close a coverage gap; contract
+      coverage table filled; stale `:<digits>` anchors in both plan docs
+      corrected post-implementation (CAM-4/CAM-7 lesson).
+- [x] 2026-09-08 (logged retroactively in the review fix cycle — review
+      Finding 4) — user-directed follow-up `f50a1b8`: "About Cambio"
+      intro section ahead of setup (guide now has eight sections),
+      suit-red ♥/♦ glyphs in the scoring table's Card column
+      (`CardLabel`), and the decorative `WordmarkSuits` ♠ ♥ ♣ ♦ cluster
+      beside the AppShell wordmark (app-shell.md r6). Then the
+      user-directed live-play round `364e562`/`bc04f32` (four bugs —
+      see Surprises).
+- [x] 2026-09-08 — review fix cycle (from the retrospective's finding
+      list): guide copy corrected (own-slot on the draw branch,
+      zero-card keep exception + rare-situations sentence, J/Q
+      same-player allowance, "no-op"/"slam-eligible" wording); canon
+      docs corrected (app-shell.md version→6 + control order,
+      how-to-play-guide.md r3 — suit-coloring scope + "reveal"
+      carve-out); stale code-header revisions bumped (app-shell.tsx,
+      draw-deck.tsx, how-to-play-guide.tsx); tests strengthened (F1.3
+      progressbar, F4.2 queen-swap data-state, F2.3 negative tracking
+      sweep, F2.2 same-player pin, powers-table↔hint no-drift pin);
+      false fixture comment in the F4.1/F4.3 test reworded; contract
+      amendments (F3.1, F5.5, M4, D5, context bullets) and coverage
+      table reconciled in both plan docs.
+
+## Decision log
+
+- 2026-09-08 — **D1: guide depth = core + edge cases** — one complete
+  guide; ADR-decided rare situations included in a compact section so
+  they don't bury the basics. (User call, round 1.)
+- 2026-09-08 — **D2: entry point = AppShell help icon-button** — mint
+  `MarkHelp` and an `onHelp` slot mirroring `onSettings`; one consistent
+  affordance on all three screens, fits the game's collapsed chrome.
+  Rejected: per-screen ghost text buttons (three placements, no home in
+  game chrome); mixed icon/text (two patterns to maintain). (User call,
+  round 2, creation-gate approval.)
+- 2026-09-08 — **D3: modal.md slam rule revised, not obeyed verbatim** —
+  the rule predates any player-openable modal; its intent (game flow
+  never waits on a modal) is preserved by scoping it to game-action
+  modals. The guide stays available during slam windows; missing a slam
+  while reading is the player's own cost. Rejected: gating/force-closing
+  the guide (affordance flicker after every turn, hostile mid-read
+  close). (User call, round 2.)
+- 2026-09-08 — **D4: non-active indication is copy-only** — widen the
+  copy derivation, keep `TurnIndicator`'s 4-state union and dot styling.
+  Rejected: a 5th indicator state (canon revision for marginal gain).
+  (User call, round 2.)
+- 2026-09-08 — **D5: hint renders under the held card** — second line in
+  the `HeldCard` label region, at the player's locus of attention, gone
+  when the phase ends. Rejected: chrome band (competes with slam/error
+  copy), dock-actions (empty during power resolution — resolution
+  happens on slots). (User call, round 2.) **SUPERSEDED same day by the
+  user-directed live-play round**: `ink.muted` on the table felt proved
+  near-unreadable in real play; the hint moved to the chrome band at
+  `ink.primary`/semibold and `HeldCard`'s `hint` prop was retired
+  (held-card.md r3, F3.1 amendment, Surprises).
+- 2026-09-08 — **D6: guide keeps canon modal width (`max-w-md`)** — 28rem
+  gives a sane reading measure at body sizes and both rule tables fit;
+  avoids a size-variant canon change. Revisit through the creation gate
+  only if M3's rendered check shows the tables genuinely failing.
+  (Planner call.)
+- 2026-09-08 — **D7: hint copy derives from `targeting`, never `card`** —
+  the queen-swap affordance intentionally carries no card; keying copy
+  off targeting kind makes the hint uniform across both power phases and
+  immune to the `ResolvingQueenSwap.card` server-projection question the
+  explorer flagged. (Planner call.)
+- 2026-09-08 — **D8: no auto-open/first-run behavior** — entry point
+  only; no localStorage, no first-visit tracking. (User call, round 1.)
+- 2026-09-08 — **D9: guide format = typeset text + tables** — design-
+  system typography and the `Table` component; no card illustrations or
+  new art. (User call, round 1.)
+
+## Surprises & discoveries
+
+- The brief's line references had drifted by a line or two after CAM-31
+  (`game-screen.tsx` held-card region is 739–750, chrome band 642–652,
+  `targetingForRank` 79–99) — regions all exist as described; child plan
+  cites the fresh anchors.
+- `ViewFor.ts:57` **does** project `card` to the holder during
+  `ResolvingQueenSwap`, while a client comment claims it is always absent
+  and `affordances.ts:186-189` drops it. Not load-bearing for this task
+  (D7), but the comment (now at `game-screen.tsx:165-167` post-
+  implementation — this task's M4 additions shifted it down from :150-152)
+  is unverified against the domain — flagged for some future cleanup, do
+  not rely on it either way. Step 13 deliberately never reads that field.
+- **The game screen always mounts two `Modal`s** (the Call Cambio confirm
+  plus the new how-to-play guide), both rendered unconditionally per
+  modal.md's native-`<dialog>`-inertness pattern. `screen.getByRole("dialog",
+{ hidden: true })` became ambiguous everywhere on that screen — every
+  such query (5 new + 1 pre-existing) needed `name:` disambiguation
+  against the dialog's title. Lobby and room screens mount only the guide
+  and stayed unambiguous.
+- **ADR-0033's version guard bit twice** while writing refetch-driven
+  tests: a replacement `viewResponse` fixture that omits `version` gets
+  the harness default (3), same as the bootstrap — the refetch is then
+  silently discarded as non-newer and the test hangs on a `waitFor` until
+  timeout. Every M3/M4 test that reassigns `handlers[GET_VIEW]` after
+  bootstrap sets `version: 4` explicitly.
+- **`WEB_PORT=3100`** in `.env` overrides `launch.json`'s port-3000
+  default for the web dev server — the M5 freshness-check's first grep
+  came back empty (matching AGENTS.md's warning almost exactly) until the
+  server logs revealed the real port; the fix was navigating there, not
+  restarting anything.
+- **The app-shell gallery section** (`generic.tsx`'s `AppShellSection`)
+  demoed only `onSettings`, not the new `onHelp` — added it to the default
+  and game-chrome states for parity with app-shell.md r5's "help renders
+  alongside settings" documentation. Not in the root/frontend plan's
+  enumerated file list; a small completeness fix, flagged here per the
+  doc-reconciliation discipline.
+- **A first user-directed follow-up round (`f50a1b8`) polished the guide
+  and chrome** — the "About Cambio" intro section (an eighth section
+  beyond F2.1's enumerated seven), suit-red glyph coloring in the
+  scoring table via `CardLabel`, and the decorative `WordmarkSuits`
+  cluster beside the AppShell wordmark. The wordmark cluster is an
+  out-of-contract canon change to a core `packages/ui` component,
+  documented in app-shell.md r6; its `packages/ui` placement rides an
+  existing precedent deliberately — `divider.tsx` already renders the
+  identical suit ornament with the same color split, and `marks.tsx`
+  declares suits part of the shared visual language. (This bullet was
+  added in the review fix cycle — the round predated it but was never
+  logged; review Finding 4.)
+- **A second user-directed follow-up round found four live-play bugs**,
+  diagnosed and fixed against a real 2-player game (two separate origins —
+  `localhost:3100` direct and the ngrok tunnel — for two independent
+  session cookies, driven via `javascript_tool` since `computer` clicks
+  timed out with no display attached):
+  - The F3 power hint (`ink.muted` under the held card, on the table felt)
+    was near-invisible in real play — relocated to the chrome band
+    (`ink.primary`/semibold), retiring `HeldCard`'s `hint` prop entirely
+    (held-card.md r2 → r3). Root D5's placement call is superseded by this
+    live-play finding.
+  - The chrome band's indicator could grow wide enough (a long "Slam
+    window open — match the …" message) to collide with AppShell's
+    floating connection-dot + help-button column — measured live: a 13px
+    overlap at 375px width. First fix applied `pr-8` to the whole band,
+    which silently de-centered every OTHER message too ("Ron's turn"
+    measured 32px off true-center) since `items-center` centers each
+    message independently and the reserved space shifts all of them,
+    not just the wide one. User caught it from a live screenshot;
+    corrected to scope the reservation to a wrapper around only
+    `TurnIndicator`, gated on `status.state === "slam-window"` — every
+    other message (turn copy, the power hint, the timer) stays truly
+    centered by default, re-verified live (both the normal case at true
+    center and the worst-case "match the 10" message still clearing the
+    icon corner by 16px). Also en route: the first attempt used `pr-20`,
+    which silently generated no CSS at all — this design system caps its
+    spacing scale at `spacing-8` (64px, tokens.md's ordinal scale), not
+    Tailwind's default open-ended one; an out-of-range step is a no-op,
+    not an error, and only showed up as a missing rule in the served
+    `styles.css`. No hardcoded pixel values anywhere in these fixes —
+    `pr-8`/`pt-2` are token steps this project's own tokens.md already
+    defines in px (`4 8 12 16 24 32 48 64`, CAM-13), not something this
+    task introduced or an arbitrary-value utility.
+  - An opponent seat's `active-turn` outline (3px, offset 2px) was
+    clipped at the top by the compact opponents row's scroll container
+    (`overflow-y-auto`, zero top padding, seat flush against it) —
+    confirmed live (seat top === scroll container top, exactly zero
+    clearance) and fixed with `pt-2` on `table-scroll`.
+  - The draw deck's slam-window alarm frame sat flush with the stack's
+    UNtranslated back layer instead of the visually topmost card — the
+    populated branch offsets its front layer(s) by `translate-x/y-1` or
+    `-2` to paint the offset-stack illusion, but the frame's `inset-0` was
+    relative to the outer `w-fit` wrapper, which sizes to the untranslated
+    footprint. A real, pre-existing, device-independent bug (not
+    introduced this session) — found by reading `draw-deck.tsx` after the
+    `PlayingCard` hand-card layer check came back pixel-perfect, and
+    confirmed live (frame rect === topmost layer rect only after the fix).
+    draw-deck.md r6.
+
+## Outcomes & retrospective
+
+_(written by `/review`, 2026-09-08)_
+
+**Verdict: fix-then-ship.** The code is behaviorally and architecturally
+clean — no contract-behavior defect, no hidden-information exposure, all
+suites green on a forced fresh run — but the contract text, the coverage
+table, and several canon docs are stale against the as-built state, and
+the guide copy has three rule-consequence issues. Everything on the list
+is a documentation/copy fix; no code behavior needs to change (two
+findings optionally strengthen tests).
+
+**What was run (all fresh, none cached):** `pnpm turbo build typecheck
+lint test` bare — 25/25 tasks, exit 0; then `pnpm turbo test --force` —
+10/10 tasks, 0 cached, 760 tests green including the api suite against
+live Postgres. The `hidden information (C5, structural sweep)` describe
+is byte-unchanged in the diff (the only nearby test edit adds `name:`
+disambiguation to a dialog query — non-weakening). No timing/concurrency
+behavior changed (slam drain math untouched; the reservation is a
+className gate), so no probe was required.
+
+**What passed cleanly:** F1.1–F1.3, F2.1, F2.3, F3.2, F3.4, F4.1–F4.3,
+F5.2–F5.4 all satisfied with evidence. Import boundaries clean (zero
+changes outside apps/web + packages/ui + docs); module placement correct
+(copy module in apps/web, mark in ui); `how-to-play-guide.tsx` is purely
+presentational; `powerHint()` derives only from the holder affordance's
+`targeting`; the non-holder flag derives from the public `_tag` alone;
+no hardcoded visual values in either form (arbitrary utilities and
+`style={{}}` both grepped); every new utility resolves to the ordinal
+token scales; the draw-deck alarm-frame fix is arithmetically right in
+every branch; memory-faithfulness holds (hint recomputed per render,
+persisted nowhere; `HeldCard` carries no vestigial hint code). Copy
+fidelity: **no statement contradicts canon and nothing is invented from
+priors** — the F2.2 spot-pinned facts (suit-split kings, true minus,
+no-opening-peek, obligatory power, rank-not-score) are all correct.
+
+### Findings
+
+**FINDING 1 — contract text stale after the user-directed hint
+relocation (multi-instance claim; contract clauses F3.1, F5.5).**
+The claim "the F3 hint renders under/beneath the held card via a
+`HeldCard` `hint` prop (held-card.md r2)" is false as-built: commits
+`364e562`/`bc04f32` moved the hint to the chrome band
+(`game-screen.tsx:697-701`) and retired the prop (held-card.md r3);
+only Surprises records it. The claim itself is what's wrong (the
+relocation was user-directed), so **amend everywhere with an inline
+amendment note**, not by moving code back. Instances found by sweep
+(phrasings: "beneath the held card", "under the held card", "HeldCard
+label region", "hint prop", "hint line", "held-card.md r2"):
+root F3.1; root F5.5 (whole clause — canonizes a retired prop AND its
+"not an affordance" sentence never landed in held-card.md r2/r3, so the
+sentence requirement moves to r3 or the clause is amended); root
+Context bullet "Now implemented: an optional second `hint` prop"; root
+M4 milestone "add the hint line to the `HeldCard` label region"; root
+D5 (needs an inline "superseded by live-play round" note); child
+Context held-card bullet; child step 13 (entire placement paragraph +
+canon bookkeeping); child step 14's "component-level render test for
+the new `hint` prop can extend held-card.test.tsx"; child Surprises
+bullet 1; child coverage rows F3.1/F3.3/F3.4 (see Finding 2). The fix
+must re-run this sweep across both plan docs before closing — this
+list may be incomplete.
+
+**FINDING 2 — coverage-table integrity (child plan).** (a) F3.1 row
+cites a renamed test — as-built is "holder sees the %s hint **in the
+chrome band** (F3.1)" (`game-screen.test.tsx:1142`) — and a
+**deleted** test: `held-card.test.tsx` "renders the hint as a second
+line beneath the label when supplied" was removed in `364e562`;
+verified absent. (b) **F5.5 has no row at all** (table ends at F5.4;
+its own rule is one row per owned clause). (c) F2.1 row says "all
+seven section headings" — the as-built test asserts **eight** (the
+`f50a1b8` intro). (d) F1.3 row overstates: "alongside the live timer"
+— the test asserts the indicator's slam copy, not `SlamTimer`.
+(e) F4.2 row overstates: "same F4.1 tests assert `data-state`" — only
+one of the two does. (f) F2.3's test title claims "never offers or
+implies a card-tracking aid" but its body has only the positive pin +
+no-new-requests; the negative sweep exists only as a reviewer's manual
+grep — strengthen the test (preferred) or retitle.
+
+**FINDING 3 — guide copy, rule-consequence issues
+(`how-to-play-copy.ts`).** (a) `:78` "a non-power card can be
+blind-swapped into **a slot**" — canon says **own** slot (SKILL.md
+§1.3(c)); as written it licenses swapping into anyone's slot (the
+adjacent take-branch says "your own slots", making the omission read
+deliberate). Also omits displaced-card-to-discard for this branch.
+(b) `:77` "You **must** swap it into one of your own slots" is stated
+exceptionless — ADR-0009 clause 2 makes the zero-card discard take a
+**keep** into the lowest free slot with no displaced card; the
+zero-card keep is also absent from Rare situations `:125`. (c) The
+J/Q may-swap-two-of-the-same-player's-cards allowance is stated
+nowhere, though root F2.2 enumerates "(may be the same player's)" as
+load-bearing. Fix in copy; extend the F2.2 spot-pin test where cheap.
+
+**FINDING 4 — commit `f50a1b8` unlogged in both plans
+(deviation-not-logged).** The intro "About Cambio" section (an 8th
+section beyond F2.1's enumeration), the suit-red `CardLabel` in the
+scoring table, and the **`WordmarkSuits` cluster in AppShell** — an
+out-of-contract canon change to a core `packages/ui` component
+(documented in app-shell.md r6 but in neither plan doc) — appear only
+in canon docs and the commit message. Log all three (Progress +
+Surprises); the wordmark cluster additionally needs its
+precedent-based justification recorded (divider.md's identical
+ornament) so the packages/ui suit-glyph precedent is deliberate.
+
+**FINDING 5 — app-shell.md frontmatter `version: 4`** while the doc
+carries r5 and r6 revision entries (sibling docs in the same diff
+bumped correctly). Any reader resolving canon from the frontmatter
+gets r4.
+
+**FINDING 6 — stale canon back-references in shipped code:**
+`app-shell.tsx:9` cites r5 but implements r6 (its own line 63 cites
+r6); `draw-deck.tsx:6` cites r5 but ships r6; `how-to-play-guide.tsx:20`
+cites r1 but ships r2 content; `app-shell.test.tsx:47` cites r5.
+
+**FINDING 7 — app-shell.md Anatomy + r5 note state the control order
+as "help icon-button, settings icon-button, connection dot"; as built
+both chrome states render dot → help → settings**
+(`app-shell.tsx:126-130, 144-148`). Inherited from the r4 text
+(settings/dot were already reversed) and propagated by r5 rather than
+corrected.
+
+**FINDING 8 — how-to-play-guide.md:24 overstates**: "the scoring and
+powers tables' Card column colors hearts/diamonds glyphs" — only the
+scoring table uses `CardLabel` (`how-to-play-guide.tsx`; powers table
+renders raw). The doc's own r2 revisions entry says "the scoring
+table", so the doc contradicts itself. Currently harmless (no ♥/♦ in
+the powers table) but the Anatomy text licenses behavior the code
+doesn't have.
+
+**FINDING 9 — false test comment in a hidden-information assertion**
+(`game-screen.test.tsx:1227`): claims "the fixture's non-holder phase
+carries no card field" — `resolvingPowerView` always sets
+`phase.card`. The test actually proves something **stronger** (the
+client refuses to derive a hint even when a card field is present);
+reword the comment to what it proves. The real wire guarantee
+(non-holder payload omits `card`) remains pinned by `ViewFor.test.ts`
+and `affordances.test.ts`.
+
+**FINDING 10 — voice.** (a) `:127` "as a no-op" is engine jargon in
+player copy — "fizzle" already carries the meaning; (b) `:85`
+"slam-eligible" is prop vocabulary, not a voice.md term; (c)
+"reveals"/"revealed" (`:101`, `:136`) literally violate the extension
+doc's own binding "never 'reveal'" rule — canon itself uses "publicly
+reveals" for this distinct concept (a public momentary/terminal
+reveal, not a peek), so the right fix is a documented carve-out in
+`how-to-play-guide.md`'s rules (or rephrase), not silent tolerance.
+
+### Advisory (no fix required to ship)
+
+- The "POWERS_TABLE and the hint strings never drift" comments
+  (`how-to-play-copy.ts:12`, `game-screen.tsx:185`) are byte-true today
+  but unenforced — a one-line equality test would make them true by
+  construction.
+- The `helpOpen` + `onHelp` + `<HowToPlayGuide/>` wiring is now
+  triplicated verbatim — frontend-architecture's promote-at-second-use
+  trigger is met; fine to leave, noted for the next touch.
+- Minor copy omissions vs canon (below F2.2's bar): Queen may swap the
+  card she peeked; multiple slams per window / fixed `closesAt`; a
+  resolved power goes to the discard pile (stated only for fizzle);
+  ADR-0040's discard-lands-on-empty-deck second trigger; "held cards"
+  in the J/Q strings collides with this codebase's HeldCard term
+  (canon says "player-held" — changing it would touch the F3.1 spec
+  strings); `heldCardHint` variable name is stale post-relocation.
+- turn-indicator.md doesn't describe the chrome band's new composition
+  (hint paragraph beside the banner); r2's "inline messages" wording
+  covers it — revise only if the band's composition should live in one
+  doc.
+- Skill staleness sweep: none found — no skill or command states
+  anything the shipped code contradicts.
+
+### Fix-cycle notes
+
+Load from this section, not memory. Finding 1 closes by re-running its
+sweep (all phrasings, both plan docs, including milestones and
+test-intent bullets), not by the instance list above. Prefer
+strengthening tests (Findings 2f, 3c) over weakening claims; Findings
+1, 2, 4–8 are claim-side fixes (the claims are what's wrong). Re-review
+verifies the sweep, re-runs the web/ui suites fresh plus the full gate,
+and for any hardened test reasons through the mutants it kills.
+
+### Fix-cycle resolutions (2026-09-08, same session as the review)
+
+- **Finding 1 — RESOLVED (claims amended).** Inline amendment
+  blockquotes added at F3.1 and F5.5; M4 milestone annotated; D5 marked
+  SUPERSEDED inline; root and child Context bullets corrected; child
+  step 13/14 annotated; child Surprises bullet 1 amended. Closed by
+  re-running the sweep (phrasings: "beneath the held card", "under the
+  held card", "HeldCard label region", "hint prop", "hint line",
+  "held-card.md r2") across both plan docs — every remaining hit is
+  either historical prose explicitly marked as plan-time/superseded or
+  an amendment note itself. **The sweep caught one instance the
+  finding's own list had missed** — the root Validation section's
+  manual-walkthrough bullet ("observe the hint under the held card"),
+  now amended — confirming the close-by-sweep-not-checklist rule
+  earned its keep again.
+- **Finding 2 — RESOLVED (mixed).** (a) F3.1 row recited to the
+  as-built chrome-band test name; the deleted `held-card.test.tsx`
+  citation removed. (b) F5.5 row added. (c) F2.1 corrected to eight
+  headings. (d) F1.3: **test strengthened** — now also asserts the
+  `SlamTimer` progressbar (`role="progressbar"`, name "Slam window"),
+  killing the mutant that unmounts the timer while the guide is open.
+  (e) F4.2: **test strengthened** — the queen-swap non-active test now
+  also asserts `data-state="other-turn"`, killing a
+  fifth-indicator-state mutant for that phase. (f) F2.3: **test
+  strengthened** — negative sweep asserts the rendered guide matches no
+  tracking vocabulary (`/track|history|cards you know/i`), killing a
+  copy-regression mutant that reintroduces tracking language.
+- **Finding 3 — RESOLVED (copy corrected + test strengthened).**
+  (a) draw branch now reads "into one of your own slots, sending the
+  displaced card face up onto the discard pile"; (b) the take-discard
+  line gained the zero-card exception pointer and Rare situations
+  gained the ADR-0009 keep sentence ("take the top discard (if it
+  isn't a power card) as a keep into their lowest free slot, with
+  nothing displaced"); (c) the J/Q same-player allowance added to the
+  power-cards section AND pinned by a new F2.2 spot assertion
+  (mutant killed: dropping the same-player sentence now fails).
+- **Finding 4 — RESOLVED (logged).** `f50a1b8` retroactively logged in
+  Progress and Surprises, with the `WordmarkSuits` precedent
+  justification (divider.tsx's identical ornament) recorded.
+- **Finding 5 — RESOLVED (doc corrected).** app-shell.md frontmatter
+  `version: 4` → `6`.
+- **Finding 6 — RESOLVED (headers bumped).** app-shell.tsx → r6,
+  draw-deck.tsx → r6, how-to-play-guide.tsx → r3 (the doc gained r3 in
+  this cycle). The `app-shell.test.tsx` describe's "(r5, F1.1)" was
+  deliberately left: it cites the r5 _rule_ its tests pin, and revision
+  entries are append-only history — a feature-scoped citation stays
+  correct forever.
+- **Finding 7 — RESOLVED (doc corrected).** app-shell.md Anatomy now
+  reads "connection dot, help icon-button, settings icon-button (in
+  that order)", matching the built DOM order in both chrome states.
+- **Finding 8 — RESOLVED (doc corrected, r3).** how-to-play-guide.md
+  Anatomy line rescoped to the scoring table only, with an explicit
+  "powers table renders plain" sentence; recorded as its r3 entry.
+- **Finding 9 — RESOLVED (comment reworded).** The F4.1/F4.3 test
+  comment now states what the test proves: the fixture _does_ carry a
+  card field and the client still refuses to derive a hint from it —
+  stronger than the wire guarantee, which stays pinned by
+  ViewFor.test.ts + affordances.test.ts.
+- **Finding 10 — RESOLVED (copy + doc).** "as a no-op" dropped
+  (fizzle carries the meaning); "slam-eligible" → "though you can
+  still slam against it"; the "reveal" carve-out documented in
+  how-to-play-guide.md r3 (public momentary/terminal reveals are a
+  distinct concept from peeks; canon's own word).
+- **Advisory adopted:** the powers-table↔hint no-drift promise is now
+  a test ("the guide's powers table carries exactly the F3.1 hint
+  strings (no-drift pin)") — the docblock claims are true by
+  construction. Remaining advisories (hook promotion trigger,
+  `heldCardHint` name, turn-indicator.md band composition, sub-bar
+  copy omissions) deliberately left for a future touch.

@@ -1,29 +1,20 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Schema } from "effect"
-import { decodeCardSlug } from "../src/Card.js"
-import { Timestamp, UserId } from "../src/Ids.js"
 import { decodePhase, encodePhase, type Phase } from "../src/Phase.js"
+import { card, ts, uid } from "./fixtures.js"
 
-/**
- * These exist to prove the Effect + Schema + branded-type toolchain works end
- * to end (§10), not to assert anything about the rules. There are no
- * transitions here on purpose.
- */
-
-const userId = Schema.decodeUnknownSync(UserId)("6f1b3a02-8f1e-4f3a-9d21-0f7c5a2b1e44")
+const p0 = uid(0)
+const p1 = uid(1)
 
 describe("Phase", () => {
   it("round-trips each member of the union", () => {
     const phases: ReadonlyArray<Phase> = [
-      { _tag: "AwaitingDraw", playerId: userId },
-      { _tag: "HoldingCard", playerId: userId, card: decodeCardSlug("7H"), source: "deck" },
-      { _tag: "ResolvingPower", playerId: userId, power: "Q", chosen: [] },
-      {
-        _tag: "SlamWindow",
-        closesAt: Schema.decodeUnknownSync(Timestamp)(1_700_000_000_000),
-        rank: "K",
-      },
-      { _tag: "Ended", calledBy: userId },
+      { _tag: "AwaitingDraw", playerId: p0 },
+      { _tag: "HoldingCard", playerId: p0, card: card("2H"), source: "deck" },
+      { _tag: "HoldingCard", playerId: p0, card: card("5C"), source: "discard" },
+      { _tag: "ResolvingPower", playerId: p0, card: card("QS") },
+      { _tag: "ResolvingQueenSwap", playerId: p0, card: card("QS") },
+      { _tag: "SlamWindow", turnPlayerId: p1, closesAt: ts(1_700_000_000_000), rank: "K" },
+      { _tag: "Ended", calledBy: p0 },
     ]
 
     for (const phase of phases) {
@@ -32,11 +23,23 @@ describe("Phase", () => {
   })
 
   it("discriminates on _tag", () => {
-    const phase = decodePhase({ _tag: "Ended", calledBy: userId })
+    const phase = decodePhase({ _tag: "Ended", calledBy: p0 })
     expect(phase._tag).toBe("Ended")
   })
 
   it("rejects an unknown tag", () => {
-    expect(() => decodePhase({ _tag: "Nope", playerId: userId })).toThrow()
+    expect(() => decodePhase({ _tag: "Nope", playerId: p0 })).toThrow()
+  })
+
+  it("rejects the deleted provisional ResolvingPower shape (ADR-0010)", () => {
+    expect(() =>
+      decodePhase({ _tag: "ResolvingPower", playerId: p0, power: "Q", chosen: [] }),
+    ).toThrow()
+  })
+
+  it("rejects a power-rank card held in HoldingCard (§1.3, CAM-10)", () => {
+    expect(() =>
+      decodePhase({ _tag: "HoldingCard", playerId: p0, card: card("7H"), source: "deck" }),
+    ).toThrow()
   })
 })

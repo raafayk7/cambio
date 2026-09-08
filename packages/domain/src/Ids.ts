@@ -31,3 +31,7 @@ export type Timestamp = typeof Timestamp.Type
 /** Monotonic per-game event sequence number (§4.3 `game_events`). */
 export const Seq = Schema.Int.pipe(Schema.nonNegative(), Schema.brand("Seq"))
 export type Seq = typeof Seq.Type
+
+/** Optimistic-concurrency version of a persisted game (§4.3 `games.version`). */
+export const GameVersion = Schema.Int.pipe(Schema.nonNegative(), Schema.brand("GameVersion"))
+export type GameVersion = typeof GameVersion.Type
