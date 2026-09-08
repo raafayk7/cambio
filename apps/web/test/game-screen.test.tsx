@@ -560,9 +560,7 @@ describe("how-to-play guide (F1/F2)", () => {
 
     await user.click(screen.getByRole("button", { name: "How to play" }))
     const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
-    expect(
-      within(dialog).getByText(/Remembering what you saw is the game/),
-    ).toBeInTheDocument()
+    expect(within(dialog).getByText(/Remembering what you saw is the game/)).toBeInTheDocument()
 
     expect(new Set(calls)).toEqual(callsBefore)
   })
@@ -1146,7 +1144,9 @@ describe("power hints + indicator copy (F3/F4)", () => {
     renderGameApp(GAME_ID)
     await screen.findByText(ME.name)
 
-    expect(within(heldCardRegion()).getByText("Now blind-swap any two held cards")).toBeInTheDocument()
+    expect(
+      within(heldCardRegion()).getByText("Now blind-swap any two held cards"),
+    ).toBeInTheDocument()
     expect(screen.getByText("Your turn")).toBeInTheDocument()
   })
 

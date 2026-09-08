@@ -95,14 +95,20 @@ export const SLAM_SECTION: GuideSection = {
 }
 
 export const SLAM_TABLE: ReadonlyArray<SlamOutcomeRow> = [
-  { slam: "Your own card, correct", result: "Card removed to the discard pile — your hand shrinks." },
+  {
+    slam: "Your own card, correct",
+    result: "Card removed to the discard pile — your hand shrinks.",
+  },
   { slam: "Your own card, incorrect", result: "Card stays — you draw a penalty card." },
   {
     slam: "An opponent's card, correct",
     result:
       "Card removed to the discard pile — you give one of your own cards, blind, your choice of slot, into the vacated slot.",
   },
-  { slam: "An opponent's card, incorrect", result: "Card stays with its owner — you draw a penalty card." },
+  {
+    slam: "An opponent's card, incorrect",
+    result: "Card stays with its owner — you draw a penalty card.",
+  },
 ]
 
 export const RARE_SITUATIONS_SECTION: GuideSection = {

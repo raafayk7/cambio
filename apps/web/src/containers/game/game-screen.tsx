@@ -1117,12 +1117,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
   }
 
   return (
-    <AppShell
-      scene="paving"
-      state="game"
-      connection={connection}
-      onHelp={() => setHelpOpen(true)}
-    >
+    <AppShell scene="paving" state="game" connection={connection} onHelp={() => setHelpOpen(true)}>
       {/* CAM-21: the viewport bound lives HERE, not on AppShell —
           lobby/room screens don't use this wrapper and inherit nothing
           (root plan decision 1). `max-h-dvh` + the `min-h-0` flex chain
