@@ -3,6 +3,7 @@ import { Alert, AppShell, Button, cn, Link as UiLink, Modal, Panel, Skeleton } f
 import { Link as RouterLink } from "@tanstack/react-router"
 import * as React from "react"
 
+import { HowToPlayGuide } from "../../components/help/how-to-play-guide.js"
 import { NameForm } from "../../components/identity/name-form.js"
 import { DiscardPile } from "../../components/game/discard-pile.js"
 import { DrawDeck } from "../../components/game/draw-deck.js"
@@ -20,6 +21,7 @@ import {
   isOccupiedSlot,
   slamGiveSlotRequired,
   type Affordances,
+  type PowerTargeting,
 } from "./affordances.js"
 import { useConnection } from "../../hooks/use-connection.js"
 import { sessionErrorCopy } from "../../hooks/use-session.js"
@@ -82,6 +84,12 @@ interface TurnStatus {
   /** SL1: the rank the window is matching — fully public
    * (`ViewSlamWindow.rank`), so it's safe straight in the indicator copy. */
   rank?: Rank
+  /** F4.1: set for `ResolvingPower`/`ResolvingQueenSwap` so `other-turn`
+   * copy can distinguish "playing a power" from an ordinary turn — never
+   * names the rank or power itself (F4.3: the non-holder payload carries
+   * no card field to name it from). `TurnIndicator`'s 4-state union and
+   * its dot styling stay untouched (F4.2) — this is copy-only. */
+  resolvingPower?: boolean
 }
 
 /** `Rank`'s wire encoding is `"T"` for ten (`GamePrimitives.ts` WIRE_RANKS) —
@@ -97,11 +105,16 @@ function turnStatus(phase: ViewPhase, viewerId: string | undefined): TurnStatus 
   switch (phase._tag) {
     case "AwaitingDraw":
     case "HoldingCard":
+      return {
+        state: phase.playerId === viewerId ? "your-turn" : "other-turn",
+        activePlayerId: phase.playerId,
+      }
     case "ResolvingPower":
     case "ResolvingQueenSwap":
       return {
         state: phase.playerId === viewerId ? "your-turn" : "other-turn",
         activePlayerId: phase.playerId,
+        resolvingPower: true,
       }
     case "SlamWindow":
       return { state: "slam-window", activePlayerId: phase.turnPlayerId, rank: phase.rank }
@@ -126,7 +139,9 @@ function turnStatusCopy(status: TurnStatus, activePlayerName: string): React.Rea
     case "your-turn":
       return "Your turn"
     case "other-turn":
-      return `${activePlayerName}'s turn`
+      return status.resolvingPower === true
+        ? `${activePlayerName} is playing a power card`
+        : `${activePlayerName}'s turn`
     case "slam-window":
       return status.rank === undefined
         ? "Slam window open"
@@ -163,6 +178,36 @@ function isHeldPhase(
 /** voice.md register — exactly the two example strings, never a value. */
 function heldCardLabel(isHolder: boolean, holderName: string): string {
   return isHolder ? "You drew" : `${holderName} is holding`
+}
+
+/** F3.1 hint strings, keyed by the holder affordance's `targeting.kind` —
+ * spec strings from root plan F3.1, matching the how-to-play guide's
+ * powers table verbatim so the two surfaces never drift apart. */
+const POWER_HINT_BY_TARGETING: Record<PowerTargeting["kind"], string> = {
+  "peek-own": "Peek at one of your own cards",
+  "peek-other": "Peek at one of another player's cards",
+  "swap-two": "Blind-swap any two held cards",
+  "queen-peek": "Peek at any card, then blind-swap any two held cards",
+}
+
+/** F3.2: the queen's second step gets its own fixed copy — its affordance
+ * carries `targeting: {kind: "swap-two"}` but the guide should read as a
+ * continuation of the queen's power, not a plain jack-style swap. */
+const QUEEN_SWAP_STEP_HINT = "Now blind-swap any two held cards"
+
+/** F3/D7: derives the holder's power hint from the affordance's
+ * `targeting` alone — never from a `card` field, which the
+ * `ResolvingQueenSwap` affordance deliberately omits (affordances.ts).
+ * Non-holders and every other phase get no hint (F3.4: nothing to derive
+ * one from — their payload carries no card field). */
+function powerHint(affordances: Affordances): string | undefined {
+  if (affordances.phase === "ResolvingPower" && affordances.holder) {
+    return POWER_HINT_BY_TARGETING[affordances.targeting.kind]
+  }
+  if (affordances.phase === "ResolvingQueenSwap" && affordances.holder) {
+    return QUEEN_SWAP_STEP_HINT
+  }
+  return undefined
 }
 
 // ---- per-seat hand wiring (T2/T3): who may click, which slots, which are
@@ -354,6 +399,10 @@ function GameTable({
       : turnStatus(view.phase, viewerId)
   const indicatorState = status.state === "slam-window" ? "slam-window" : status.state
   const affordances = affordancesFor(view, viewerId)
+  // F3: the holder's power hint, gone the instant the phase leaves
+  // ResolvingPower/ResolvingQueenSwap — derived fresh every render from
+  // the current affordances, persisted nowhere (F3.3).
+  const heldCardHint = powerHint(affordances)
   // SL1: fully public, phase-gated (not turn-gated) — every viewer may slam
   // while this is non-null, holder or not.
   const slamPhase = view.phase._tag === "SlamWindow" ? view.phase : undefined
@@ -621,9 +670,35 @@ function GameTable({
         data-region="chrome"
         className="flex shrink-0 flex-col items-center gap-4 regular:contents"
       >
-        <TurnIndicator state={indicatorState}>
-          {turnStatusCopy(status, playerName(status.activePlayerId))}
-        </TurnIndicator>
+        {/* pr-8 on this wrapper only, gated to the one message that can
+            actually reach AppShell's floating connection-dot + help-button
+            corner: "Slam window open — match the …" (measured live at
+            compact: icons occupy the rightmost ~64px, `spacing-8` — this
+            design system's largest enumerated step, tokens.md's ordinal
+            scale, not Tailwind's default open-ended one). Scoping the
+            reserve to just this wrapper (not the whole band) keeps every
+            OTHER message — "Your turn", the power hint, the timer — truly
+            centered by default instead of permanently shifted for a
+            collision only the slam message risks (user-directed fix: an
+            earlier band-wide pr-8 visibly de-centered "Ron's turn" too).
+            `regular:contents` makes the wrapper (and its padding) inert at
+            regular, matching the band's own pattern. */}
+        <div className={cn("regular:contents", status.state === "slam-window" && "pr-8")}>
+          <TurnIndicator state={indicatorState}>
+            {turnStatusCopy(status, playerName(status.activePlayerId))}
+          </TurnIndicator>
+        </div>
+        {/* F3 (user-directed relocation): the holder's power-resolution hint
+            used to render under the held card, on the table felt — olive
+            ink.muted against green/paving is nearly unreadable there. This
+            band sits on cream (surface.page) alongside every other
+            transient instruction, so it moves here instead; HeldCard's
+            hint prop is retired (held-card.md r3). */}
+        {!ended && heldCardHint !== undefined ? (
+          <p className="font-ui text-sm font-semibold text-ink-primary regular:order-1">
+            {heldCardHint}
+          </p>
+        ) : null}
         {slamPhase !== undefined ? (
           // SL1/SL2: pairs with the indicator above, never replaces it
           // (turn-indicator.md) — `resolving` pauses the drain visually while
@@ -633,7 +708,7 @@ function GameTable({
             window={{ closesAt: slamPhase.closesAt, durationMs: view.config.slamWindowMs }}
             resolving={slamReveal !== null}
             onExpire={onSlamExpire}
-            className="regular:order-1"
+            className="regular:order-2"
           />
         ) : null}
         {/* E3: slam/peek/turn ephemera are ignored once the game has ended —
@@ -694,7 +769,17 @@ function GameTable({
           // parent has no effect. `regular:contents` already dissolves
           // this element's own box (and therefore its `display` value)
           // entirely at regular, so this addition is inert there.
-          className="flex w-full flex-1 min-h-0 flex-col overflow-y-auto regular:contents"
+          //
+          // pt-2 (user-directed fix): an opponent seat in `active-turn`
+          // state paints a 3px `outline` at a 2px offset (5px total)
+          // beyond its own border box — decorative, so it never affects
+          // layout, but this element's own top edge sits flush against
+          // the compact opponents row above (measured live: 0px gap), and
+          // `overflow-y-auto` clips anything painted outside its box. The
+          // ring's top arc was getting cut off there. 8px (`spacing-2`,
+          // this design system's smallest step past the ring's own
+          // ~5px need) clears it with margin.
+          className="flex w-full flex-1 min-h-0 flex-col overflow-y-auto pt-2 regular:contents"
         >
           <TableSurface
             state={ended ? "game-over" : "in-game"}
@@ -978,6 +1063,7 @@ function GameTable({
 
 export function GameScreen({ gameId }: { gameId: string }) {
   const connection = useConnection()
+  const [helpOpen, setHelpOpen] = React.useState(false)
   const {
     session,
     createUser,
@@ -1066,7 +1152,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
   }
 
   return (
-    <AppShell scene="paving" state="game" connection={connection}>
+    <AppShell scene="paving" state="game" connection={connection} onHelp={() => setHelpOpen(true)}>
       {/* CAM-21: the viewport bound lives HERE, not on AppShell —
           lobby/room screens don't use this wrapper and inherit nothing
           (root plan decision 1). `max-h-dvh` + the `min-h-0` flex chain
@@ -1097,6 +1183,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
         {ownHeading ? null : <h1 className="sr-only">Game</h1>}
         {content}
       </div>
+      <HowToPlayGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
     </AppShell>
   )
 }

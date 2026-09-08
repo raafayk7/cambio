@@ -1,6 +1,6 @@
 name: app-shell
 status: draft
-version: 4
+version: 6
 extends: none
 
 The screen frame. Class: **Layout**.
@@ -8,13 +8,28 @@ The screen frame. Class: **Layout**.
 ## Anatomy
 
 - Header: slim bar on `surface.page` — wordmark in `display` face (small),
-  right side: settings icon-button, connection dot. No nav tabs; this app
-  is lobby → room → game, a corridor, not a site.
+  a small decorative suit cluster (♠ ♥ ♣ ♦, `text-sm`, `aria-hidden`)
+  immediately beside it, right side: connection dot, help icon-button,
+  settings icon-button (in that order). No nav tabs; this app is lobby →
+  room → game, a corridor, not a site.
+- The suit cluster's color split matches `divider.md`'s `ornament`
+  variant: hearts/diamonds in `accent.suit-red`, spades/clubs in
+  `ink.primary` (tokens.md's "suit red is quarantined" rule) — but the
+  **order is deliberately its own** (♠ ♥ ♣ ♦, not the divider's ♠ ♥ ♦ ♣),
+  a wordmark-specific choice, not a divider correction. Decorative only,
+  never a status signal — no `role`, `aria-hidden`. Default chrome only;
+  the collapsed `game` chrome has no wordmark to sit beside.
 - Content: the screen, on the scene ground its class requires (CAM-13
   scene map: lobby full-scene, game table+paving, forms plain cream with
   chrome).
 - The game screen may collapse the header to a floating icon-button pair —
-  play is full-bleed.
+  play is full-bleed. The help icon-button renders in this floating pair
+  too, alongside settings.
+- The help icon-button uses `MarkHelp` (a drawn "?" in the mark language —
+  `packages/ui/src/lib/marks.tsx`, which is the marks' code home; this doc
+  is their canon home, matching where the settings mark's rules already
+  live). Accessible label "How to play". Same render-only-with-handler
+  rule as settings (below).
 - Connection dot: shape-redundant, never color-only (r3) — a filled disc
   when connected, a hollow ring when reconnecting, both ~12px (the ordinal
   scale's `size-3`). In the collapsed `game` chrome this dot is the only
@@ -80,3 +95,14 @@ None.
   compact viewport bound itself (`max-h-dvh` + the flex-shrink chain)
   also lives on the game screen's own wrapper, not here — lobby and room
   screens use this shell unchanged and inherit nothing from it.
+- r5 (CAM-30): a help icon-button (new `MarkHelp` mark) joins settings in
+  both chrome states' control groups — default header's right group and
+  the game state's floating icon pair. Same rule as settings: renders
+  only when `onHelp` is supplied (an inert-looking control is worse than
+  its absence, CAM-17 gate finding), accessible label "How to play". All
+  three screens (lobby, room, game) supply it, opening the how-to-play
+  guide (`components/extensions/how-to-play-guide.md`).
+- r6 (CAM-30 follow-up, user-directed): a decorative ♠ ♥ ♣ ♦ suit cluster
+  renders beside the wordmark in default chrome, reusing `divider.md`'s
+  ornament color split. Default chrome only — the collapsed `game` chrome
+  never carried a wordmark to begin with, so nothing changes there.

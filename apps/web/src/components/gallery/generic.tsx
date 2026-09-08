@@ -633,7 +633,7 @@ export function AppShellSection() {
     >
       <StateCard label="default (plain cream)" wide>
         <div className="aspect-video w-full overflow-hidden rounded-md border-frame">
-          <AppShell onSettings={() => {}} className="min-h-0 h-full">
+          <AppShell onHelp={() => {}} onSettings={() => {}} className="min-h-0 h-full">
             <div className="p-4">Screen content</div>
           </AppShell>
         </div>
@@ -647,7 +647,13 @@ export function AppShellSection() {
       </StateCard>
       <StateCard label="game (collapsed header, paving scene)" wide>
         <div className="aspect-video w-full overflow-hidden rounded-md border-frame">
-          <AppShell state="game" scene="paving" onSettings={() => {}} className="min-h-0 h-full">
+          <AppShell
+            state="game"
+            scene="paving"
+            onHelp={() => {}}
+            onSettings={() => {}}
+            className="min-h-0 h-full"
+          >
             <div className="p-4" />
           </AppShell>
         </div>

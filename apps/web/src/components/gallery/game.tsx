@@ -7,6 +7,7 @@ import { DrawDeck } from "../game/draw-deck.js"
 import { FlightLayer, useFlights } from "../game/flight/flight-layer.js"
 import { Hand } from "../game/hand.js"
 import { HeldCard } from "../game/held-card.js"
+import { HowToPlayGuide } from "../help/how-to-play-guide.js"
 import { PlayingCard } from "../game/playing-card.js"
 import { ScoreSheet } from "../game/score-sheet.js"
 import { Seat } from "../game/seat.js"
@@ -504,6 +505,23 @@ export function ScoreSheetSection() {
   )
 }
 
+export function HowToPlayGuideSection() {
+  const [open, setOpen] = React.useState(false)
+  return (
+    <Section
+      title="how-to-play-guide"
+      note="The complete rules, hosted in Modal at canon width (extensions/how-to-play-guide.md)."
+    >
+      <StateCard label="open">
+        <Button variant="secondary" onClick={() => setOpen(true)}>
+          Open how to play
+        </Button>
+        <HowToPlayGuide open={open} onClose={() => setOpen(false)} />
+      </StateCard>
+    </Section>
+  )
+}
+
 export function GameSections() {
   return (
     <>
@@ -517,6 +535,7 @@ export function GameSections() {
       <SlamTimerSection />
       <TurnIndicatorSection />
       <ScoreSheetSection />
+      <HowToPlayGuideSection />
     </>
   )
 }

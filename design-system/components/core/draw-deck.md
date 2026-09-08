@@ -1,6 +1,6 @@
 name: draw-deck
 status: draft
-version: 5
+version: 6
 extends: none
 
 The face-down stock. Class: **Game object**.
@@ -103,3 +103,15 @@ None.
   Pre-authorized through the creation gate by the CAM-31 root plan's
   Decision Log (2026-09-08): "the empty-branch reshuffle-motion fix and
   canon r-bumps are in scope for CAM-31, not deferred."
+- r6 (CAM-30 follow-up, user-directed bug fix): the `slam-window` alarm
+  frame now tracks the visually topmost offset card-back layer, not the
+  untranslated bottom one. r3 positioned the frame via `inset-0` on the
+  outer `w-fit` wrapper, which sizes to the stack's UNtranslated footprint
+  (layer 0) — the populated branch's own topmost layer is shifted by
+  `space.1`/`space.2` (`translate-x/y-1` at 2 layers, `-2` at 3) to paint
+  the offset-stack illusion, so the frame sat flush with the back of the
+  pile, up-left of the card a player actually looks at. Fixed live against
+  a real slam window (measured: frame and topmost layer now share the
+  identical rect) rather than by inspection alone. The frame gains the
+  same translate the topmost rendered layer carries; the empty branch (a
+  single untranslated span) is unaffected.

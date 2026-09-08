@@ -4,7 +4,7 @@ import { cn } from "@cambio/ui"
 import { PlayingCard } from "./playing-card.js"
 
 /**
- * HeldCard — design-system/components/core/held-card.md (r1, CAM-18 T2).
+ * HeldCard — design-system/components/core/held-card.md (r3, CAM-18 T2).
  * Class: Game object.
  *
  * The one place on the table a drawn or taken card sits while its holder

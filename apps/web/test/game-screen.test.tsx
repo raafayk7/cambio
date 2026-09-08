@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { ROW_WIDTH } from "../src/components/game/hand.js"
+import { POWERS_TABLE } from "../src/components/help/how-to-play-copy.js"
 import { BENCH_ANCHOR_CLASS, BENCH_POSITION_CLASS } from "../src/components/game/table-surface.js"
 import { setRealtimeClientForTests } from "../src/services/realtime.js"
 import { FakeRealtimeClient } from "./support/fake-realtime.js"
@@ -493,6 +494,169 @@ describe("hidden information (C5, structural sweep)", () => {
   })
 })
 
+/**
+ * How-to-play guide (root plan F1–F2): entry point, copy fidelity
+ * spot-pins, memory-faithful sweep, and slam-window availability
+ * (modal.md r2's opt-in reference overlay exception).
+ */
+describe("how-to-play guide (F1/F2)", () => {
+  it("opens the guide from the game screen's help icon-button and closes it", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    await user.click(screen.getByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
+    expect(within(dialog).getByText("How to play")).toBeInTheDocument()
+    // F2.1: every section the functional contract lists.
+    for (const heading of [
+      "About Cambio",
+      "Setup",
+      "Scoring",
+      "Taking a turn",
+      "Power cards",
+      "Slamming",
+      "Rare situations",
+      "How the game ends",
+    ]) {
+      expect(within(dialog).getByText(heading)).toBeInTheDocument()
+    }
+
+    await user.click(within(dialog).getByRole("button", { name: "Close" }))
+    await waitFor(() => {
+      expect(dialog).not.toHaveAttribute("open")
+    })
+  })
+
+  it("the guide's rules copy matches canon on the load-bearing spot-pins (F2.2)", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    await user.click(screen.getByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
+
+    // No opening peek (setup).
+    expect(
+      within(dialog).getByText(/does not look at any of them — there is no opening peek/),
+    ).toBeInTheDocument()
+    // Suit-split king scores, true minus sign (scoring table). The red-king
+    // row's ♥/♦ glyphs render as separate colored spans (see CardLabel), so
+    // a plain string query won't match text split across elements — a
+    // custom matcher checks the cell's full text content instead (the RTL-
+    // documented pattern for this exact case).
+    expect(within(dialog).getByText("King ♠, King ♣")).toBeInTheDocument()
+    expect(
+      within(dialog).getByText(
+        (_content, node) => node?.tagName === "TD" && node.textContent === "King ♥, King ♦",
+      ),
+    ).toBeInTheDocument()
+    expect(within(dialog).getByText("−1")).toBeInTheDocument()
+    expect(within(dialog).getByText("−2")).toBeInTheDocument()
+    // The red king row's ♥ and ♦ glyphs carry the quarantined suit-red
+    // token (tokens.md); the black king row's suits stay plain ink.
+    expect(within(dialog).getByText("♥")).toHaveClass("text-accent-suit-red")
+    expect(within(dialog).getByText("♦")).toHaveClass("text-accent-suit-red")
+    // Obligatory power (taking a turn).
+    expect(
+      within(dialog).getByText(/obligates you to play it: you can't decline, keep, or discard/),
+    ).toBeInTheDocument()
+    // Rank-not-score slam matching.
+    expect(
+      within(dialog).getByText(
+        /matching is by rank, not score, so a jack never matches a queen despite scoring the same/,
+      ),
+    ).toBeInTheDocument()
+    // J/Q swaps may pair two of the same player's cards (F2.2 enumerated
+    // fact, SKILL.md §1.4 — added in the review fix cycle).
+    expect(
+      within(dialog).getByText(/including two belonging to the same player/),
+    ).toBeInTheDocument()
+  })
+
+  it("never offers or implies a card-tracking aid, and opening it makes no new requests (F2.3)", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    const { calls } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+    const callsBefore = new Set(calls)
+
+    await user.click(screen.getByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
+    expect(within(dialog).getByText(/Remembering what you saw is the game/)).toBeInTheDocument()
+    // Negative sweep for the title's "never offers or implies" claim: no
+    // tracking vocabulary anywhere in the rendered guide (memory-faithful,
+    // voice.md — copy may reference events, never a tracking aid).
+    expect(dialog.textContent).not.toMatch(/track|history|cards you know/i)
+
+    expect(new Set(calls)).toEqual(callsBefore)
+  })
+
+  it("stays open during the slam window and never blocks the timer (F1.3, modal.md r2)", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    await user.click(screen.getByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
+    expect(dialog).toHaveAttribute("open")
+    // The slam timer keeps rendering — the guide never pauses the window.
+    // Both the indicator's slam copy AND the live SlamTimer itself (the
+    // progressbar): the copy alone would still pass if the timer unmounted.
+    expect(screen.getByText(/Slam window open/)).toBeInTheDocument()
+    expect(screen.getByRole("progressbar", { name: "Slam window" })).toBeInTheDocument()
+  })
+
+  it("survives a phase-change refetch instead of being force-closed (F1.3)", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    const { handlers } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+
+    await user.click(screen.getByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
+    expect(dialog).toHaveAttribute("open")
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        phase: { _tag: "AwaitingDraw", playerId: FRIEND.id },
+        // ADR-0033 version guard: a refetch only applies at a strictly
+        // newer version than the bootstrap's default (3).
+        version: 4,
+      }),
+    )
+    act(() => {
+      room.emit("TurnAdvanced", { _tag: "TurnAdvanced", playerId: FRIEND.id })
+    })
+    await waitFor(() => {
+      expect(screen.getByText(`${FRIEND.name}'s turn`)).toBeInTheDocument()
+    })
+    expect(dialog).toHaveAttribute("open")
+  })
+})
+
 describe("turn flow — AwaitingDraw (H1/T1)", () => {
   it("Call Cambio opens the confirm modal and sends CallCambio only after the explicit confirm", async () => {
     const fake = setupFake()
@@ -504,7 +668,7 @@ describe("turn flow — AwaitingDraw (H1/T1)", () => {
     await channelsReady(fake)
 
     await user.click(screen.getByRole("button", { name: "Call Cambio" }))
-    const dialog = screen.getByRole("dialog", { hidden: true })
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "Call Cambio — ends the game" })
     expect(within(dialog).getByText("Call Cambio — ends the game")).toBeInTheDocument()
     // Opening the confirm never sends the command by itself.
     expect(postedCommands(fetchMock)).toEqual([])
@@ -951,6 +1115,177 @@ describe("powers + peeks (T3/T4)", () => {
         document.querySelector(`[data-flight-anchor="slot:${ME.userId}:0"] button`),
       ).not.toBeNull()
     })
+  })
+})
+
+/**
+ * Power hints + indicator copy (root plan F3/F4): the holder's hint, keyed
+ * off the affordance's `targeting` alone (D7), and the non-active
+ * indicator's power-card copy (F4.1), with the existing 4-state
+ * `TurnIndicator` union untouched (F4.2). The hint itself lives in the
+ * chrome band, not under the held card (user-directed relocation,
+ * held-card.md r3 — the table-felt background made `ink.muted` text there
+ * nearly unreadable).
+ */
+describe("power hints + indicator copy (F3/F4)", () => {
+  const resolvingPowerView = (card: string, holderId: string = ME.userId) =>
+    viewResponse({
+      players: [
+        { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+        { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+      ],
+      phase: { _tag: "ResolvingPower", playerId: holderId, card },
+    })
+
+  /** The chrome band, scoped so hint assertions never collide with the
+   * always-mounted how-to-play guide's powers table (same strings). */
+  function chromeBand(): HTMLElement {
+    const region = document.querySelector<HTMLElement>('[data-region="chrome"]')
+    if (region === null) throw new Error("no chrome band rendered")
+    return region
+  }
+
+  it.each([
+    ["7H", "Peek at one of your own cards"],
+    ["8H", "Peek at one of your own cards"],
+    ["9H", "Peek at one of another player's cards"],
+    ["TH", "Peek at one of another player's cards"],
+    ["JH", "Blind-swap any two held cards"],
+    ["QH", "Peek at any card, then blind-swap any two held cards"],
+  ])("holder sees the %s hint in the chrome band (F3.1)", async (card, hint) => {
+    setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, resolvingPowerView(card)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(within(chromeBand()).getByText(hint)).toBeInTheDocument()
+    // The holder's own indicator still reads a plain turn, never the
+    // power-card copy — that copy is for non-active viewers only.
+    expect(screen.getByText("Your turn")).toBeInTheDocument()
+  })
+
+  it("ResolvingQueenSwap holder sees the swap-step hint (F3.2)", async () => {
+    setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+          ],
+          phase: { _tag: "ResolvingQueenSwap", playerId: ME.userId },
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(within(chromeBand()).getByText("Now blind-swap any two held cards")).toBeInTheDocument()
+    expect(screen.getByText("Your turn")).toBeInTheDocument()
+  })
+
+  it("the hint disappears once the phase leaves ResolvingPower (F3.3)", async () => {
+    const fake = setupFake()
+    const { handlers } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, resolvingPowerView("7H")),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+    expect(within(chromeBand()).getByText("Peek at one of your own cards")).toBeInTheDocument()
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        phase: { _tag: "AwaitingDraw", playerId: FRIEND.id },
+        version: 4,
+      }),
+    )
+    act(() => {
+      room.emit("TurnAdvanced", { _tag: "TurnAdvanced", playerId: FRIEND.id })
+    })
+    await waitFor(() => {
+      expect(screen.getByText(`${FRIEND.name}'s turn`)).toBeInTheDocument()
+    })
+    expect(
+      within(chromeBand()).queryByText("Peek at one of your own cards"),
+    ).not.toBeInTheDocument()
+  })
+
+  it("non-holder renders no hint and the indicator reads the power-card copy (F4.1, F4.3)", async () => {
+    setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, resolvingPowerView("9H", FRIEND.id)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(screen.getByText(`${FRIEND.name} is playing a power card`)).toBeInTheDocument()
+    expect(document.querySelector('[role="status"][data-state]')).toHaveAttribute(
+      "data-state",
+      "other-turn",
+    )
+    // No F3 hint string leaks to a non-holder, and the copy never names the
+    // rank (F4.3). Stronger than the wire guarantee: this fixture DOES put
+    // a card field on the phase, and the client still refuses to derive a
+    // hint from it — `affordancesFor` discards `card` on every non-holder
+    // branch (the real non-holder payload omits the field entirely, pinned
+    // by ViewFor.test.ts + affordances.test.ts). Scoped to the chrome band:
+    // the how-to-play guide's powers table carries the same strings
+    // unconditionally and would otherwise false-positive this away.
+    expect(within(chromeBand()).queryByText(/Peek at|Blind-swap/)).not.toBeInTheDocument()
+  })
+
+  it("the non-active copy for ResolvingQueenSwap reads the same power-card line (F4.1)", async () => {
+    setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+          ],
+          phase: { _tag: "ResolvingQueenSwap", playerId: FRIEND.id },
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(screen.getByText(`${FRIEND.name} is playing a power card`)).toBeInTheDocument()
+    // F4.2: the power-card copy rides the existing other-turn state in this
+    // phase too — no fifth indicator state exists.
+    expect(document.querySelector('[role="status"][data-state]')).toHaveAttribute(
+      "data-state",
+      "other-turn",
+    )
+  })
+
+  // The guide's powers table and the in-game hint record are two
+  // independent literal sets whose docblocks promise they "never drift
+  // apart" (how-to-play-copy.ts, game-screen.tsx). Pin the promise: these
+  // are the same four F3.1 spec strings the parameterized holder tests
+  // assert in the chrome band, so a drift in either source now fails a test.
+  it("the guide's powers table carries exactly the F3.1 hint strings (no-drift pin)", () => {
+    expect(POWERS_TABLE.map((row) => row.power)).toEqual([
+      "Peek at one of your own cards",
+      "Peek at one of another player's cards",
+      "Blind-swap any two held cards",
+      "Peek at any card, then blind-swap any two held cards",
+    ])
   })
 })
 

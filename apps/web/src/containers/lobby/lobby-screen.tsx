@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import * as React from "react"
 
+import { HowToPlayGuide } from "../../components/help/how-to-play-guide.js"
 import { NameForm } from "../../components/identity/name-form.js"
 import { useConnection } from "../../hooks/use-connection.js"
 import { sessionErrorCopy, useSession } from "../../hooks/use-session.js"
@@ -42,6 +43,7 @@ export function LobbyScreen() {
   const navigate = useNavigate()
   const connection = useConnection()
   const { session, createUser } = useSession()
+  const [helpOpen, setHelpOpen] = React.useState(false)
 
   const createRoom = useMutation({
     mutationFn: () => apiRequest("/lobbies", { method: "POST", decode: decodeLobbyResponse }),
@@ -150,10 +152,11 @@ export function LobbyScreen() {
   }
 
   return (
-    <AppShell scene="courtyard" connection={connection}>
+    <AppShell scene="courtyard" connection={connection} onHelp={() => setHelpOpen(true)}>
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 p-5">
         {content}
       </div>
+      <HowToPlayGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
     </AppShell>
   )
 }

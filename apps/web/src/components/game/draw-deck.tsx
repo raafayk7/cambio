@@ -3,7 +3,7 @@ import * as React from "react"
 import { cn } from "@cambio/ui"
 
 /**
- * DrawDeck — design-system/components/core/draw-deck.md (r5, CAM-31).
+ * DrawDeck — design-system/components/core/draw-deck.md (r6).
  * Class: Game object.
  *
  * The face-down stock: a 2–3 offset stack of card backs. Deck count is
@@ -113,11 +113,22 @@ export function DrawDeck({ count, onClick, state, slamWindow = false, className 
         // (`playing-card.tsx`) and the discard's `slamTarget` echo of it —
         // deck and discard pulse as one system while the window is open.
         // A sibling of `stack`, not nested inside it: `inset-0` on this
-        // `relative w-fit` parent lands on the stack's own footprint
-        // (card-md) regardless of the populated/empty branch above.
+        // `relative w-fit` parent lands on the UNTRANSLATED back-layer's
+        // footprint (card-md) — correct for the empty branch (a single
+        // flush span, no stacking), but the populated branch's visually
+        // topmost card is itself translated by `layers - 1` steps
+        // (layer 1: translate-x-1/y-1, layer 2: translate-x-2/y-2, the
+        // offset-stack illusion just above) — this frame needs the same
+        // translate or it hugs the BACK of the stack, not the card a
+        // player is actually looking at (user-directed fix: it read as
+        // "out of place", offset up-left from the visible top card).
         <span
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-10 card-frame card-md border-2 border-accent-alarm animate-pulse-soft"
+          className={cn(
+            "pointer-events-none absolute inset-0 z-10 card-frame card-md border-2 border-accent-alarm animate-pulse-soft",
+            layers === 2 && "translate-x-1 translate-y-1",
+            layers === 3 && "translate-x-2 translate-y-2",
+          )}
         />
       ) : null}
       {onClick !== undefined ? (
