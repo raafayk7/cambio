@@ -69,7 +69,16 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       tailwindcss(),
-      tanstackStart(),
+      // SPA/static build mode (CAM-32, ADR-0041): the app uses zero SSR
+      // features, so the deployed artifact is dist/client only. With `spa`
+      // enabled the plugin forces prerender on and renders the maskPath
+      // ("/", default) shell-only — root document, no route content — to
+      // `spa.prerender.outputPath` (default "/_shell"), i.e.
+      // dist/client/_shell.html. vercel.json's SPA catch-all rewrite targets
+      // exactly /_shell.html, so if either default changes here, the rewrite
+      // must change with it. dist/server/ still exists after the build —
+      // build-time prerender machinery only, never deployed.
+      tanstackStart({ spa: { enabled: true } }),
       // React's plugin must come after Start's.
       viteReact(),
     ],

@@ -40,9 +40,16 @@ const POST_COMMANDS = `POST /games/${GAME_ID}/commands`
 /** The exact command body(ies) POSTed so far, decoded from the fetch mock's
  * recorded call arguments. */
 function postedCommands(fetchMock: ReturnType<typeof stubApi>["fetchMock"]) {
-  return fetchMock.mock.calls
-    .filter(([input]) => new URL(String(input)).pathname === `/games/${GAME_ID}/commands`)
-    .map(([, init]) => JSON.parse(String(init?.body)))
+  return (
+    fetchMock.mock.calls
+      // The base makes bare relative request paths parse (VITE_API_URL unset →
+      // same-origin relative requests, CAM-32 C11); absolute URLs ignore it.
+      .filter(
+        ([input]) =>
+          new URL(String(input), "http://localhost").pathname === `/games/${GAME_ID}/commands`,
+      )
+      .map(([, init]) => JSON.parse(String(init?.body)))
+  )
 }
 
 /** A slot's clickable button, found by its stable flight anchor

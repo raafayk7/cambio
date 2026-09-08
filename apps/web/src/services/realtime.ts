@@ -66,18 +66,20 @@ function getClient(): RealtimeClientLike {
     const url: string | undefined = tunnelHost
       ? `wss://${window.location.host}/socket`
       : import.meta.env.VITE_REALTIME_URL
-    const jwt: string | undefined = import.meta.env.VITE_REALTIME_ANON_JWT
+    const apikey: string | undefined = import.meta.env.VITE_REALTIME_APIKEY
     // Empty/whitespace counts as missing: .env.example ships
-    // VITE_REALTIME_ANON_JWT= blank, and `""` would pass an undefined-only
+    // VITE_REALTIME_APIKEY= blank, and `""` would pass an undefined-only
     // check, then fail the handshake with no diagnostic (review F10).
-    if (url === undefined || url.trim() === "" || jwt === undefined || jwt.trim() === "") {
+    if (url === undefined || url.trim() === "" || apikey === undefined || apikey.trim() === "") {
       throw new Error(
-        "realtime env missing — VITE_REALTIME_URL and VITE_REALTIME_ANON_JWT must be set and non-empty (ADR-0032)",
+        "realtime env missing — VITE_REALTIME_URL and VITE_REALTIME_APIKEY must be set and non-empty (ADR-0032, amended by ADR-0041)",
       )
     }
-    // The anon JWT is public by design (ADR-0032): it gates the socket
-    // handshake only; capability topics are the authorization.
-    client = new RealtimeClient(url, { params: { apikey: jwt } })
+    // The apikey is public by design: locally a self-minted anon JWT
+    // (ADR-0032), in prod the Supabase publishable key (ADR-0041). Either
+    // way it gates the socket handshake only; capability topics are the
+    // authorization.
+    client = new RealtimeClient(url, { params: { apikey } })
   }
   return client
 }

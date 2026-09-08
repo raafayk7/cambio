@@ -124,7 +124,11 @@ export const json = (status: number, body: unknown) => () =>
 export function stubApi(handlers: Record<string, () => Response>) {
   const calls: string[] = []
   const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-    const url = new URL(String(input))
+    // The base makes bare relative paths parse: with VITE_API_URL unset the
+    // service issues same-origin relative requests (CAM-32 C11), and
+    // `new URL("/me")` without a base throws. Absolute URLs ignore the base,
+    // so both request shapes key on their pathname.
+    const url = new URL(String(input), "http://localhost")
     const key = `${init?.method ?? "GET"} ${url.pathname}`
     calls.push(key)
     const handler = handlers[key]

@@ -78,12 +78,12 @@ describe("subscribeTopic (W3)", () => {
     // Clear the injection seam so getClient really runs its env guard —
     // with a fake injected the guard is never reached.
     setRealtimeClientForTests(null)
-    // .env.example ships the JWT blank; whitespace on the URL pins the trim
-    // half of the guard. If the `url.trim() === ""` check were removed
+    // .env.example ships the apikey blank; whitespace on the URL pins the
+    // trim half of the guard. If the `url.trim() === ""` check were removed
     // (the mutant), getClient would construct a real client from junk env,
     // never throw, and neither assertion below could pass.
     vi.stubEnv("VITE_REALTIME_URL", "   ")
-    vi.stubEnv("VITE_REALTIME_ANON_JWT", "anon-jwt")
+    vi.stubEnv("VITE_REALTIME_APIKEY", "local-anon-jwt")
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
     const statusChanges: string[] = []
     const stopListening = onConnectionStatusChange(() => statusChanges.push(getConnectionStatus()))
