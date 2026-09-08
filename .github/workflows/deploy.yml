@@ -1,0 +1,52 @@
+# Deploys development (ADR-0042): the same gate as PRs, then migrations
+# against the Supabase prod database, then — only after both succeed —
+# the Render deploy hook. Vercel deploys development independently via
+# git integration and is deliberately absent here.
+name: deploy
+
+on:
+  push:
+    branches: [development]
+
+concurrency:
+  group: deploy-development
+  cancel-in-progress: false # never cancel a migrate mid-flight
+
+jobs:
+  gate:
+    uses: ./.github/workflows/gate.yml
+
+  migrate:
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable corepack
+        run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      # Full install on purpose: the migrate script runs via tsx, a
+      # devDependency (ADR-0042).
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      # DATABASE_URL: the Supabase session-mode pooler URL (IPv4-safe).
+      # The runner is idempotent — re-runs are no-op successes.
+      - name: Migrate
+        run: pnpm --filter @cambio/api migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  deploy-api:
+    needs: migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # -f: an HTTP error fails the job. The hook URL is a credential —
+      # never echo it; the response body is discarded.
+      - name: Trigger Render deploy
+        run: curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL" -o /dev/null
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}

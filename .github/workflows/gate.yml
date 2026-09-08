@@ -1,0 +1,52 @@
+# The full Cambio gate, runnable two ways: on every pull request (any
+# target branch), and as a reusable workflow so deploy.yml runs the
+# byte-identical gate (ADR-0042). The gate never shrinks and is never
+# piped — the bare exit code is the verdict (AGENTS.md).
+name: gate
+
+on:
+  pull_request:
+  workflow_call:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # corepack before setup-node: the pnpm cache resolver needs pnpm
+      # (pinned by the root packageManager field) on PATH.
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # glibc does not resolve *.localhost subdomains; the realtime
+      # container's tenant is addressed by Host header first label.
+      - name: Map realtime-dev.localhost
+        run: echo "127.0.0.1 realtime-dev.localhost" | sudo tee -a /etc/hosts
+
+      # The dev compose file verbatim (ADR-0042): CI reproduces the
+      # documented dev environment — Postgres on 5433, Realtime on 4000.
+      - name: Start services
+        run: docker compose -f docker/docker-compose.yml up -d --wait
+
+      # Optimization only — never a substitute for running the gate.
+      - name: Turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            turbo-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+            turbo-${{ runner.os }}-
+
+      - name: Gate
+        run: pnpm turbo build typecheck lint test
