@@ -9,11 +9,14 @@ added, refreshed, or removed.
 
 - **Upstream:** <https://github.com/emilkowalski/skills>, pinned commit
   `d23d7f88a2e21c9e4b1418c7abe420f5c1052ba7` (vendored 2026-09-04).
-- **License:** MIT (Copyright (c) 2026 Emil Kowalski).
-- **Copied verbatim:** `animate/` (with `RECIPES.md`),
-  `review-animations/` (with `STANDARDS.md`; keeps its
-  `disable-model-invocation: true`), `find-animation-opportunities/`,
-  `animation-vocabulary/`.
+- **License:** MIT (Copyright (c) 2026 Emil Kowalski). The upstream
+  root `LICENSE` text is copied verbatim into each of the four vendored
+  directories (CAM-33, 2026-09-08 — previously only referenced from this
+  file, not co-located with the code as MIT redistribution expects).
+- **Copied verbatim:** `animate/` (with `RECIPES.md` and `LICENSE`),
+  `review-animations/` (with `STANDARDS.md` and `LICENSE`; keeps its
+  `disable-model-invocation: true`), `find-animation-opportunities/`
+  (with `LICENSE`), `animation-vocabulary/` (with `LICENSE`).
 - **Excluded by decision (ADR-0029):** `pick-ui-library`, `write-swift`,
   `ask-sonner`, `apple-design`, `animate-expo`, `emil-design-eng`,
   `prototype`, `improve-animations`.
@@ -32,7 +35,17 @@ added, refreshed, or removed.
   `.agents/settings.json` (the installer's `settings.local.json` was
   merged and deleted; the replaced `.claude/skills` symlink was
   restored).
-- **License:** Apache-2.0 (see upstream `NOTICE.md`).
+- **License:** Apache-2.0. `LICENSE` and `NOTICE.md` are copied verbatim
+  from the upstream `skill-v4.1.3` tag into
+  `.agents/skills/impeccable/` (CAM-33, 2026-09-08 — previously this
+  entry said "see upstream NOTICE.md" without the file actually being
+  vendored in-repo, which doesn't satisfy Apache-2.0 §4's redistribution
+  conditions). The vendored `NOTICE.md` itself documents a further
+  transitive attribution: `reference/ios.md` and `reference/android.md`
+  are distilled from ehmo's `platform-design-skills`
+  (<https://github.com/ehmo/platform-design-skills>, MIT) — both files
+  are present in our vendored copy, so that MIT notice travels with them
+  via the same `NOTICE.md`.
 - **Local state:** payload is prettier-ignored (refreshed wholesale;
   formatting it would churn every update). Product truth for its
   commands lives in `PRODUCT.md` at the repo root. Its config dir
@@ -47,17 +60,24 @@ added, refreshed, or removed.
   trusting the hooks.
 - **Refresh:** `npx impeccable update`, then re-verify the `.claude/`
   symlinks, re-lift any hook changes into `.agents/settings.json`, and
-  update the version here.
+  update the version here. The installer only manages the `skill/`
+  payload, not the upstream repo's root `LICENSE`/`NOTICE.md` — re-fetch
+  those two files by hand from the new pinned tag and diff them for
+  changes (including the transitive `platform-design-skills` notice)
+  whenever the version bumps.
 
-## design-gate (UNLICENSED — Carbonteq internal), dissolved
+## design-gate + ai-tells (UNLICENSED — Carbonteq internal), dissolved
 
 - **Upstream:** Carbonteq Design's plugin, vendored as
   `docs/design/resources/design-gate-plugin.zip` on release branches —
   that zip is the pristine source; diffs against it are the update path.
+  Carbonteq's original `ai-tells` skill (pre-adaptation) is vendored
+  alongside it as `docs/design/resources/ai-tells/{SKILL.md,catalog.md}`.
 - **Dissolved per ADR-0029** (not installed as a plugin): skills `gate`,
   `intent-prep`, `design-context`, `rubric-principles`, `hard-checks`,
-  `annotated-exemplars`, `ai-slop` → `.agents/skills/`; agents
-  `decompose`/`map`/`judge` → `.agents/agents/`; scripts
+  `annotated-exemplars`, `ai-slop`, and the adapted `ai-tells` (re-scoped
+  to grade against `design-system/` tokens and voice) → `.agents/skills/`;
+  agents `decompose`/`map`/`judge` → `.agents/agents/`; scripts
   (`render.js`, `wcag.js`, `hardcheck.js`, `hardcheck.test.js`,
   `auto-gate.mjs`, `package.json`, lockfile) →
   `.agents/scripts/design-gate/`.
@@ -75,3 +95,15 @@ added, refreshed, or removed.
   prettier-formatted; `package.json`'s `postinstall` (auto Chromium
   download) stripped per ADR-0029 and its npm script paths fixed for the
   flat vendored layout (review fix cycle, F3).
+- **Public redistribution (CAM-33, 2026-09-08):** this material carries
+  no OSS license — ADR-0029 states it outright ("design-gate is
+  UNLICENSED internal Carbonteq code") — so redistribution rights don't
+  come from a license grant here. Raafay Kazmi (repo owner) confirmed
+  during CAM-33 planning that he holds Carbonteq's permission to
+  redistribute this material publicly. That permission is the basis for
+  including it in the public repo; it covers
+  `design-gate-plugin.zip`, `docs/design/resources/ai-tells/`, and every
+  skill/agent/script dissolved from them, listed above. If that
+  permission is ever narrowed or withdrawn, this material has to come out
+  of the public tree (and its git history), not just get re-gitignored —
+  revisit this note first.

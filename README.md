@@ -1,6 +1,7 @@
 # Cambio
 
-A hidden-information, memory-based card game. Lowest score wins.
+A hidden-information, memory-based card game. Lowest score wins. MIT licensed
+— see [`LICENSE`](LICENSE).
 
 **Read [`docs/HANDOFF.md`](docs/HANDOFF.md) before writing any code.** It is the
 source of truth for the game rules, the architecture, and the data model, and it
@@ -9,7 +10,9 @@ is deliberately not a task list. Decisions live in [`docs/adr/`](docs/adr/)
 agents start at [`AGENTS.md`](AGENTS.md); skills and workflow commands live in
 `.agents/` (symlinked into `.claude/`).
 
-Current state: **scaffold only**. No game logic exists yet, by design.
+Current state: **v0 is live and playable end to end**, deployed via CI/CD to
+production. See [`docs/HANDOFF.md`](docs/HANDOFF.md) for scope and
+[`docs/adr/`](docs/adr/) for what's been decided along the way.
 
 ## Requirements
 

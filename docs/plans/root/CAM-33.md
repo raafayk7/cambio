@@ -139,19 +139,20 @@ find-animation-opportunities,animation-vocabulary}` — attribution
 
 ### Acceptance criteria
 
-- [ ] `LICENSE` exists at repo root, MIT text, correct copyright line.
-- [ ] Full-history gitleaks (or trufflehog) run completed; results pasted
+- [x] `LICENSE` exists at repo root, MIT text, correct copyright line.
+- [x] Full-history gitleaks (or trufflehog) run completed; results pasted
       into Validation; every finding triaged (expected-anon-JWT vs.
       blocker); a clean result is explicitly recorded, not assumed.
-- [ ] Any blocker finding is reported to the user in this plan and in the
+- [x] Any blocker finding is reported to the user in this plan and in the
       Linear issue **before** the task is considered done — implementation
       does not proceed to close out CAM-33 with an unresolved blocker.
-- [ ] `.agents/skills/VENDORED.md` updated with the Carbonteq
+      _(N/A — no blocker found; scan is clean per Validation.)_
+- [x] `.agents/skills/VENDORED.md` updated with the Carbonteq
       redistribution-permission note.
-- [ ] `README.md` stale scaffold line corrected; MIT note added.
-- [ ] Public-flip runbook present in this plan (see below) and echoed in
+- [x] `README.md` stale scaffold line corrected; MIT note added.
+- [x] Public-flip runbook present in this plan (see below) and echoed in
       the close-out Linear comment.
-- [ ] `pnpm turbo build typecheck lint test` passes.
+- [x] `pnpm turbo build typecheck lint test` passes.
 
 ## Plan of work
 
@@ -199,23 +200,112 @@ into `development` and v0 is confirmed live — not automated by this task)_
 
 ## Validation
 
-- Paste the full gitleaks (or trufflehog) output here once run, plus the
-  triage table (finding → expected-anon-JWT / blocker / false-positive).
-- Confirm `LICENSE` parses as OSI-standard MIT (diff against the canonical
-  text, e.g. `choosealicense.com/licenses/mit`).
-- Load `README.md` rendered (GitHub preview or a local markdown renderer)
-  and confirm the corrected line and MIT note read cleanly.
-- Diff `VENDORED.md` before/after to confirm only the intended note was
-  added.
-- `pnpm turbo build typecheck lint test` — full gate, bare (never piped).
+### Secrets scan (2026-09-08)
+
+Ran dockerized gitleaks v8.30.1 twice via
+`docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest detect --source=/repo --redact --report-format=json ...`:
+
+1. `--log-opts="--all"` (default, non-merge commits only): 211 commits
+   scanned, 2 findings.
+2. `--log-opts="--all -m"` (also diffs merge commits individually, to
+   catch anything introduced only during a manual conflict resolution):
+   260 commits scanned, 34 findings.
+
+All 34 findings from the thorough run reduce to exactly **one** underlying
+secret, repeated across the 17 commits where the line changed, matched by
+two rules (`jwt` + `curl-auth-header`) each time — confirmed by grouping
+findings on `(File, RuleID)`: only
+`(docker/docker-compose.yml, jwt)` and
+`(docker/docker-compose.yml, curl-auth-header)` appear, nothing else,
+anywhere, on any branch.
+
+**Triage:**
+
+| Finding                                     | Location                        | Verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Self-hosted Realtime healthcheck Bearer JWT | `docker/docker-compose.yml:109` | **Expected — non-blocker.** Signed with `API_JWT_SECRET: cambio-dev-realtime-jwt-secret-0123456789` (same file, line 85), a self-chosen local-dev-only placeholder documented in `.env.example:76` (`REALTIME_JWT_SECRET=cambio-dev-realtime-jwt-secret-0123456789`, comment: "this stays required-but-unused [in the cloud/prod deploy]... set any minted throwaway value"). Per ADR-0041, production Realtime authenticates with Supabase's cloud publishable key instead — this container and its secret are local-dev-only infrastructure with zero production exposure. Already publicly visible in the tracked `.env.example`, so the docker-compose match adds no new exposure. |
+
+No `SESSION_SECRET`, `TOPIC_SECRET`, real `REALTIME_JWT_SECRET` (prod
+value), service-role key, or `DATABASE_URL`/`TEST_DATABASE_URL` password
+appears anywhere in history, on any branch — clean on every pattern the
+Functional Contract flags as a blocker. `.env` itself was never committed
+(`git log --all --full-history -- .env` → empty). **No blocker found; no
+report-to-user action needed for this milestone.**
+
+Full JSON reports saved outside the repo tree (session scratchpad), not
+committed — they're scan artifacts, not deliverables, and the triage above
+is the durable record.
+
+### Vendored-license audit (2026-09-08)
+
+Re-verifying `VENDORED.md`'s claims against the actual tree surfaced a real
+gap the planning-time read missed: the Apache-2.0 NOTICE and MIT
+attribution were only **referenced** from `VENDORED.md`, not actually
+**co-located** with the vendored payloads in-repo — Apache-2.0 §4
+specifically requires giving recipients a copy of the License and, if the
+Work ships a NOTICE file, reproducing it in the distribution. Fixed rather
+than just reported, since it's a small, additive, non-destructive,
+mechanical addition squarely inside this milestone's stated scope
+("required attribution/license texts are present in-repo"):
+
+- Fetched the exact upstream texts (byte-for-byte, via `curl` against
+  `raw.githubusercontent.com` at the pinned refs — `d23d7f88a` for
+  emilkowalski/skills, tag `skill-v4.1.3` for impeccable — not
+  paraphrased or reconstructed from memory).
+- Added `LICENSE` (MIT, Copyright (c) 2026 Emil Kowalski) to each of the
+  four vendored `emilkowalski/skills` directories.
+- Added `LICENSE` (Apache-2.0, Copyright 2025 Paul Bakaus) and
+  `NOTICE.md` to `.agents/skills/impeccable/`.
+- impeccable's own `NOTICE.md` revealed a further transitive
+  attribution: `reference/ios.md` and `reference/android.md` (both
+  present in our vendored copy) are distilled from ehmo's
+  `platform-design-skills` (MIT) — not previously documented anywhere in
+  this repo. Now recorded in `VENDORED.md`.
+- `VENDORED.md` updated throughout to describe what's actually in-repo
+  now, plus a refresh-time reminder that `npx impeccable update` doesn't
+  touch these two root files — they need a manual re-fetch and diff on
+  version bumps.
+- The Carbonteq `design-gate`/`ai-tells` material needed no equivalent
+  file addition: it carries no OSS license, so there's no license text to
+  vendor — the public-redistribution basis is the permission recorded in
+  `VENDORED.md`'s new note (see Decision Log), not a license grant.
+
+### Remaining validation
+
+- `LICENSE` (repo root): MIT text matches the canonical
+  `choosealicense.com/licenses/mit` template verbatim aside from the
+  copyright line (`Copyright (c) 2026 Raafay Kazmi`).
+- `README.md`: stale scaffold line replaced; MIT note added near the top
+  — read back clean, no other structural changes.
+- `pnpm turbo build typecheck lint test` — **25/25 tasks successful**,
+  bare (never piped), including `//:format:check` ("All matched files use
+  Prettier code style!" — the new `LICENSE` files and plan-doc edits
+  formatted clean).
 
 ## Progress
 
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-08 — `/plan` completed: interview, exploration, and plan
+- [x] 2026-09-08 — `/plan` completed: interview, exploration, and plan
       write-up done. No child plans, no ADRs. Awaiting `/implement`.
+- [x] 2026-09-08 — `/implement` milestone 1: added `LICENSE` (MIT, Raafay
+      Kazmi, 2026); fixed `README.md`'s stale scaffold line, added MIT
+      note.
+- [x] 2026-09-08 — `/implement` milestone 2: full-history gitleaks scan
+      run twice (default + merge-inclusive), all refs, 260 commits; one
+      recurring finding triaged as expected/non-blocker; no other secrets
+      found; no user report needed. See Validation.
+- [x] 2026-09-08 — `/implement` milestone 3: vendored-license audit found
+      Apache-2.0/MIT texts were referenced but not co-located in-repo;
+      fixed by vendoring the exact upstream `LICENSE`/`NOTICE.md` files
+      (impeccable, emilkowalski/skills) plus the newly-surfaced
+      `ehmo/platform-design-skills` transitive attribution; `VENDORED.md`
+      updated with the Carbonteq permission-to-redistribute note. See
+      Validation and Surprises.
+- [x] 2026-09-08 — `/implement` milestone 4: Public-flip runbook already
+      written into the root plan during `/plan` (see above) — no
+      additional work needed this milestone.
 
 ## Decision log
 
@@ -252,11 +342,51 @@ timestamp each entry)_
   task forces is either fully determined by an existing ADR (LICENSE
   landing-path applies ADR-0028's existing test rather than extending it)
   or a task-scoped call recorded above.
+- 2026-09-08 — **Vendored missing `LICENSE`/`NOTICE.md` files into the
+  payload directories instead of only reporting the gap.** Planning-time
+  re-verification trusted `VENDORED.md`'s claims ("Apache NOTICE
+  retained", "attribution recorded"); implementation-time re-verification
+  found neither file actually existed in-repo, only referenced. Chose to
+  fix rather than just flag because it's additive-only (no code behavior
+  change, no deletion, no history rewrite), squarely inside the ticket's
+  stated scope ("required attribution/license texts are present
+  in-repo"), and the exact upstream text was fetchable and verifiable
+  rather than needing to be authored from scratch. This is the kind of
+  small tactical deviation the `/implement` workflow allows without
+  stopping to ask, as distinct from a functional-contract or ADR
+  conflict.
 
 ## Surprises & discoveries
 
 _(anything found mid-implementation that the plan didn't predict — wrong
 assumptions, upstream bugs, better approaches. Evidence included.)_
+
+- 2026-09-08 — **The root plan's Context section assumed `VENDORED.md`'s
+  license claims were accurate; they weren't fully.** `VENDORED.md` said
+  impeccable's "Apache NOTICE [is] retained" and emilkowalski/skills'
+  "attribution [is] recorded" — both true only in the sense that
+  `VENDORED.md` itself mentions the licenses, not that the actual
+  `LICENSE`/`NOTICE.md` files were vendored alongside the payloads.
+  Neither file existed anywhere under `.agents/skills/impeccable/` or the
+  four `emilkowalski/skills` directories before this task. Fixed (see
+  Decision Log) rather than treated as a planning error, since the plan's
+  Functional Contract already scoped "re-verify... present" as
+  implementation work, not a planning-time guarantee.
+- 2026-09-08 — **A third, previously undocumented license chain**:
+  impeccable's own `NOTICE.md` (fetched from upstream to fix the gap
+  above) revealed that `reference/ios.md` and `reference/android.md` —
+  both present in our vendored copy — are distilled from ehmo's
+  `platform-design-skills` (MIT), a fact `VENDORED.md` had never
+  recorded. Now documented there.
+- 2026-09-08 — **`docker/docker-compose.yml`'s self-hosted Realtime
+  healthcheck secret is gitleaks-flagged but already public**: it's the
+  exact literal value documented in the tracked `.env.example` as a
+  "throwaway value," used only by the local dev self-hosted container
+  (ADR-0024) with no production role (ADR-0041 routes prod Realtime auth
+  through Supabase's cloud publishable key instead). Confirms the plan's
+  anticipated pattern (a designed-to-be-public credential triggering a
+  scanner match) extends beyond just the Supabase anon JWT case named in
+  the Functional Contract.
 
 ## Outcomes & retrospective
 
