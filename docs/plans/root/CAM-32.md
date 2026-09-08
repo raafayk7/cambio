@@ -227,7 +227,10 @@ all modes to keep config tests green, so Render carries a throwaway.
 _(updated continuously; append new entries at the BOTTOM — newest last;
 timestamp each entry)_
 
-- [ ] 2026-09-08 — plan written; ADRs 0041–0043 drafted; awaiting sign-off
+- [x] 2026-09-08 — plan written; ADRs 0041–0043 drafted; signed off
+- [x] 2026-09-08 16:20 — **M0 (partial)**: Supabase project `cambio` created (ref `vbrvdqywrehxymbjfbgb`, ap-south-1, free tier, $0 cost confirmed); Render service `cambio-api` created (`srv-dag2djdg1s2s738of660`, singapore, free, auto-deploy **off**, `https://cambio-api-g8uk.onrender.com`); Render env set: NODE_ENV, SESSION_COOKIE_SECURE=true, SESSION_COOKIE_SAMESITE=lax, LOG_LEVEL, SESSION_SECRET, TOPIC_SECRET, REALTIME_JWT_SECRET (throwaway), REALTIME_URL. Publishable key retrieved. Remaining M0 items need the user (see Surprises): Vercel project connect, DB password, sb_secret key, deploy-hook URL.
+- [x] 2026-09-08 16:22 — **M1 done**: `659dc3d` on `main` (gate.yml, deploy.yml, vercel.json with the real Render host), merged down `main` → `development` → `release-v0`; task branch fast-forwarded. First `deploy.yml` run [34243991527](https://github.com/raafayk7/cambio/actions/runs/34243991527): gate ✓ 1m30s (compose `--wait` worked on the scaffold), migrate ✗ (missing secret — the designed pre-wiring failure), deploy-api **skipped** — C3 ordering proven pre-secrets.
+- [x] 2026-09-08 17:05 — **M2 done**: backend lane `cb3d886` (C9 cloud transport + `REALTIME_SECRET_KEY`, C12 fail-at-boot guard, C13 `.env.example`), frontend lane `f87659d` (C7 SPA static build + local proof, C11 fallback hardening, C10 `VITE_REALTIME_APIKEY` rename). Full gate bare: 25/25 tasks, api 130/130 (RealtimeIntegration executing), web 282/282. Coverage rows filled in both child plans.
 
 ## Decision log
 
@@ -246,6 +249,9 @@ timestamp each entry)_
 - 2026-09-08 — **`VITE_REALTIME_ANON_JWT` → `VITE_REALTIME_APIKEY` rename** (frontend child F4 call, folded back) — the value is a publishable key in prod; the old name would lie. Five touch points enumerated in the frontend plan, atomic commit.
 - 2026-09-08 — **`VITE_TUNNEL_HOST` left untouched** — the tunnel workflow is local-device testing, orthogonal to this task (its undeclared-in-turbo.json quirk noted for a future ticket).
 
+- 2026-09-08 — **Lanes ran sequentially, not parallel** (implementation call) — both child plans share `.env.example`/`turbo.json` and carried a whichever-lands-second-reconciles note; sequential execution (backend → frontend) made the reconcile deterministic. Wall-clock cost accepted.
+- 2026-09-08 — **Provider placement**: Supabase `ap-south-1` (nearest players), Render `singapore` (nearest offered region to players and the Mumbai DB); service named `cambio-api`.
+
 ## Surprises & discoveries
 
 _(anything found mid-implementation that the plan didn't predict — wrong
@@ -260,6 +266,32 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
   misconfigured cloud realtime would fail **silently**; the M4 smoke must
   therefore include an end-to-end broadcast check, not just a 200 from
   `/api/health`.
+
+- 2026-09-08 (implementation) — **Direct DB host is IPv6-only, confirmed**:
+  `getent hosts db.vbrvdqywrehxymbjfbgb.supabase.co` returns only an AAAA
+  record — the pooler-everywhere decision was validated before first use.
+- 2026-09-08 (implementation) — **Four wiring steps need the user's
+  hands**: (1) the permission classifier (correctly) blocked setting the
+  DB password via MCP SQL — dashboard reset instead; (2) the Vercel CLI
+  is logged out and the Vercel MCP has no create-project-from-git tool —
+  dashboard import; (3) Render's API/MCP does not expose deploy-hook
+  URLs — dashboard copy; (4) the `sb_secret_…` key is not retrievable via
+  the Supabase MCP — dashboard copy. All four are in the M3 checklist
+  posted to the user; none block the code work.
+- 2026-09-08 (implementation) — **Render fired a creation-time deploy
+  despite `autoDeploy: no`** (and again on env-var updates). Both fail at
+  boot on the missing `DATABASE_URL` — harmless, but "auto-deploy off"
+  means _push-triggered_ deploys only; API-side actions still deploy.
+- 2026-09-08 (implementation) — **Frontend harness ripple from C11** (the
+  plan vetted `api.test.ts` but not the shared test harness): 132 jsdom
+  tests went red because `new URL(String(input))` in
+  `apps/web/test/support/harness.tsx` and the game-screen suite requires
+  absolute URLs. Fixed with a base argument in test support only; full
+  evidence in the frontend child plan's Surprises.
+- 2026-09-08 (implementation) — One-off `@cambio/config#test` flake on an
+  untouched package during the backend lane's first full gate (same turbo
+  hash failed once, passed bare re-run) — signature recorded in the
+  backend child plan; if CI shows it, suspect the runner.
 
 ## Outcomes & retrospective
 
