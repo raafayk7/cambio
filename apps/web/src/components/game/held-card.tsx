@@ -4,8 +4,8 @@ import { cn } from "@cambio/ui"
 import { PlayingCard } from "./playing-card.js"
 
 /**
- * HeldCard — design-system/components/core/held-card.md (r1, CAM-18 T2).
- * Class: Game object.
+ * HeldCard — design-system/components/core/held-card.md (r2, CAM-18 T2 +
+ * CAM-30 F3). Class: Game object.
  *
  * The one place on the table a drawn or taken card sits while its holder
  * decides what to do with it (`HoldingCard`/`ResolvingPower`/
@@ -24,10 +24,17 @@ export interface HeldCardProps {
    * "<Name> is holding" for everyone else. Never a value ("Nadia peeked at
    * slot 2", never what was seen — the same rule applies here). */
   label: string
+  /** r2 (CAM-30 F3): a second muted line naming the current power
+   * obligation ("Peek at one of your own cards"), present only for the
+   * holder during `ResolvingPower`/`ResolvingQueenSwap`. Instruction copy
+   * about the obligation, not an affordance — held-card.md r1's "nothing
+   * here implies an affordance" rule stands; targeting stays on the
+   * hands. Absent otherwise, so it renders nothing extra by default. */
+  hint?: string
   className?: string
 }
 
-export function HeldCard({ card, label, className }: HeldCardProps) {
+export function HeldCard({ card, label, hint, className }: HeldCardProps) {
   return (
     <div data-flight-anchor="held" className={cn("flex flex-col items-center gap-1", className)}>
       <PlayingCard
@@ -35,6 +42,7 @@ export function HeldCard({ card, label, className }: HeldCardProps) {
         size="md"
       />
       <span className="font-ui text-sm text-ink-muted">{label}</span>
+      {hint !== undefined ? <span className="font-ui text-sm text-ink-muted">{hint}</span> : null}
     </div>
   )
 }

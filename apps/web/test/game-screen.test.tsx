@@ -1082,6 +1082,150 @@ describe("powers + peeks (T3/T4)", () => {
   })
 })
 
+/**
+ * Power hints + indicator copy (root plan F3/F4): the holder's hint under
+ * the held card, keyed off the affordance's `targeting` alone (D7), and
+ * the non-active indicator's power-card copy (F4.1), with the existing
+ * 4-state `TurnIndicator` union untouched (F4.2).
+ */
+describe("power hints + indicator copy (F3/F4)", () => {
+  const resolvingPowerView = (card: string, holderId: string = ME.userId) =>
+    viewResponse({
+      players: [
+        { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+        { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+      ],
+      phase: { _tag: "ResolvingPower", playerId: holderId, card },
+    })
+
+  /** The held-card spot, scoped so hint assertions never collide with the
+   * always-mounted how-to-play guide's powers table (same strings). */
+  function heldCardRegion(): HTMLElement {
+    const region = document.querySelector<HTMLElement>('[data-flight-anchor="held"]')
+    if (region === null) throw new Error("no held-card spot rendered")
+    return region
+  }
+
+  it.each([
+    ["7H", "Peek at one of your own cards"],
+    ["8H", "Peek at one of your own cards"],
+    ["9H", "Peek at one of another player's cards"],
+    ["TH", "Peek at one of another player's cards"],
+    ["JH", "Blind-swap any two held cards"],
+    ["QH", "Peek at any card, then blind-swap any two held cards"],
+  ])("holder sees the %s hint under the held card (F3.1)", async (card, hint) => {
+    setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, resolvingPowerView(card)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(within(heldCardRegion()).getByText(hint)).toBeInTheDocument()
+    // The holder's own indicator still reads a plain turn, never the
+    // power-card copy — that copy is for non-active viewers only.
+    expect(screen.getByText("Your turn")).toBeInTheDocument()
+  })
+
+  it("ResolvingQueenSwap holder sees the swap-step hint (F3.2)", async () => {
+    setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+          ],
+          phase: { _tag: "ResolvingQueenSwap", playerId: ME.userId },
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(within(heldCardRegion()).getByText("Now blind-swap any two held cards")).toBeInTheDocument()
+    expect(screen.getByText("Your turn")).toBeInTheDocument()
+  })
+
+  it("the hint disappears once the phase leaves ResolvingPower (F3.3)", async () => {
+    const fake = setupFake()
+    const { handlers } = stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, resolvingPowerView("7H")),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+    expect(within(heldCardRegion()).getByText("Peek at one of your own cards")).toBeInTheDocument()
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        phase: { _tag: "AwaitingDraw", playerId: FRIEND.id },
+        version: 4,
+      }),
+    )
+    act(() => {
+      room.emit("TurnAdvanced", { _tag: "TurnAdvanced", playerId: FRIEND.id })
+    })
+    await waitFor(() => {
+      expect(screen.getByText(`${FRIEND.name}'s turn`)).toBeInTheDocument()
+    })
+    // AwaitingDraw carries no held-card spot at all — the hint's host is gone.
+    expect(document.querySelector('[data-flight-anchor="held"]')).toBeNull()
+  })
+
+  it("non-holder renders no hint and the indicator reads the power-card copy (F4.1, F4.3)", async () => {
+    setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, resolvingPowerView("9H", FRIEND.id)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(screen.getByText(`${FRIEND.name} is playing a power card`)).toBeInTheDocument()
+    expect(document.querySelector('[role="status"][data-state]')).toHaveAttribute(
+      "data-state",
+      "other-turn",
+    )
+    // No F3 hint string leaks to a non-holder, and the copy never names the
+    // rank — the fixture's non-holder phase carries no card field to name
+    // it from (F4.3), the same structural guarantee as F3.4. Scoped to the
+    // held-card spot: the how-to-play guide's powers table carries the same
+    // strings unconditionally and would otherwise false-positive this away.
+    expect(within(heldCardRegion()).queryByText(/Peek at|Blind-swap/)).not.toBeInTheDocument()
+  })
+
+  it("the non-active copy for ResolvingQueenSwap reads the same power-card line (F4.1)", async () => {
+    setupFake()
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(
+        200,
+        viewResponse({
+          players: [
+            { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+            { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+          ],
+          phase: { _tag: "ResolvingQueenSwap", playerId: FRIEND.id },
+        }),
+      ),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+
+    expect(screen.getByText(`${FRIEND.name} is playing a power card`)).toBeInTheDocument()
+  })
+})
+
 describe("slam window rendering + targeting (SL1)", () => {
   it("renders the slam timer from closesAt + config.slamWindowMs only in the SlamWindow phase", async () => {
     const fake = setupFake()

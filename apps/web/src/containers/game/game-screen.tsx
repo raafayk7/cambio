@@ -21,6 +21,7 @@ import {
   isOccupiedSlot,
   slamGiveSlotRequired,
   type Affordances,
+  type PowerTargeting,
 } from "./affordances.js"
 import { useConnection } from "../../hooks/use-connection.js"
 import { sessionErrorCopy } from "../../hooks/use-session.js"
@@ -83,6 +84,12 @@ interface TurnStatus {
   /** SL1: the rank the window is matching — fully public
    * (`ViewSlamWindow.rank`), so it's safe straight in the indicator copy. */
   rank?: Rank
+  /** F4.1: set for `ResolvingPower`/`ResolvingQueenSwap` so `other-turn`
+   * copy can distinguish "playing a power" from an ordinary turn — never
+   * names the rank or power itself (F4.3: the non-holder payload carries
+   * no card field to name it from). `TurnIndicator`'s 4-state union and
+   * its dot styling stay untouched (F4.2) — this is copy-only. */
+  resolvingPower?: boolean
 }
 
 /** `Rank`'s wire encoding is `"T"` for ten (`GamePrimitives.ts` WIRE_RANKS) —
@@ -98,11 +105,16 @@ function turnStatus(phase: ViewPhase, viewerId: string | undefined): TurnStatus 
   switch (phase._tag) {
     case "AwaitingDraw":
     case "HoldingCard":
+      return {
+        state: phase.playerId === viewerId ? "your-turn" : "other-turn",
+        activePlayerId: phase.playerId,
+      }
     case "ResolvingPower":
     case "ResolvingQueenSwap":
       return {
         state: phase.playerId === viewerId ? "your-turn" : "other-turn",
         activePlayerId: phase.playerId,
+        resolvingPower: true,
       }
     case "SlamWindow":
       return { state: "slam-window", activePlayerId: phase.turnPlayerId, rank: phase.rank }
@@ -127,7 +139,9 @@ function turnStatusCopy(status: TurnStatus, activePlayerName: string): React.Rea
     case "your-turn":
       return "Your turn"
     case "other-turn":
-      return `${activePlayerName}'s turn`
+      return status.resolvingPower === true
+        ? `${activePlayerName} is playing a power card`
+        : `${activePlayerName}'s turn`
     case "slam-window":
       return status.rank === undefined
         ? "Slam window open"
@@ -164,6 +178,36 @@ function isHeldPhase(
 /** voice.md register — exactly the two example strings, never a value. */
 function heldCardLabel(isHolder: boolean, holderName: string): string {
   return isHolder ? "You drew" : `${holderName} is holding`
+}
+
+/** F3.1 hint strings, keyed by the holder affordance's `targeting.kind` —
+ * spec strings from root plan F3.1, matching the how-to-play guide's
+ * powers table verbatim so the two surfaces never drift apart. */
+const POWER_HINT_BY_TARGETING: Record<PowerTargeting["kind"], string> = {
+  "peek-own": "Peek at one of your own cards",
+  "peek-other": "Peek at one of another player's cards",
+  "swap-two": "Blind-swap any two held cards",
+  "queen-peek": "Peek at any card, then blind-swap any two held cards",
+}
+
+/** F3.2: the queen's second step gets its own fixed copy — its affordance
+ * carries `targeting: {kind: "swap-two"}` but the guide should read as a
+ * continuation of the queen's power, not a plain jack-style swap. */
+const QUEEN_SWAP_STEP_HINT = "Now blind-swap any two held cards"
+
+/** F3/D7: derives the holder's power hint from the affordance's
+ * `targeting` alone — never from a `card` field, which the
+ * `ResolvingQueenSwap` affordance deliberately omits (affordances.ts).
+ * Non-holders and every other phase get no hint (F3.4: nothing to derive
+ * one from — their payload carries no card field). */
+function powerHint(affordances: Affordances): string | undefined {
+  if (affordances.phase === "ResolvingPower" && affordances.holder) {
+    return POWER_HINT_BY_TARGETING[affordances.targeting.kind]
+  }
+  if (affordances.phase === "ResolvingQueenSwap" && affordances.holder) {
+    return QUEEN_SWAP_STEP_HINT
+  }
+  return undefined
 }
 
 // ---- per-seat hand wiring (T2/T3): who may click, which slots, which are
@@ -355,6 +399,10 @@ function GameTable({
       : turnStatus(view.phase, viewerId)
   const indicatorState = status.state === "slam-window" ? "slam-window" : status.state
   const affordances = affordancesFor(view, viewerId)
+  // F3: the holder's power hint, gone the instant the phase leaves
+  // ResolvingPower/ResolvingQueenSwap — derived fresh every render from
+  // the current affordances, persisted nowhere (F3.3).
+  const heldCardHint = powerHint(affordances)
   // SL1: fully public, phase-gated (not turn-gated) — every viewer may slam
   // while this is non-null, holder or not.
   const slamPhase = view.phase._tag === "SlamWindow" ? view.phase : undefined
@@ -747,6 +795,7 @@ function GameTable({
                   <HeldCard
                     {...(heldPhase.card !== undefined ? { card: heldPhase.card } : {})}
                     label={heldCardLabel(heldIsHolder, playerName(heldPhase.playerId))}
+                    {...(heldCardHint !== undefined ? { hint: heldCardHint } : {})}
                   />
                 ) : null}
               </div>
