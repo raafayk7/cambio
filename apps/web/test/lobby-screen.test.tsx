@@ -35,6 +35,9 @@ describe("lobby identity (W2, L1)", () => {
 
     expect(await screen.findByLabelText("Your name")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Deal me in" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("link", { name: "Source code and feedback on GitHub" }),
+    ).toBeInTheDocument()
   })
 
   it("submits a valid name to POST /users and flips to authenticated without a reload", async () => {
@@ -180,6 +183,20 @@ describe("how-to-play guide entry point (F1)", () => {
   })
 })
 
+describe("source link (CAM-34)", () => {
+  it("links to the GitHub repo with new-tab hygiene, alongside the authenticated lobby", async () => {
+    setup()
+    stubApi({ "GET /me": json(200, ME) })
+    renderApp("/")
+
+    await screen.findByText(`shuffle up, ${ME.name}`)
+    const link = screen.getByRole("link", { name: "Source code and feedback on GitHub" })
+    expect(link).toHaveAttribute("href", "https://github.com/raafayk7/cambio/tree/development")
+    expect(link).toHaveAttribute("target", "_blank")
+    expect(link).toHaveAttribute("rel", "noreferrer noopener")
+  })
+})
+
 describe("lobby page states (L4)", () => {
   it("shows the first-load skeleton while /me resolves", async () => {
     setup()
@@ -193,6 +210,11 @@ describe("lobby page states (L4)", () => {
     expect(screen.queryByLabelText("Your name")).not.toBeInTheDocument()
     // The skeleton respects the 300ms no-flash rule, so it appears late.
     expect(await screen.findByTestId("lobby-skeleton")).toBeInTheDocument()
+    // The source link sits outside the state-branching content, so it's
+    // present even while that content is still the skeleton.
+    expect(
+      screen.getByRole("link", { name: "Source code and feedback on GitHub" }),
+    ).toBeInTheDocument()
   })
 
   it("renders the page-error alert with retry when /me fails outright", async () => {
@@ -205,5 +227,8 @@ describe("lobby page states (L4)", () => {
       "Couldn't reach the table. Check your connection and try again.",
     )
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument()
+    expect(
+      screen.getByRole("link", { name: "Source code and feedback on GitHub" }),
+    ).toBeInTheDocument()
   })
 })

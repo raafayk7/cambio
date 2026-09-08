@@ -31,7 +31,7 @@ create/join panels).
   `<div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 p-5">`
   that holds a `content` variable branching on session state (skeleton /
   page error / unauthenticated `NameForm` / authenticated create-room +
-  join-room panels) — see lobby-screen.tsx:71-158.
+  join-room panels) — see lobby-screen.tsx:80-161.
 - **No footer or secondary-content slot exists anywhere in this app.**
   `AppShell` ([packages/ui/src/components/app-shell.tsx:103-161](../../../packages/ui/src/components/app-shell.tsx))
   is strictly header + `<main>{children}</main>`; the design doc
@@ -44,9 +44,14 @@ create/join panels).
 - The design system already has a registered `Link` component
   ([packages/ui/src/components/link.tsx](../../../packages/ui/src/components/link.tsx),
   doc: [design-system/components/core/link.md](../../../design-system/components/core/link.md))
-  with **zero current call sites** anywhere in the app — this is its first
-  real usage. It renders a plain `<a>` (or a Radix `Slot` via `asChild`) and
-  forwards all anchor props, so `href`/`target`/`rel` pass straight through.
+  with **no prior production usage** — its only existing call sites are in
+  the dev-only component gallery
+  ([apps/web/src/components/gallery/generic.tsx:81,84](../../../apps/web/src/components/gallery/generic.tsx),
+  mounted at the `/dev/components` route, not a real screen; corrected at
+  `/review` — the planning-phase grep missed this directory). This is its
+  first usage in a screen players actually see. It renders a plain `<a>`
+  (or a Radix `Slot` via `asChild`) and forwards all anchor props, so
+  `href`/`target`/`rel` pass straight through.
   No new component, token, or icon is introduced by this task.
 - There is no existing external-link pattern in the codebase to follow (repo-wide
   search for `<a `, `target="_blank"`, `rel=` returned zero hits before this
@@ -73,10 +78,11 @@ create/join panels).
    and authenticated (create-room/join-room panels) — i.e. it sits outside
    the state-branching `content` variable, not duplicated inside each
    branch.
-3. The link lives inside the existing centered content column
-   (`mx-auto max-w-md` div in `LobbyScreen`), as a sibling below `{content}`
-   — not inside `AppShell`, and `AppShell` itself gains no new prop, slot,
-   or footer region.
+3. The link renders centered, immediately below the `AppShell` header (i.e.
+   as the first child inside `AppShell`'s content, before the centered
+   `mx-auto max-w-md` column) — not inside `AppShell` itself, and `AppShell`
+   gains no new prop, slot, or header region. (Revised mid-implementation
+   from "below the panels" — see Decision Log.)
 4. No new design-system component, token, or icon is introduced. The line
    uses the existing `Link` component unmodified and ordinary Tailwind
    utility classes already in use elsewhere (e.g. `text-sm`, `text-center`)
@@ -86,14 +92,15 @@ create/join panels).
 
 ### Acceptance criteria
 
-- [ ] Link renders with the exact copy, href, and attributes above, in all
+- [x] Link renders with the exact copy, href, and attributes above, in all
       four lobby states.
-- [ ] `AppShell` (packages/ui) has no changes — diff confined to
+- [x] `AppShell` (packages/ui) has no changes — diff confined to
       `lobby-screen.tsx` and its test file.
-- [ ] Existing `lobby-screen.test.tsx` assertions pass unmodified; a new
-      test asserts the link's role, accessible name, `href`, `target`, and
-      `rel`.
-- [ ] `pnpm turbo build typecheck lint test` passes.
+- [x] Existing `lobby-screen.test.tsx` assertions pass unmodified (3 gained
+      an appended presence assertion — see the frontend child plan's
+      Surprises entry); a new test asserts the link's role, accessible name,
+      `href`, `target`, and `rel`.
+- [x] `pnpm turbo build typecheck lint test` passes.
 
 ## Plan of work
 
@@ -116,7 +123,13 @@ asserting its presence/attributes, then run the full gate.
 
 ## Progress
 
-- [ ] YYYY-MM-DD HH:MM — step description
+- [x] 2026-09-09 00:10 — Implemented: `Link` added to `lobby-screen.tsx` as
+      a sibling to the state-branching `content`, pointing at
+      `https://github.com/raafayk7/cambio/tree/development` with
+      `target="_blank"` / `rel="noreferrer noopener"`. Test coverage added
+      for all four lobby states. Full gate green: `pnpm turbo build
+typecheck lint test` — 25/25 tasks, 284/284 web tests, `packages/ui`
+      untouched.
 
 ## Decision log
 
@@ -156,6 +169,36 @@ asserting its presence/attributes, then run the full gate.
   rationale: WCAG SC 3.2.5 (notifying users of new windows) is AAA, not the
   AA baseline the `hard-checks` skill enforces; skipped as out of scope for
   this task's quality bar.
+- 2026-09-09 — The link sits directly on the courtyard scene backdrop, not
+  inside a `Panel` wash surface (unlike every heading/form on this screen,
+  per panel.md r2's "never on bare artwork" convention). Verified rather
+  than assumed: `.agents/scripts/design-gate/hardcheck.js` against a live
+  render reports PASS (0 constraint fails) with one advisory — "text over
+  image — contrast not statically verifiable" — and a visual check shows
+  the rendered color (`rgb(54, 99, 74)`, the Link component's own default)
+  against the courtyard's light pavement is clearly legible with a wide
+  margin. — rationale: wrapping one small unobtrusive line in a wash panel
+  would add visual weight out of proportion to the task ("tiny task by
+  design") and there's no existing pattern for a bare-text-on-wash treatment
+  this small; flagged here rather than silently deviating from the
+  panel-wash convention, since the convention exists for exactly this kind
+  of contrast risk. Worth a second look at `/review` if the courtyard art
+  changes.
+- 2026-09-09 — Mid-implementation revision (user feedback after seeing the
+  first render): moved the link from below the create/join panels to
+  centered, immediately below the header/wordmark — same courtyard-scene
+  legibility question, re-verified with the same hard-check tooling (still
+  PASS, same single contrast advisory). Kept the canonical green underlined
+  `Link` styling rather than introducing a "quiet" bold-black variant —
+  user's explicit choice between the two, offered because the
+  bold-black/no-underline look they initially asked for (matching the
+  mid-game power-hint text at
+  [game-screen.tsx:698](../../../apps/web/src/containers/game/game-screen.tsx))
+  would have been an unregistered `Link` appearance (link.md: "underline
+  always on... Variants: None"), which the creation gate requires stopping
+  for. Surfaced instead of silently applied; user chose to keep the
+  registered look and fix placement instead. Functional contract clause 3
+  updated to match.
 
 ## Surprises & discoveries
 
@@ -163,4 +206,66 @@ _(none yet — filled during implementation)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+**Verdict: ship.**
+
+Reviewed via two independent read-only subagents (contract + architecture)
+plus direct verification: a forced, non-cached full gate run
+(`pnpm turbo build typecheck lint test --force`, 25/25 tasks — 284/284 web
+tests, 132/132 api tests including live Postgres/realtime integration
+suites) and a manual re-check of the false-claim finding below.
+
+**Contract review:** all 5 functional-contract clauses satisfied and all 4
+acceptance criteria demonstrably hold, verified against the current code
+(not just the plan's coverage table) — file:line evidence for each clause.
+The frontend plan's Contract coverage table's clause→test mapping was
+independently confirmed accurate (each cited test really does assert what
+the table claims). No scope creep: exactly one link, one wrapper, no extra
+props or hidden behavior.
+
+**Architecture review:** no import-boundary, layering, design-system, or
+hidden-information violations. `packages/ui/` has zero diff (confirmed
+directly via `git diff --stat`); `Link` and `AppShell` are consumed, not
+modified. `p-3` / `text-center` / `text-sm` are pre-existing, token-backed
+utilities already used elsewhere in this codebase, not novel values.
+`ai-tells` and `hidden-information` both confirmed not applicable (no new
+visual surface beyond one text line; no client-facing payload/contracts/
+realtime code touched) rather than silently skipped.
+
+**Finding (documentation accuracy, non-blocking — fixed in this cycle):**
+both plan docs claimed `Link` had no prior usage in the app:
+
+- root plan (this file, Context & orientation): "with **zero current call
+  sites** anywhere in the app — this is its first real usage."
+- [frontend/CAM-34.md](../frontend/CAM-34.md) (Context & orientation):
+  "This is the component's first real call site in the app."
+
+Both are false — `Link` is already used at
+[apps/web/src/components/gallery/generic.tsx:81,84](../../../apps/web/src/components/gallery/generic.tsx),
+mounted at the `/dev/components` gallery route
+([apps/web/src/routes/dev/components.tsx](../../../apps/web/src/routes/dev/components.tsx)).
+The original planning-phase Explore agent's grep apparently missed
+`apps/web/src/components/gallery/`. This didn't affect any decision made —
+the gallery route is a dev-only component showcase, not a competing
+production pattern, and no clause or Decision Log entry depended on the
+"first usage" framing being literally true — but it's a false claim in a
+living doc and is corrected below rather than left standing. (The adjacent,
+narrower claim — "no existing `target=\"_blank\"`/`rel=` external-link
+pattern in the codebase" — was re-verified and holds: the gallery's `Link`
+usages set neither attribute.)
+
+**Verified independently, not just asserted:**
+
+- `packages/ui/` zero-diff claim — confirmed via `git diff --stat` against
+  `release-v0`.
+- `development` is genuinely the production-deploying branch (Decision Log
+  entry citing ADR-0041/0042) — confirmed by reading
+  [ADR-0042](../../adr/0042-ci-github-actions-compose-gate-migrate-then-deploy.md),
+  which gates deploy on `push` to `development` specifically.
+- The contrast-advisory Decision Log entries (courtyard-scene legibility) —
+  re-ran `.agents/scripts/design-gate/hardcheck.js` against a fresh render
+  independently during review: still PASS, same single advisory, consistent
+  with what implementation logged.
+
+**Deferred / nothing else outstanding.** No ADRs were needed and none were
+skipped that should have been written. No skill or command text was found
+to contradict the shipped code (no staleness sweep action needed).
