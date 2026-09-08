@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
+import { fireEvent, render, screen } from "@testing-library/react"
+import { describe, expect, it, vi } from "vitest"
 
 import { AppShell } from "../src/components/app-shell.js"
 
@@ -39,6 +39,45 @@ describe("AppShell positioning", () => {
       </AppShell>,
     )
     expect(queryByLabelText("Settings")).not.toBeInTheDocument()
+  })
+})
+
+/**
+ * app-shell.md (r5) — the help icon-button joins settings in both chrome
+ * states' control groups, same render-only-with-handler rule (CAM-17
+ * gate finding: an inert-looking control is worse than its absence).
+ */
+describe("AppShell help entry point (r5, F1.1)", () => {
+  it("renders the help button in default chrome when onHelp is supplied, and fires it on click", () => {
+    const onHelp = vi.fn()
+    const { getByLabelText } = render(
+      <AppShell onHelp={onHelp}>
+        <div>screen</div>
+      </AppShell>,
+    )
+    const button = getByLabelText("How to play")
+    expect(button).toBeInTheDocument()
+    fireEvent.click(button)
+    expect(onHelp).toHaveBeenCalledTimes(1)
+  })
+
+  it("renders the help button inside the game state's floating controls column", () => {
+    const onHelp = vi.fn()
+    const { getByLabelText } = render(
+      <AppShell state="game" scene="paving" onHelp={onHelp}>
+        <div>table</div>
+      </AppShell>,
+    )
+    expect(getByLabelText("How to play")).toBeInTheDocument()
+  })
+
+  it("does not render the help control when no handler is supplied (never an inert affordance)", () => {
+    const { queryByLabelText } = render(
+      <AppShell>
+        <div>screen</div>
+      </AppShell>,
+    )
+    expect(queryByLabelText("How to play")).not.toBeInTheDocument()
   })
 })
 

@@ -47,3 +47,16 @@ export function MarkSettings(props: MarkProps) {
     </svg>
   )
 }
+
+/** Help — a drawn "?": hook curve plus a filled dot, matching MarkSettings'
+ * filled-dot accent so the glyph reads at 16px (no Unicode "?", which
+ * renders at font metrics and doesn't merge with the drawn artwork —
+ * design-gate D8 finding, CAM-15 M4). */
+export function MarkHelp(props: MarkProps) {
+  return (
+    <svg {...base} strokeLinecap="round" {...props}>
+      <path d="M5 5.5a3 3 0 1 1 4.5 2.6C8.4 8.7 8 9.3 8 10.2v.3" />
+      <circle cx="8" cy="13" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
