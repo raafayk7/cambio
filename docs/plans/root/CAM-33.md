@@ -390,5 +390,52 @@ assumptions, upstream bugs, better approaches. Evidence included.)_
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`: what shipped, what was cut,
-what should carry into the next task.)_
+**Verdict: SHIP** (2026-09-08, `/review`).
+
+**What shipped:** everything in the Functional Contract — root `LICENSE`
+(MIT), the README fix, a full-history secrets scan (clean, one triaged
+non-blocker finding), the `VENDORED.md` Carbonteq permission note, and the
+public-flip runbook — plus the mid-implementation license-file fix
+(genuine upstream `LICENSE`/`NOTICE.md` text vendored into
+`impeccable/` and all four `emilkowalski/skills` directories, and the
+newly-documented `ehmo/platform-design-skills` transitive attribution).
+Nothing was cut; the task's scope as planned was fully delivered.
+
+**Review process:** two read-only reviewers ran in parallel, adapted from
+the command's usual backend/frontend split since this task touches
+neither — a **contract reviewer** (graded all 6 Functional Contract
+clauses + acceptance criteria against the actual diff and repo state, not
+the plan's self-report) and an **independent fact-verification reviewer**
+(re-ran the gitleaks scan from scratch rather than trusting the pasted
+output, and byte-diffed the vendored license files against live upstream
+via fresh `curl` fetches). In parallel, the reviewing session force-reran
+the full gate (`pnpm turbo build typecheck lint test --force`, 0 cached,
+25/25 tasks, including the Postgres-backed `@cambio/api` suite — 132
+tests) rather than trusting the implementation session's cached result.
+
+**Findings: none.** Both reviewers independently confirmed every claim:
+
+- Contract reviewer: all 6 Functional Contract clauses and every
+  acceptance-criteria checkbox satisfied by verifiable repo state; the
+  vendored LICENSE/NOTICE additions (flagged as a potential scope-creep
+  candidate) confirmed justified by the ticket's own wording and accurate
+  against live upstream — not fabricated, not scope creep.
+- Fact-verification reviewer: re-running gitleaks fresh reproduced the
+  same finding set (34 findings → exactly the same two `(File, RuleID)`
+  pairs, 17 recurring commits, nothing else in history); the JWT triage
+  chain (docker-compose.yml ↔ .env.example ↔ ADR-0041) confirmed by
+  direct reads; all three vendored license/notice files confirmed
+  byte-identical to fresh upstream fetches; the transitive
+  `ehmo/platform-design-skills` attribution confirmed present and
+  accurately described. One benign wrinkle noted, not a finding: the
+  implementation-time scan (211/260 commits) predates this review's
+  re-run (212/261 commits) by the two CAM-33 commits themselves — same
+  findings either way, just a commit-count offset from timing.
+
+**What should carry into the next task:** `VENDORED.md`'s stated
+"present"/"retained" claims about vendored license text were wrong at
+planning time and only caught by an implementation-time re-verification
+that happened to be thorough — worth remembering that a ledger doc's
+claims about _its own accuracy_ aren't self-verifying, the same way test
+titles aren't evidence of coverage. No other carry-forward items; this
+was a clean, self-contained repo-meta task.
