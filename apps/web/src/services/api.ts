@@ -28,7 +28,15 @@ export class ApiError extends Error {
   }
 }
 
-const API_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:3001"
+// Ad-hoc tunnel support (ngrok or similar), opt-in only, mirrors
+// `VITE_TUNNEL_HOST` in vite.config.ts: when set, requests go same-origin
+// (relative path) so vite.config.ts's dev proxy carries them to the API —
+// required because two independent tunnel subdomains are cross-SITE under
+// the public suffix list, so the session cookie (SameSite=Lax) would never
+// survive a direct cross-tunnel fetch. Unset (the default): byte-identical
+// to before, a plain cross-origin call to VITE_API_URL.
+const TUNNEL_MODE: boolean = Boolean(import.meta.env.VITE_TUNNEL_HOST?.trim())
+const API_URL: string = TUNNEL_MODE ? "" : (import.meta.env.VITE_API_URL ?? "http://localhost:3001")
 
 export interface ApiRequestOptions<A> {
   method?: "GET" | "POST"
@@ -42,12 +50,17 @@ export async function apiRequest<A>(path: string, options: ApiRequestOptions<A>)
   const response = await fetch(`${API_URL}${path}`, {
     method: options.method ?? "GET",
     credentials: "include",
-    ...(options.body !== undefined
-      ? {
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(options.body),
-        }
-      : {}),
+    headers: {
+      // Skips ngrok's free-tier browser-warning interstitial (which
+      // otherwise intercepts real-browser requests, even XHR/fetch, and
+      // returns HTML instead of JSON). Gated behind TUNNEL_MODE so a
+      // normal (non-tunnel) request never carries a non-safelisted header
+      // that would turn an otherwise-simple cross-origin request into a
+      // preflighted one for no reason.
+      ...(TUNNEL_MODE ? { "ngrok-skip-browser-warning": "true" } : {}),
+      ...(options.body !== undefined ? { "content-type": "application/json" } : {}),
+    },
+    ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
   })
 
   if (!response.ok) {

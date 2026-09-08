@@ -55,7 +55,17 @@ function getClient(): RealtimeClientLike {
     throw new Error("realtime client requested during SSR — subscribe from browser effects only")
   }
   if (client === null) {
-    const url: string | undefined = import.meta.env.VITE_REALTIME_URL
+    // Ad-hoc tunnel support (ngrok or similar), opt-in only, mirrors
+    // `VITE_TUNNEL_HOST` in vite.config.ts/api.ts: derive the socket URL
+    // from whatever origin actually served this page instead of the
+    // fixed dev host, so it rides vite.config.ts's `/socket` proxy and
+    // needs no per-session URL to keep in sync with the tunnel's
+    // (frequently-rotating) address. Unset (the default): byte-identical
+    // to before, the fixed `VITE_REALTIME_URL`.
+    const tunnelHost = import.meta.env.VITE_TUNNEL_HOST?.trim()
+    const url: string | undefined = tunnelHost
+      ? `wss://${window.location.host}/socket`
+      : import.meta.env.VITE_REALTIME_URL
     const jwt: string | undefined = import.meta.env.VITE_REALTIME_ANON_JWT
     // Empty/whitespace counts as missing: .env.example ships
     // VITE_REALTIME_ANON_JWT= blank, and `""` would pass an undefined-only
