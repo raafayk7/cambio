@@ -20,9 +20,15 @@ describe("DrawDeck", () => {
     const button = screen.getByRole("button", { name: "Draw a card" })
     fireEvent.click(button)
     expect(onClick).toHaveBeenCalledTimes(1)
-    // The count badge keeps its own accessible label regardless of the
-    // wrapping button (screen-screen.test.tsx pins this label).
-    expect(screen.getByLabelText("20 cards in the draw deck")).toBeInTheDocument()
+    // The count has no visual badge (CAM-29) — it rides the button's
+    // accessible description instead, so the name still names the action
+    // (game-screen.test.tsx pins the same description elsewhere).
+    expect(button).toHaveAccessibleDescription("20 cards in the draw deck")
+  })
+
+  it("(CAM-29) exposes the count via role=img aria-label when there's no button to describe", () => {
+    render(<DrawDeck count={20} />)
+    expect(screen.getByRole("img", { name: "20 cards in the draw deck" })).toBeInTheDocument()
   })
 
   it("exposes the deck's flight anchor", () => {

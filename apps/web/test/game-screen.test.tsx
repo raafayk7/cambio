@@ -128,7 +128,11 @@ describe("bootstrap (C1)", () => {
 
     expect(await screen.findByText(ME.name)).toBeInTheDocument()
     expect(screen.getByText(FRIEND.name)).toBeInTheDocument()
-    expect(screen.getByLabelText("37 cards in the draw deck")).toBeInTheDocument()
+    // CAM-29: the count is no longer a visible badge, only the "Draw a
+    // card" button's accessible description.
+    expect(
+      screen.getByRole("button", { name: "Draw a card", description: "37 cards in the draw deck" }),
+    ).toBeInTheDocument()
     // The discard's top card is the only public value on the table — it
     // renders face-up (structural: `data-face="up"` carries the rank).
     const discardRank = screen.getByText("K")
@@ -173,7 +177,12 @@ describe("version guard + refetch authority (C2, ADR-0033)", () => {
       room.emit("CardDrawn", { _tag: "CardDrawn", playerId: ME.userId })
     })
     await waitFor(() => {
-      expect(screen.getByLabelText("20 cards in the draw deck")).toBeInTheDocument()
+      expect(
+        screen.getByRole("button", {
+          name: "Draw a card",
+          description: "20 cards in the draw deck",
+        }),
+      ).toBeInTheDocument()
     })
 
     // A stale response (version 4 < the 5 already applied) lands next —
@@ -195,8 +204,15 @@ describe("version guard + refetch authority (C2, ADR-0033)", () => {
     // Give the debounced refetch time to land, then assert the stale
     // response never displaced the newer snapshot.
     await new Promise((resolve) => setTimeout(resolve, 200))
-    expect(screen.getByLabelText("20 cards in the draw deck")).toBeInTheDocument()
-    expect(screen.queryByLabelText("99 cards in the draw deck")).not.toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Draw a card", description: "20 cards in the draw deck" }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", {
+        name: "Draw a card",
+        description: "99 cards in the draw deck",
+      }),
+    ).not.toBeInTheDocument()
   })
 
   it("fires exactly one refetch for a burst of several events in one batch", async () => {
@@ -267,10 +283,17 @@ describe("version guard + refetch authority (C2, ADR-0033)", () => {
     })
     // Synchronously after the broadcast (before the debounced GET can have
     // resolved) the snapshot is untouched — the event carried no state.
-    expect(screen.getByLabelText("37 cards in the draw deck")).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Draw a card", description: "37 cards in the draw deck" }),
+    ).toBeInTheDocument()
 
     await waitFor(() => {
-      expect(screen.getByLabelText("10 cards in the draw deck")).toBeInTheDocument()
+      expect(
+        screen.getByRole("button", {
+          name: "Draw a card",
+          description: "10 cards in the draw deck",
+        }),
+      ).toBeInTheDocument()
     })
   })
 
@@ -1570,7 +1593,9 @@ describe("reshuffle choreography (CH2)", () => {
     await screen.findByText(ME.name)
     const { room } = await channelsReady(fake)
 
-    expect(screen.getByLabelText("37 cards in the draw deck")).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Draw a card", description: "37 cards in the draw deck" }),
+    ).toBeInTheDocument()
 
     handlers[GET_VIEW] = json(
       200,
@@ -1592,7 +1617,12 @@ describe("reshuffle choreography (CH2)", () => {
     expect(screen.getByText("K").closest('[data-face="up"]')).not.toBeNull()
 
     await waitFor(() => {
-      expect(screen.getByLabelText("25 cards in the draw deck")).toBeInTheDocument()
+      expect(
+        screen.getByRole("button", {
+          name: "Draw a card",
+          description: "25 cards in the draw deck",
+        }),
+      ).toBeInTheDocument()
     })
     // Still the same retained top after the refetch too.
     expect(screen.getByText("K").closest('[data-face="up"]')).not.toBeNull()

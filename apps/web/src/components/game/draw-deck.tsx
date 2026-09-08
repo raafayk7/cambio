@@ -1,13 +1,17 @@
-import { Badge, cn } from "@cambio/ui"
+import * as React from "react"
+
+import { cn } from "@cambio/ui"
 
 /**
- * DrawDeck — design-system/components/core/draw-deck.md (r3, CAM-26).
+ * DrawDeck — design-system/components/core/draw-deck.md (r4, CAM-29).
  * Class: Game object.
  *
- * The face-down stock: a 2–3 offset stack of card backs + a count badge.
- * Deck count is public state (the wire sends deckCount only — order
- * never reaches a client). `low` (count ≤ 5) shifts the badge text to
- * accent.alarm-deep: reshuffle tension is real information.
+ * The face-down stock: a 2–3 offset stack of card backs. Deck count is
+ * public state (the wire sends deckCount only — order never reaches a
+ * client) but stays non-visual (CAM-29): the count no longer sits in a
+ * badge over the tappable stack, only in the accessible name/description
+ * (`low`, count ≤ 5, keeps marking `data-state` for callers that render
+ * reshuffle tension visually elsewhere).
  *
  * r2 (CAM-18 T1/T2): `onClick` (the draw affordance — accessible-button
  * wrap, following Hand's internal slot-button precedent: no handler or a
@@ -23,6 +27,14 @@ import { Badge, cn } from "@cambio/ui"
  * a slam window was open (root plan), so this only makes that state
  * visible, using the same alarm-frame idiom as `PlayingCard`'s
  * `slamEligible` and the discard's `slamTarget` echo of it.
+ *
+ * r4 (CAM-29): the visual count badge covered too much of the tappable
+ * surface on compact and wasn't needed — sighted players read the stack
+ * height/reshuffle-alarm framing instead. The count stays available to
+ * screen readers: on the interactive stack it rides `aria-describedby`
+ * (button `aria-label` stays "Draw a card" so it keeps naming the action,
+ * not the state); on the static stack (no `onClick`) it's the `role="img"`
+ * wrapper's `aria-label` directly, since there's no action name to protect.
  */
 export interface DrawDeckProps {
   count: number
@@ -47,6 +59,8 @@ export interface DrawDeckProps {
 export function DrawDeck({ count, onClick, state, slamWindow = false, className }: DrawDeckProps) {
   const low = count <= 5
   const layers = Math.min(3, Math.max(1, count))
+  const countLabel = `${count} cards in the draw deck`
+  const countLabelId = React.useId()
 
   const stack =
     count === 0 ? (
@@ -99,34 +113,20 @@ export function DrawDeck({ count, onClick, state, slamWindow = false, className 
         <button
           type="button"
           aria-label="Draw a card"
+          aria-describedby={countLabelId}
           onClick={onClick}
           className="block cursor-pointer rounded-sm focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-accent-focus focus-visible:outline-solid"
         >
           {stack}
+          <span id={countLabelId} className="sr-only">
+            {countLabel}
+          </span>
         </button>
       ) : (
-        stack
+        <div role="img" aria-label={countLabel}>
+          {stack}
+        </div>
       )}
-      <Badge
-        variant="count"
-        aria-label={`${count} cards in the draw deck`}
-        className={cn(
-          // CAM-20 gate fix (compact, finding 2): the corner-overhang
-          // treatment (`-right-2 -bottom-2`, pushing the badge 8px past
-          // the deck's own edge on both axes) reads fine at regular's
-          // larger card-md (64px) with a full gap-4 to the discard pile,
-          // but at compact's 32px deck and 4px gutter it crossed into the
-          // discard's own space and hung 8px below both cards — visually
-          // ambiguous about which pile it was counting. Compact insets it
-          // flush to the deck's own corner instead (`right-0 bottom-0`,
-          // measured to sit entirely within the deck's rendered box);
-          // regular keeps the original overhang, unchanged.
-          "absolute right-0 bottom-0 z-10 regular:-right-2 regular:-bottom-2",
-          low && count > 0 && "text-accent-alarm-deep",
-        )}
-      >
-        {count}
-      </Badge>
     </div>
   )
 }

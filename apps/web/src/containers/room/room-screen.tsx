@@ -183,15 +183,15 @@ function SeatedRoom({
 
           {startError !== undefined ? <Alert variant="alarm">{startError}</Alert> : null}
 
-          <div className="flex items-center justify-between gap-3">
-            <Button variant="ghost" onClick={onLeave} disabled={leavePending}>
+          <div className="flex flex-wrap items-center justify-between gap-3 regular:flex-nowrap">
+            <Button variant="ghost" className="shrink-0" onClick={onLeave} disabled={leavePending}>
               Leave room
             </Button>
             <div className="flex items-center gap-3">
               <span className="font-ui text-sm text-ink-muted">
                 {lobby.members.length} seated · {START_HELPER}
               </span>
-              <Button onClick={onStart} disabled={startPending}>
+              <Button className="shrink-0" onClick={onStart} disabled={startPending}>
                 Start game
               </Button>
             </div>

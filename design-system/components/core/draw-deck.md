@@ -1,23 +1,26 @@
 name: draw-deck
 status: draft
-version: 3
+version: 4
 extends: none
 
 The face-down stock. Class: **Game object**.
 
 ## Anatomy
 
-- Stack of 2–3 offset card backs (offset = `space.1`, shadows stacked) +
-  a count badge (`surface.raised` pill, `1.5px` `ink.primary` border,
-  `numeral` type).
+- Stack of 2–3 offset card backs (offset = `space.1`, shadows stacked). No
+  visual count (r4): the badge covered too much of the tappable surface on
+  compact and wasn't needed — sighted players read the stack via the
+  low/reshuffle choreography instead. Count stays available to screen
+  readers (see Rules).
 - Sits on `surface.table` beside the discard-pile; the pair is the table's
   center.
 
 ## States
 
-- `populated` — stack + count.
-- `low` — count ≤ 5: badge text shifts to `accent.alarm-deep` (reshuffle is
-  near; that tension is real information).
+- `populated` — stack, no visible count.
+- `low` — count ≤ 5: `data-state="low"` (a styling hook only; r4 dropped
+  the badge that used to carry this in `accent.alarm-deep` text — reshuffle
+  tension has no visual expression right now beyond that attribute).
 - `empty→reshuffling` — the discard pile (minus its retained top card)
   flights over and becomes the new stack. Public, designed moment at
   `duration.track`: every player must see the reshuffle happen.
@@ -58,6 +61,12 @@ None.
   `receiving`-over-`slam-target` precedence) — the pulse is a phase
   overlay, not a state that can starve a flight already in progress.
 - The stock exposes `data-flight-anchor="deck"` for the flight layer.
+- The count is exposed to screen readers, never sighted-only (r4): on the
+  interactive stack (`onClick` present) it rides the "Draw a card" button's
+  `aria-describedby`, so the button's accessible name still names the
+  action, not the state; on the static stack (no `onClick`) it's the
+  `role="img"` wrapper's `aria-label` directly, since there's no action
+  name to protect there.
 
 ## Revisions
 
@@ -70,3 +79,8 @@ None.
   plan); this closes that gap with the existing alarm-frame idiom, no new
   tokens. Crossing the creation gate was explicitly authorized by the user
   (root plan Decision Log, 2026-09-07) rather than proposed unprompted.
+- r4 (CAM-29, 2026-09-08): dropped the visual count badge — it covered too
+  much of the tappable deck surface on compact and wasn't load-bearing for
+  sighted play. Count moved to accessibility-only exposure (`aria-describedby`
+  on the interactive stack, `role="img"`/`aria-label` on the static one); no
+  new tokens, no replacement visual for `low`.
