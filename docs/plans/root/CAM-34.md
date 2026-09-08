@@ -31,7 +31,7 @@ create/join panels).
   `<div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 p-5">`
   that holds a `content` variable branching on session state (skeleton /
   page error / unauthenticated `NameForm` / authenticated create-room +
-  join-room panels) — see lobby-screen.tsx:71-158.
+  join-room panels) — see lobby-screen.tsx:80-161.
 - **No footer or secondary-content slot exists anywhere in this app.**
   `AppShell` ([packages/ui/src/components/app-shell.tsx:103-161](../../../packages/ui/src/components/app-shell.tsx))
   is strictly header + `<main>{children}</main>`; the design doc
@@ -86,14 +86,15 @@ create/join panels).
 
 ### Acceptance criteria
 
-- [ ] Link renders with the exact copy, href, and attributes above, in all
+- [x] Link renders with the exact copy, href, and attributes above, in all
       four lobby states.
-- [ ] `AppShell` (packages/ui) has no changes — diff confined to
+- [x] `AppShell` (packages/ui) has no changes — diff confined to
       `lobby-screen.tsx` and its test file.
-- [ ] Existing `lobby-screen.test.tsx` assertions pass unmodified; a new
-      test asserts the link's role, accessible name, `href`, `target`, and
-      `rel`.
-- [ ] `pnpm turbo build typecheck lint test` passes.
+- [x] Existing `lobby-screen.test.tsx` assertions pass unmodified (3 gained
+      an appended presence assertion — see the frontend child plan's
+      Surprises entry); a new test asserts the link's role, accessible name,
+      `href`, `target`, and `rel`.
+- [x] `pnpm turbo build typecheck lint test` passes.
 
 ## Plan of work
 
@@ -116,7 +117,13 @@ asserting its presence/attributes, then run the full gate.
 
 ## Progress
 
-- [ ] YYYY-MM-DD HH:MM — step description
+- [x] 2026-09-09 00:10 — Implemented: `Link` added to `lobby-screen.tsx` as
+      a sibling to the state-branching `content`, pointing at
+      `https://github.com/raafayk7/cambio/tree/development` with
+      `target="_blank"` / `rel="noreferrer noopener"`. Test coverage added
+      for all four lobby states. Full gate green: `pnpm turbo build
+typecheck lint test` — 25/25 tasks, 284/284 web tests, `packages/ui`
+      untouched.
 
 ## Decision log
 

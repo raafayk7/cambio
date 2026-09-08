@@ -1,5 +1,14 @@
 import { decodeLobbyResponse } from "@cambio/contracts"
-import { Alert, AppShell, Button, FieldScaffold, Panel, Skeleton, TextField } from "@cambio/ui"
+import {
+  Alert,
+  AppShell,
+  Button,
+  FieldScaffold,
+  Link,
+  Panel,
+  Skeleton,
+  TextField,
+} from "@cambio/ui"
 import { useMutation } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import * as React from "react"
@@ -155,6 +164,14 @@ export function LobbyScreen() {
     <AppShell scene="courtyard" connection={connection} onHelp={() => setHelpOpen(true)}>
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-5 p-5">
         {content}
+        <Link
+          href="https://github.com/raafayk7/cambio/tree/development"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="text-center text-sm"
+        >
+          Source code and feedback on GitHub
+        </Link>
       </div>
       <HowToPlayGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
     </AppShell>
