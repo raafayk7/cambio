@@ -459,4 +459,179 @@ guide` sections; added `onHelp` to the app-shell gallery demo for
 
 ## Outcomes & retrospective
 
-_(filled at the end, typically by `/review`)_
+_(written by `/review`, 2026-09-08)_
+
+**Verdict: fix-then-ship.** The code is behaviorally and architecturally
+clean — no contract-behavior defect, no hidden-information exposure, all
+suites green on a forced fresh run — but the contract text, the coverage
+table, and several canon docs are stale against the as-built state, and
+the guide copy has three rule-consequence issues. Everything on the list
+is a documentation/copy fix; no code behavior needs to change (two
+findings optionally strengthen tests).
+
+**What was run (all fresh, none cached):** `pnpm turbo build typecheck
+lint test` bare — 25/25 tasks, exit 0; then `pnpm turbo test --force` —
+10/10 tasks, 0 cached, 760 tests green including the api suite against
+live Postgres. The `hidden information (C5, structural sweep)` describe
+is byte-unchanged in the diff (the only nearby test edit adds `name:`
+disambiguation to a dialog query — non-weakening). No timing/concurrency
+behavior changed (slam drain math untouched; the reservation is a
+className gate), so no probe was required.
+
+**What passed cleanly:** F1.1–F1.3, F2.1, F2.3, F3.2, F3.4, F4.1–F4.3,
+F5.2–F5.4 all satisfied with evidence. Import boundaries clean (zero
+changes outside apps/web + packages/ui + docs); module placement correct
+(copy module in apps/web, mark in ui); `how-to-play-guide.tsx` is purely
+presentational; `powerHint()` derives only from the holder affordance's
+`targeting`; the non-holder flag derives from the public `_tag` alone;
+no hardcoded visual values in either form (arbitrary utilities and
+`style={{}}` both grepped); every new utility resolves to the ordinal
+token scales; the draw-deck alarm-frame fix is arithmetically right in
+every branch; memory-faithfulness holds (hint recomputed per render,
+persisted nowhere; `HeldCard` carries no vestigial hint code). Copy
+fidelity: **no statement contradicts canon and nothing is invented from
+priors** — the F2.2 spot-pinned facts (suit-split kings, true minus,
+no-opening-peek, obligatory power, rank-not-score) are all correct.
+
+### Findings
+
+**FINDING 1 — contract text stale after the user-directed hint
+relocation (multi-instance claim; contract clauses F3.1, F5.5).**
+The claim "the F3 hint renders under/beneath the held card via a
+`HeldCard` `hint` prop (held-card.md r2)" is false as-built: commits
+`364e562`/`bc04f32` moved the hint to the chrome band
+(`game-screen.tsx:697-701`) and retired the prop (held-card.md r3);
+only Surprises records it. The claim itself is what's wrong (the
+relocation was user-directed), so **amend everywhere with an inline
+amendment note**, not by moving code back. Instances found by sweep
+(phrasings: "beneath the held card", "under the held card", "HeldCard
+label region", "hint prop", "hint line", "held-card.md r2"):
+root F3.1; root F5.5 (whole clause — canonizes a retired prop AND its
+"not an affordance" sentence never landed in held-card.md r2/r3, so the
+sentence requirement moves to r3 or the clause is amended); root
+Context bullet "Now implemented: an optional second `hint` prop"; root
+M4 milestone "add the hint line to the `HeldCard` label region"; root
+D5 (needs an inline "superseded by live-play round" note); child
+Context held-card bullet; child step 13 (entire placement paragraph +
+canon bookkeeping); child step 14's "component-level render test for
+the new `hint` prop can extend held-card.test.tsx"; child Surprises
+bullet 1; child coverage rows F3.1/F3.3/F3.4 (see Finding 2). The fix
+must re-run this sweep across both plan docs before closing — this
+list may be incomplete.
+
+**FINDING 2 — coverage-table integrity (child plan).** (a) F3.1 row
+cites a renamed test — as-built is "holder sees the %s hint **in the
+chrome band** (F3.1)" (`game-screen.test.tsx:1142`) — and a
+**deleted** test: `held-card.test.tsx` "renders the hint as a second
+line beneath the label when supplied" was removed in `364e562`;
+verified absent. (b) **F5.5 has no row at all** (table ends at F5.4;
+its own rule is one row per owned clause). (c) F2.1 row says "all
+seven section headings" — the as-built test asserts **eight** (the
+`f50a1b8` intro). (d) F1.3 row overstates: "alongside the live timer"
+— the test asserts the indicator's slam copy, not `SlamTimer`.
+(e) F4.2 row overstates: "same F4.1 tests assert `data-state`" — only
+one of the two does. (f) F2.3's test title claims "never offers or
+implies a card-tracking aid" but its body has only the positive pin +
+no-new-requests; the negative sweep exists only as a reviewer's manual
+grep — strengthen the test (preferred) or retitle.
+
+**FINDING 3 — guide copy, rule-consequence issues
+(`how-to-play-copy.ts`).** (a) `:78` "a non-power card can be
+blind-swapped into **a slot**" — canon says **own** slot (SKILL.md
+§1.3(c)); as written it licenses swapping into anyone's slot (the
+adjacent take-branch says "your own slots", making the omission read
+deliberate). Also omits displaced-card-to-discard for this branch.
+(b) `:77` "You **must** swap it into one of your own slots" is stated
+exceptionless — ADR-0009 clause 2 makes the zero-card discard take a
+**keep** into the lowest free slot with no displaced card; the
+zero-card keep is also absent from Rare situations `:125`. (c) The
+J/Q may-swap-two-of-the-same-player's-cards allowance is stated
+nowhere, though root F2.2 enumerates "(may be the same player's)" as
+load-bearing. Fix in copy; extend the F2.2 spot-pin test where cheap.
+
+**FINDING 4 — commit `f50a1b8` unlogged in both plans
+(deviation-not-logged).** The intro "About Cambio" section (an 8th
+section beyond F2.1's enumeration), the suit-red `CardLabel` in the
+scoring table, and the **`WordmarkSuits` cluster in AppShell** — an
+out-of-contract canon change to a core `packages/ui` component
+(documented in app-shell.md r6 but in neither plan doc) — appear only
+in canon docs and the commit message. Log all three (Progress +
+Surprises); the wordmark cluster additionally needs its
+precedent-based justification recorded (divider.md's identical
+ornament) so the packages/ui suit-glyph precedent is deliberate.
+
+**FINDING 5 — app-shell.md frontmatter `version: 4`** while the doc
+carries r5 and r6 revision entries (sibling docs in the same diff
+bumped correctly). Any reader resolving canon from the frontmatter
+gets r4.
+
+**FINDING 6 — stale canon back-references in shipped code:**
+`app-shell.tsx:9` cites r5 but implements r6 (its own line 63 cites
+r6); `draw-deck.tsx:6` cites r5 but ships r6; `how-to-play-guide.tsx:20`
+cites r1 but ships r2 content; `app-shell.test.tsx:47` cites r5.
+
+**FINDING 7 — app-shell.md Anatomy + r5 note state the control order
+as "help icon-button, settings icon-button, connection dot"; as built
+both chrome states render dot → help → settings**
+(`app-shell.tsx:126-130, 144-148`). Inherited from the r4 text
+(settings/dot were already reversed) and propagated by r5 rather than
+corrected.
+
+**FINDING 8 — how-to-play-guide.md:24 overstates**: "the scoring and
+powers tables' Card column colors hearts/diamonds glyphs" — only the
+scoring table uses `CardLabel` (`how-to-play-guide.tsx`; powers table
+renders raw). The doc's own r2 revisions entry says "the scoring
+table", so the doc contradicts itself. Currently harmless (no ♥/♦ in
+the powers table) but the Anatomy text licenses behavior the code
+doesn't have.
+
+**FINDING 9 — false test comment in a hidden-information assertion**
+(`game-screen.test.tsx:1227`): claims "the fixture's non-holder phase
+carries no card field" — `resolvingPowerView` always sets
+`phase.card`. The test actually proves something **stronger** (the
+client refuses to derive a hint even when a card field is present);
+reword the comment to what it proves. The real wire guarantee
+(non-holder payload omits `card`) remains pinned by `ViewFor.test.ts`
+and `affordances.test.ts`.
+
+**FINDING 10 — voice.** (a) `:127` "as a no-op" is engine jargon in
+player copy — "fizzle" already carries the meaning; (b) `:85`
+"slam-eligible" is prop vocabulary, not a voice.md term; (c)
+"reveals"/"revealed" (`:101`, `:136`) literally violate the extension
+doc's own binding "never 'reveal'" rule — canon itself uses "publicly
+reveals" for this distinct concept (a public momentary/terminal
+reveal, not a peek), so the right fix is a documented carve-out in
+`how-to-play-guide.md`'s rules (or rephrase), not silent tolerance.
+
+### Advisory (no fix required to ship)
+
+- The "POWERS_TABLE and the hint strings never drift" comments
+  (`how-to-play-copy.ts:12`, `game-screen.tsx:185`) are byte-true today
+  but unenforced — a one-line equality test would make them true by
+  construction.
+- The `helpOpen` + `onHelp` + `<HowToPlayGuide/>` wiring is now
+  triplicated verbatim — frontend-architecture's promote-at-second-use
+  trigger is met; fine to leave, noted for the next touch.
+- Minor copy omissions vs canon (below F2.2's bar): Queen may swap the
+  card she peeked; multiple slams per window / fixed `closesAt`; a
+  resolved power goes to the discard pile (stated only for fizzle);
+  ADR-0040's discard-lands-on-empty-deck second trigger; "held cards"
+  in the J/Q strings collides with this codebase's HeldCard term
+  (canon says "player-held" — changing it would touch the F3.1 spec
+  strings); `heldCardHint` variable name is stale post-relocation.
+- turn-indicator.md doesn't describe the chrome band's new composition
+  (hint paragraph beside the banner); r2's "inline messages" wording
+  covers it — revise only if the band's composition should live in one
+  doc.
+- Skill staleness sweep: none found — no skill or command states
+  anything the shipped code contradicts.
+
+### Fix-cycle notes
+
+Load from this section, not memory. Finding 1 closes by re-running its
+sweep (all phrasings, both plan docs, including milestones and
+test-intent bullets), not by the instance list above. Prefer
+strengthening tests (Findings 2f, 3c) over weakening claims; Findings
+1, 2, 4–8 are claim-side fixes (the claims are what's wrong). Re-review
+verifies the sweep, re-runs the web/ui suites fresh plus the full gate,
+and for any hardened test reasons through the mutants it kills.
