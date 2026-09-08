@@ -15,6 +15,7 @@ import {
 import { Link as RouterLink } from "@tanstack/react-router"
 import * as React from "react"
 
+import { HowToPlayGuide } from "../../components/help/how-to-play-guide.js"
 import { NameForm } from "../../components/identity/name-form.js"
 import { Seat } from "../../components/game/seat.js"
 import { TableSurface } from "../../components/game/table-surface.js"
@@ -211,6 +212,7 @@ export function RoomScreen({ gameId }: { gameId: string }) {
   const connection = useConnection()
   const { session, createUser, room, denial, failed, retry, start, leave, viewerId } =
     useRoom(gameId)
+  const [helpOpen, setHelpOpen] = React.useState(false)
 
   let content: React.ReactNode
   // Every branch gets a page h1. Most render the sr-only "Room" heading in
@@ -281,11 +283,12 @@ export function RoomScreen({ gameId }: { gameId: string }) {
   }
 
   return (
-    <AppShell scene="paving" connection={connection}>
+    <AppShell scene="paving" connection={connection} onHelp={() => setHelpOpen(true)}>
       <div className="flex w-full flex-1 flex-col justify-center gap-5 p-5">
         {ownHeading ? null : <h1 className="sr-only">Room</h1>}
         {content}
       </div>
+      <HowToPlayGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
     </AppShell>
   )
 }

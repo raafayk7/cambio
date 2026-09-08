@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react"
+import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
@@ -155,6 +155,28 @@ describe("authenticated lobby (L1, L2)", () => {
       ),
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe("/")
+  })
+})
+
+/** Root plan F1.1/F1.2/F1.3: the entry point on every screen. This suite
+ * proves lobby wiring only — copy-fidelity spot-pins live in
+ * game-screen.test.tsx (root plan step 11) to keep the fidelity diff in
+ * one file. */
+describe("how-to-play guide entry point (F1)", () => {
+  it("opens the guide from the lobby's help icon-button and closes it", async () => {
+    setup()
+    const user = userEvent.setup()
+    stubApi({ "GET /me": json(200, ME) })
+    renderApp("/")
+
+    await user.click(await screen.findByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true })
+    expect(within(dialog).getByText("How to play")).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole("button", { name: "Close" }))
+    await waitFor(() => {
+      expect(dialog).not.toHaveAttribute("open")
+    })
   })
 })
 

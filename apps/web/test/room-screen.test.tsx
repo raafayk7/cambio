@@ -89,6 +89,25 @@ describe("member bootstrap (R1, R3)", () => {
   })
 })
 
+/** Root plan F1.1/F1.2: the entry point on every screen. */
+describe("how-to-play guide entry point (F1)", () => {
+  it("opens the guide from the room's help icon-button and closes it", async () => {
+    setupFake()
+    const user = userEvent.setup()
+    memberBootstrap()
+    renderApp(`/room/${GAME_ID}`)
+
+    await user.click(await screen.findByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true })
+    expect(within(dialog).getByText("How to play")).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole("button", { name: "Close" }))
+    await waitFor(() => {
+      expect(dialog).not.toHaveAttribute("open")
+    })
+  })
+})
+
 describe("join-on-visit (R2)", () => {
   it("joins on a bootstrap 404 and renders the room from the join response", async () => {
     setupFake()

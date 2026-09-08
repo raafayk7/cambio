@@ -3,6 +3,7 @@ import { Alert, AppShell, Button, cn, Link as UiLink, Modal, Panel, Skeleton } f
 import { Link as RouterLink } from "@tanstack/react-router"
 import * as React from "react"
 
+import { HowToPlayGuide } from "../../components/help/how-to-play-guide.js"
 import { NameForm } from "../../components/identity/name-form.js"
 import { DiscardPile } from "../../components/game/discard-pile.js"
 import { DrawDeck } from "../../components/game/draw-deck.js"
@@ -978,6 +979,7 @@ function GameTable({
 
 export function GameScreen({ gameId }: { gameId: string }) {
   const connection = useConnection()
+  const [helpOpen, setHelpOpen] = React.useState(false)
   const {
     session,
     createUser,
@@ -1066,7 +1068,12 @@ export function GameScreen({ gameId }: { gameId: string }) {
   }
 
   return (
-    <AppShell scene="paving" state="game" connection={connection}>
+    <AppShell
+      scene="paving"
+      state="game"
+      connection={connection}
+      onHelp={() => setHelpOpen(true)}
+    >
       {/* CAM-21: the viewport bound lives HERE, not on AppShell —
           lobby/room screens don't use this wrapper and inherit nothing
           (root plan decision 1). `max-h-dvh` + the `min-h-0` flex chain
@@ -1097,6 +1104,7 @@ export function GameScreen({ gameId }: { gameId: string }) {
         {ownHeading ? null : <h1 className="sr-only">Game</h1>}
         {content}
       </div>
+      <HowToPlayGuide open={helpOpen} onClose={() => setHelpOpen(false)} />
     </AppShell>
   )
 }

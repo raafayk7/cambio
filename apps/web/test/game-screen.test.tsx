@@ -493,6 +493,134 @@ describe("hidden information (C5, structural sweep)", () => {
   })
 })
 
+/**
+ * How-to-play guide (root plan F1–F2): entry point, copy fidelity
+ * spot-pins, memory-faithful sweep, and slam-window availability
+ * (modal.md r2's opt-in reference overlay exception).
+ */
+describe("how-to-play guide (F1/F2)", () => {
+  it("opens the guide from the game screen's help icon-button and closes it", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    await user.click(screen.getByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
+    expect(within(dialog).getByText("How to play")).toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole("button", { name: "Close" }))
+    await waitFor(() => {
+      expect(dialog).not.toHaveAttribute("open")
+    })
+  })
+
+  it("the guide's rules copy matches canon on the load-bearing spot-pins (F2.2)", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    await user.click(screen.getByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
+
+    // No opening peek (setup).
+    expect(
+      within(dialog).getByText(/does not look at any of them — there is no opening peek/),
+    ).toBeInTheDocument()
+    // Suit-split king scores, true minus sign (scoring table).
+    expect(within(dialog).getByText("King ♠, King ♣")).toBeInTheDocument()
+    expect(within(dialog).getByText("King ♥, King ♦")).toBeInTheDocument()
+    expect(within(dialog).getByText("−1")).toBeInTheDocument()
+    expect(within(dialog).getByText("−2")).toBeInTheDocument()
+    // Obligatory power (taking a turn).
+    expect(
+      within(dialog).getByText(/obligates you to play it: you can't decline, keep, or discard/),
+    ).toBeInTheDocument()
+    // Rank-not-score slam matching.
+    expect(
+      within(dialog).getByText(
+        /matching is by rank, not score, so a jack never matches a queen despite scoring the same/,
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it("never offers or implies a card-tracking aid, and opening it makes no new requests (F2.3)", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    const { calls } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+    const callsBefore = new Set(calls)
+
+    await user.click(screen.getByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
+    expect(
+      within(dialog).getByText(/Remembering what you saw is the game/),
+    ).toBeInTheDocument()
+
+    expect(new Set(calls)).toEqual(callsBefore)
+  })
+
+  it("stays open during the slam window and never blocks the timer (F1.3, modal.md r2)", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    const closesAt = Date.now() + 8000
+    stubApi({
+      "GET /me": json(200, ME),
+      [GET_VIEW]: json(200, slamWindowView("7", closesAt)),
+    })
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    await channelsReady(fake)
+
+    await user.click(screen.getByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
+    expect(dialog).toHaveAttribute("open")
+    // The slam timer keeps rendering — the guide never pauses the window.
+    expect(screen.getByText(/Slam window open/)).toBeInTheDocument()
+  })
+
+  it("survives a phase-change refetch instead of being force-closed (F1.3)", async () => {
+    const fake = setupFake()
+    const user = userEvent.setup()
+    const { handlers } = gameBootstrap()
+    renderGameApp(GAME_ID)
+    await screen.findByText(ME.name)
+    const { room } = await channelsReady(fake)
+
+    await user.click(screen.getByRole("button", { name: "How to play" }))
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "How to play" })
+    expect(dialog).toHaveAttribute("open")
+
+    handlers[GET_VIEW] = json(
+      200,
+      viewResponse({
+        players: [
+          { id: ME.userId, name: ME.name, hand: [0, 1, 2, 3] },
+          { id: FRIEND.id, name: FRIEND.name, hand: [0, 1] },
+        ],
+        phase: { _tag: "AwaitingDraw", playerId: FRIEND.id },
+        // ADR-0033 version guard: a refetch only applies at a strictly
+        // newer version than the bootstrap's default (3).
+        version: 4,
+      }),
+    )
+    act(() => {
+      room.emit("TurnAdvanced", { _tag: "TurnAdvanced", playerId: FRIEND.id })
+    })
+    await waitFor(() => {
+      expect(screen.getByText(`${FRIEND.name}'s turn`)).toBeInTheDocument()
+    })
+    expect(dialog).toHaveAttribute("open")
+  })
+})
+
 describe("turn flow — AwaitingDraw (H1/T1)", () => {
   it("Call Cambio opens the confirm modal and sends CallCambio only after the explicit confirm", async () => {
     const fake = setupFake()
@@ -504,7 +632,7 @@ describe("turn flow — AwaitingDraw (H1/T1)", () => {
     await channelsReady(fake)
 
     await user.click(screen.getByRole("button", { name: "Call Cambio" }))
-    const dialog = screen.getByRole("dialog", { hidden: true })
+    const dialog = screen.getByRole("dialog", { hidden: true, name: "Call Cambio — ends the game" })
     expect(within(dialog).getByText("Call Cambio — ends the game")).toBeInTheDocument()
     // Opening the confirm never sends the command by itself.
     expect(postedCommands(fetchMock)).toEqual([])
