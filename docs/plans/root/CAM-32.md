@@ -128,12 +128,20 @@ answers through the proxy from Render.
       through the proxy), C4 idempotent re-run, C3 job graph, C8's
       "applied migrations match the deployed branch" SQL — captured in
       Progress (M3/M4 entries).
-- [ ] Live smoke, **deferred to the first /release** (the scaffold on
+- [x] Live smoke, **deferred to the first /release** (the scaffold on
       `development` has no `/users` routes, no `0004` migration, and no
       SPA build mode until release-v0 merges): C6 cookie flow, C7 deployed
       page load, C8's `cron.job` check, C9/C10 end-to-end broadcast.
       These get local/CI proofs now (child plans) and live proofs on
       release day — the /release task's checklist must carry them forward.
+      **Proven live at Release V0 (2026-09-08):** C6 `Set-Cookie:
+  cambio_session=…; Max-Age=604800; Path=/; HttpOnly; Secure;
+  SameSite=Lax` (no Domain) via the proxy, replay on `/api/me`
+      returned the created user; C7 `GET /` → 200 `text/html` (after the
+      root-rewrite fix, see Decision Log); C8 `cron.job` lists all three
+      ADR-0025 jobs active; C9/C10 lobby create + second-session join
+      updated the host's browser via broadcast, Render logs clean of
+      `realtime publish failed`.
 - [x] Merge-down complete: `main` → `development` → `release-v0` carries
       the workflows + `vercel.json` (ADR-0043 definition of done) — and the
       AGENTS.md/Release-History "once CI/CD exists" phrasing updated (M5).
@@ -296,6 +304,7 @@ timestamp each entry)_
 - 2026-09-08 — **Split landing** (user call; ADR-0043) — config → `main`, app code → task branch → `release-v0`.
 - 2026-09-08 — **Pooler over direct connections everywhere in prod paths** — GitHub runners and (reportedly) Render free egress are IPv4-only while Supabase direct connections are IPv6-first; Supavisor **session mode** is the IPv4-safe default for both runtime and migrations. Implementation must verify the `0004` pg_cron `DO` block succeeds through the pooler; fallback is running that one migration via the Supabase MCP (`execute_sql`) and recording it, or the paid IPv4 add-on. Surprises section must record which path was taken.
 - 2026-09-08 — **Migration checksums/down-migrations stay deferred** — the infrastructure-persistence skill forbids adding them "in passing" even though a prod DB now exists; flagged for a future hardening task instead.
+- 2026-09-08 — **Root rewrite fixed at Release V0** (found by release-day smoke) — Vercel's `/:path*` catch-all never matches the bare root, so `GET /` 404'd while deep links served the shell; an explicit `{"source": "/", "destination": "/_shell.html"}` rewrite landed on `main` via the ADR-0043 lane (`83b3f2e`) and merged down. Same session: the Vercel project's Production Branch was found set to `main` (explaining manual promotes) and flipped to `development` by the user — git pushes to `development` now deploy production automatically.
 - 2026-09-08 — **Turbo remote cache deferred; `actions/cache` on `.turbo`** — no account coupling, good enough.
 - 2026-09-08 — **Vercel preview deployments disabled** — out of scope per ticket; revisit with custom domain.
 - 2026-09-08 — **C7 sequencing gap accepted (root-plan call on the frontend child's flag)** — the SPA build toggle is app code and stays on the release lane per ADR-0043; therefore the deploy-now proof covers pipeline mechanics + C5, while C7's live proof (deployed page renders) waits for release day. Deliberately NOT extending the carve-out to `vite.config.ts` — ADR-0043 excluded the SPA build mode from the main lane hours earlier with user consent; contradicting it silently is exactly what the ADR discipline forbids. Consequence: until release day the Vercel `/` URL serves a 404/asset-only shell — known, harmless, recorded.
