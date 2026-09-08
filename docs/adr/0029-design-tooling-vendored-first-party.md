@@ -1,6 +1,6 @@
 # 0029 — Design tooling vendored in-repo as first-party harness config
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-04
 - **Task:** CAM-14
 

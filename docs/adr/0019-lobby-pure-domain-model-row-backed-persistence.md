@@ -1,6 +1,6 @@
 # 0019 — Lobby is a pure domain model outside the engine, persisted as rows via GameRepository lobby methods
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-01
 - **Task:** CAM-5
 

@@ -1,6 +1,6 @@
 # 0038 — Compact table art sizes fluidly via container-query units, not a fixed pixel token
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-07
 - **Task:** CAM-27
 

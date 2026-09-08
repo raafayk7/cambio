@@ -1,6 +1,6 @@
 # 0009 — Zero-card players: a correct opponent slam is resolved draw-then-give; taking the discard becomes a keep
 
-- **Status:** proposed (accepted at the release-v0 → development merge, upon human approval)
+- **Status:** accepted
 - **Date:** 2026-08-31
 - **Task:** CAM-1
 

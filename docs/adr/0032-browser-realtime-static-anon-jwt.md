@@ -1,6 +1,6 @@
 # 0032 — Browser realtime via @supabase/realtime-js with a static build-time anon JWT
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-05
 - **Task:** CAM-17
 

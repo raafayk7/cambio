@@ -1,6 +1,6 @@
 # 0044 — The /release pipeline: snapshot main, accept ADRs on the release branch, deploy by PR merge, tag, roll the branch
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-08
 - **Task:** — (harness)
 

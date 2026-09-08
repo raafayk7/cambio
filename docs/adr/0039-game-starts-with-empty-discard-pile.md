@@ -1,6 +1,6 @@
 # 0039 — The game starts with an empty discard pile; no initial face-up card
 
-- **Status:** proposed (accepted at the release-v0 → development merge, upon human approval)
+- **Status:** accepted
 - **Date:** 2026-09-08
 - **Task:** CAM-31
 

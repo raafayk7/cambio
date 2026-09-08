@@ -1,6 +1,6 @@
 # 0027 — Tailwind v4 @theme CSS variables carry the design-system tokens
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-04
 - **Task:** CAM-14
 

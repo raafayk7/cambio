@@ -1,6 +1,6 @@
 # 0013 — Hand-rolled seeded simulation driver, not a property-testing library
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-08-31
 - **Task:** CAM-2
 

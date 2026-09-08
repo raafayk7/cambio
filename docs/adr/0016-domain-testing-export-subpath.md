@@ -1,6 +1,6 @@
 # 0016 — The simulation harness ships from domain via a "./testing" export subpath
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-08-31
 - **Task:** CAM-3
 

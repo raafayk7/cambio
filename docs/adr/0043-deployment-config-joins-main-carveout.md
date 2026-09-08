@@ -1,6 +1,6 @@
 # 0043 — Deployment config joins the ADR-0028 main carve-out; app-code fixes stay on the release flow
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-08
 - **Task:** CAM-32
 

@@ -1,6 +1,6 @@
 # 0036 — Four-player cap; bench-anchored table layout
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-06
 - **Task:** CAM-20
 

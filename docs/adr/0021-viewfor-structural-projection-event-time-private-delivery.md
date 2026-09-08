@@ -1,6 +1,6 @@
 # 0021 — viewFor projects structure only; private card values are delivered once, at event time, and never re-sent
 
-- **Status:** proposed (accepted at the release-v0 → development merge, upon human approval)
+- **Status:** accepted
 - **Date:** 2026-09-01
 - **Task:** CAM-6
 

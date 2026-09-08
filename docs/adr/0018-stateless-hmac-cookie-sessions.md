@@ -1,6 +1,6 @@
 # 0018 — Temporary-user sessions: stateless HMAC-signed cookie, 7-day sliding lifetime, cookie is the identity
 
-- **Status:** proposed (accepted at the release-v0 → development merge, upon human approval)
+- **Status:** accepted
 - **Date:** 2026-09-01
 - **Task:** CAM-4
 

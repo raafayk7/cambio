@@ -1,6 +1,6 @@
 # 0034 — Card flights via a hand-rolled FLIP layer, no animation dependency
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-05
 - **Task:** CAM-18
 

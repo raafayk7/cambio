@@ -1,6 +1,6 @@
 # 0015 — One aggregate-shaped GameRepository: state written and events appended in a single transaction
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-08-31
 - **Task:** CAM-3
 

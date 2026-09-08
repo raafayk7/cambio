@@ -1,6 +1,6 @@
 # 0040 — Deck reshuffle is eager and single-mechanism: it fires when the deck empties or when a discard makes it reshufflable
 
-- **Status:** proposed (accepted at the release-v0 → development merge, upon human approval)
+- **Status:** accepted
 - **Date:** 2026-09-08
 - **Task:** CAM-31
 

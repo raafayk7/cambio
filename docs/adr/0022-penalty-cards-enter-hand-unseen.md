@@ -1,6 +1,6 @@
 # 0022 — Penalty cards enter the slammer's hand unseen by everyone
 
-- **Status:** proposed (accepted at the release-v0 → development merge, upon human approval)
+- **Status:** accepted
 - **Date:** 2026-09-01
 - **Task:** CAM-6
 

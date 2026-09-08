@@ -1,6 +1,6 @@
 # 0011 — Slam window closes at a fixed time from game config; impossible penalty/give draws are skipped
 
-- **Status:** proposed (accepted at the release-v0 → development merge, upon human approval)
+- **Status:** accepted
 - **Date:** 2026-08-31
 - **Task:** CAM-1
 

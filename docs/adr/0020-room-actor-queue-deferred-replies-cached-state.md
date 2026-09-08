@@ -1,6 +1,6 @@
 # 0020 — Room actor: per-room queue with Deferred replies, cached state, evict on game end
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-01
 - **Task:** CAM-5
 

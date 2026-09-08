@@ -1,6 +1,6 @@
 # 0025 — Data lifecycle as SQL functions with guarded pg_cron scheduling; row-level hard-delete
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-03
 - **Task:** CAM-8
 

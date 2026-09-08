@@ -1,6 +1,6 @@
 # 0014 — Shuffle events record the resulting PrngState; the fold transcribes, never recomputes
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-08-31
 - **Task:** CAM-3
 

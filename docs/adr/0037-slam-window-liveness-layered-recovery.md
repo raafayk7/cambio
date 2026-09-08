@@ -1,6 +1,6 @@
 # 0037 — Slam-window liveness via layered recovery: view-route poke, re-arm on load and conflict, client expiry nudge
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-07
 - **Task:** CAM-26
 

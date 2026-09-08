@@ -1,6 +1,6 @@
 # 0028 — Harness changes land on main and propagate by merge-down
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-04
 - **Task:** CAM-14
 

@@ -1,6 +1,6 @@
 # 0041 — Production topology: static SPA on Vercel proxying `/api` to one Render instance, Supabase for Postgres + Realtime
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-08
 - **Task:** CAM-32
 

@@ -1,6 +1,6 @@
 # 0031 — Design-system fonts are self-hosted via @fontsource packages
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-04
 - **Task:** CAM-15
 

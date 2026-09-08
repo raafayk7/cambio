@@ -1,6 +1,6 @@
 # 0042 — CI/CD: GitHub Actions runs the compose-backed full gate; development pushes go gate → migrate → deploy hook
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-08
 - **Task:** CAM-32
 

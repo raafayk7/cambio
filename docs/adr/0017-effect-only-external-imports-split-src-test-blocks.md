@@ -1,6 +1,6 @@
 # 0017 — Effect-only external imports via ordered boundaries/dependencies policies, split by src/test file blocks
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-01
 - **Task:** CAM-11; amended by CAM-12
 - **Amended:** 2026-09-01 (CAM-12) — extended the Decision to also cover Node

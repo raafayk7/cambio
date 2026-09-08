@@ -1,6 +1,6 @@
 # 0035 — Compact fit via token-driven CSS sizing; no transform scale above the flight root
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-06
 - **Task:** CAM-21
 

@@ -1,6 +1,6 @@
 # 0026 — HoldingCard rejects power-rank cards via Schema.filter, not a runtime guard
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-03
 - **Task:** CAM-10
 

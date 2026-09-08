@@ -1,6 +1,6 @@
 # 0033 — Game screen state is the refetched view; broadcasts are animation triggers only
 
-- **Status:** proposed
+- **Status:** accepted
 - **Date:** 2026-09-05
 - **Task:** CAM-18
 
