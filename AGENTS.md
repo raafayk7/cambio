@@ -123,7 +123,9 @@ sides the task touches). Templates: `.agents/templates/`.
 
 ### Branching
 
-`main` (stable) → `development` (deployment target once CI/CD exists) →
+`main` (stable) → `development` (production: a push auto-deploys via
+GitHub Actions — gate → migrate → Render for the api, Vercel git
+integration for the web; ADR-0041/0042, landed in CAM-32) →
 **release branches** (`release-vN`) → task branches. The current release
 branch is the base of all work and the PR target; task branches use Linear's
 suggested branch name per issue. Release branches merge into `development`
