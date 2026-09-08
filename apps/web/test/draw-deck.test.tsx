@@ -45,6 +45,19 @@ describe("DrawDeck", () => {
     expect(container.firstChild).toHaveAttribute("data-state", "populated")
   })
 
+  it("shows reshuffle motion over the empty dashed outline too (ADR-0040: the eager reshuffle re-arms a visibly empty deck)", () => {
+    const { container, rerender } = render(<DrawDeck count={0} state="reshuffling" />)
+    expect(container.firstChild).toHaveAttribute("data-state", "reshuffling")
+    const outline = container.querySelector("[aria-hidden]")
+    expect(outline).toHaveClass("animate-pulse-soft")
+
+    rerender(<DrawDeck count={0} state="draw" />)
+    expect(container.querySelector("[aria-hidden]")).toHaveClass("animate-pulse-soft")
+
+    rerender(<DrawDeck count={0} />)
+    expect(container.querySelector("[aria-hidden]")).not.toHaveClass("animate-pulse-soft")
+  })
+
   /**
    * CAM-26 C4: the deck signals an open slam window instead of going
    * silently dead. A separate boolean (not a `state` enum member — mirrors

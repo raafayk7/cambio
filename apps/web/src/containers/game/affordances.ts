@@ -151,7 +151,9 @@ export function affordancesFor(view: PlayerGameView, viewerId: string): Affordan
       if (phase.playerId !== viewerId) return { phase: "AwaitingDraw", holder: false }
       const top = view.discard[0]
       const takeDiscard = top !== undefined && !isPowerRank(rankOfSlug(top))
-      const drawFromDeck = view.deckCount > 0 || view.discard.length > 1
+      // ADR-0040: the reshuffle is eager, so a resting deck-empty state is
+      // never reshufflable — no "tap the empty deck to reshuffle" affordance.
+      const drawFromDeck = view.deckCount > 0
       return { phase: "AwaitingDraw", holder: true, callCambio: true, takeDiscard, drawFromDeck }
     }
 

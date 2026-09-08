@@ -1,6 +1,6 @@
 name: draw-deck
 status: draft
-version: 4
+version: 5
 extends: none
 
 The face-down stock. Class: **Game object**.
@@ -23,7 +23,12 @@ The face-down stock. Class: **Game object**.
   tension has no visual expression right now beyond that attribute).
 - `empty→reshuffling` — the discard pile (minus its retained top card)
   flights over and becomes the new stack. Public, designed moment at
-  `duration.track`: every player must see the reshuffle happen.
+  `duration.track`: every player must see the reshuffle happen. The
+  reshuffle is eager (ADR-0040, r5): it fires the instant the deck empties
+  or a discard lands on an empty deck, so the deck never rests visibly
+  empty while anything is reshufflable — this state is genuinely
+  occupancy-independent (r2's original claim), rendering its motion over
+  the `empty` dashed outline exactly as it does over a populated stack.
 - `draw` — top card flights to the active player at `duration.track`,
   face-down for everyone except the drawer.
 - `slam-window` — the slam window is open: the stack carries the
@@ -47,9 +52,10 @@ None.
 - The reshuffle retains the current top discard — visibly: it stays put
   while the rest flights.
 - The click affordance (r2) is presentation only — legality is the server's
-  and the client mirrors it in its affordance mapping (`deckCount > 0
-|| discard.length > 1` — a T1-specified rule, distinct from H1's two
-  helpers);
+  and the client mirrors it in its affordance mapping (`deckCount > 0` —
+  r5/ADR-0040: the eager reshuffle retired the old `|| discard.length > 1`
+  "reshuffle fuel" disjunction, since a resting deck-empty state is never
+  reshufflable — a T1-specified rule, distinct from H1's two helpers);
   omitting `onClick` entirely renders the deck as a static, non-interactive
   stack rather than a disabled button.
 - `slam-window` (r3) is presentation only, same as the click affordance:
@@ -84,3 +90,12 @@ None.
   sighted play. Count moved to accessibility-only exposure (`aria-describedby`
   on the interactive stack, `role="img"`/`aria-label` on the static one); no
   new tokens, no replacement visual for `low`.
+- r5 (CAM-31, 2026-09-08): the reshuffle became eager (ADR-0040) — the
+  empty-branch previously rendered no motion during `reshuffling` (a latent
+  gap, now the guaranteed path since a resting empty deck is always
+  mid-reshuffle-or-nothing); the empty stack now carries the same
+  `--animate-pulse-soft` treatment the populated branch already had, no new
+  tokens. The click-affordance formula simplifies to `deckCount > 0`.
+  Pre-authorized through the creation gate by the CAM-31 root plan's
+  Decision Log (2026-09-08): "the empty-branch reshuffle-motion fix and
+  canon r-bumps are in scope for CAM-31, not deferred."

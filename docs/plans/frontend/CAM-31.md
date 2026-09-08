@@ -325,12 +325,12 @@ the rows below (clause 3's removed wire field → the row-16 fixture sweep;
 clauses 6–9's causing-event-before-reshuffle batch order → the row-14
 gate's ordering assumption).
 
-| Clause                                                                                                                                                                                                                                                                                                                                                          | Test (file + name) | What is asserted |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------- |
-| 13 — planned: pure affordance case (opening state: take off, draw on, call on) replacing the unreachable "reshuffle fuel" pin, plus a game-start integration render (empty dashed discard, Draw present, no Take)                                                                                                                                               |                    |                  |
-| 14 — planned: sequencing pin with stubbed non-degenerate rects + fake timers (draw flight active first, reshuffle flight only after its settle), plus a liveness case under jsdom auto-cancel; existing CH2 retained-top and one-refetch-per-batch pins stay green                                                                                              |                    |                  |
-| 15 — planned: draw-deck component case — `count 0` + `state="reshuffling"` renders the reshuffling data-state **and** the motion treatment on the dashed outline; canon r-bumps (draw-deck.md r5, discard-pile.md r3) reconciled at review, not test-pinned                                                                                                     |                    |                  |
-| 16 — planned: fixture/comment/label sweep — `gameStartedPayload()` sheds `firstDiscard`, the use-game CH1 comment stops claiming reshuffle falls through, the gallery empty-deck label stops promising an imminent reshuffle; pinned by the suite staying green against the frozen wire shape (no dedicated test — comment and label changes aren't assertable) |                    |                  |
+| Clause                                                                                                                                                                                                                                                                                                                                                          | Test (file + name)                                                                                                                                                                                                                                                                                                                                                                                                                | What is asserted                                                                                                                                                                                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 13 — planned: pure affordance case (opening state: take off, draw on, call on) replacing the unreachable "reshuffle fuel" pin, plus a game-start integration render (empty dashed discard, Draw present, no Take)                                                                                                                                               | apps/web/test/affordances.test.ts "holder: opening state — empty discard, Take off, Draw on, Call on (ADR-0039)"; apps/web/test/game-screen.test.tsx "game start (ADR-0039): empty discard, Draw present, no Take, Call Cambio present"                                                                                                                                                                                           | pure affordance mapping for the opening state; integration render shows the dashed empty discard, Draw present, no Take button, Call Cambio present                                                                     |
+| 14 — planned: sequencing pin with stubbed non-degenerate rects + fake timers (draw flight active first, reshuffle flight only after its settle), plus a liveness case under jsdom auto-cancel; existing CH2 retained-top and one-refetch-per-batch pins stay green                                                                                              | apps/web/test/game-screen.test.tsx describe "reshuffle sequencing gate (C14, ADR-0040)": "defers the reshuffle flight behind its causing discard-landing flight — never simultaneously active" and "is live under jsdom's default auto-cancelling measure — the batch still resolves to the refetched state"; existing CH2 "keeps the discard top visibly unchanged..." and "fires exactly one refetch..." stayed green unchanged | with non-degenerate rects, the deck shows neither draw nor reshuffling until the causing flight settles, then reshuffling; with the default degenerate measure the batch still resolves to the refetched view (no hang) |
+| 15 — planned: draw-deck component case — `count 0` + `state="reshuffling"` renders the reshuffling data-state **and** the motion treatment on the dashed outline; canon r-bumps (draw-deck.md r5, discard-pile.md r3) reconciled at review, not test-pinned                                                                                                     | apps/web/test/draw-deck.test.tsx "shows reshuffle motion over the empty dashed outline too (ADR-0040: the eager reshuffle re-arms a visibly empty deck)"                                                                                                                                                                                                                                                                          | count=0 + state=reshuffling                                                                                                                                                                                             | draw renders the dashed outline with animate-pulse-soft; count=0 with no state renders it without the class |
+| 16 — planned: fixture/comment/label sweep — `gameStartedPayload()` sheds `firstDiscard`, the use-game CH1 comment stops claiming reshuffle falls through, the gallery empty-deck label stops promising an imminent reshuffle; pinned by the suite staying green against the frozen wire shape (no dedicated test — comment and label changes aren't assertable) | apps/web/test/room-screen.test.tsx gameStartedPayload() (no dedicated test — the fixture sheds firstDiscard and the suite stays green against the frozen wire shape); apps/web/src/components/gallery/game.tsx label sweep; apps/web/src/containers/game/use-game.ts CH1 comment rewrite                                                                                                                                          | no assertable pin for comment/label prose — the fixture change is proven by the suite staying green with no firstDiscard reference anywhere in apps/web                                                                 |
 
 ## Progress
 
@@ -338,6 +338,40 @@ _(append new entries at the BOTTOM — newest last, timestamped)_
 
 - [x] 2026-09-08 — frontend child plan drafted (planning phase; no
       implementation yet)
+- [x] 2026-09-08 15:20 — M5 steps 1-4 implemented. Step 1: `affordances.ts`
+      simplified to `deckCount > 0`; `affordances.test.ts`'s unreachable
+      "reshuffle fuel" case replaced with the opening-state pin;
+      `game-screen.test.tsx` gained the game-start integration case.
+      Step 2: `room-screen.test.tsx`'s `gameStartedPayload()` shed
+      `firstDiscard`; `use-game.ts`'s CH1 comment rewritten (now describes
+      the cause-latch composition, not a stale "falls through to default"
+      claim); the gallery's `count={0}` label relabeled and a new
+      empty+reshuffling state card added. Step 3: canon r-bumps landed
+      first (`draw-deck.md` r5, `discard-pile.md` r3, both citing the root
+      plan's pre-authorization); `draw-deck.tsx`'s empty branch gained the
+      same `animate-pulse-soft` treatment the populated branch already
+      had; `draw-deck.test.tsx` pins both the motion-present and
+      motion-absent cases. Step 4: the reshuffle sequencing gate landed in
+      `use-game.ts` (`causeFlightIdRef`/`pendingAfterCauseRef`/
+      `runAfterCausingFlight`/`enqueueCausingFlight`, composed exactly as
+      the plan's advisory shape describes — every reshuffle-capable
+      enqueue site converted, `DeckReshuffled`'s handler wraps
+      `runAfterReveal(() => runAfterCausingFlight(enqueue))`,
+      `SlamWindowClosed` clears the latch alongside the reveal queue).
+      `pnpm turbo test --filter @cambio/web`: 260/260 green. Full gate
+      green, 25/25 (one prettier auto-fix on `draw-deck.test.tsx`).
+      **Deviation from the plan's advisory test sketch**: the sequencing
+      pin uses a `HeldSwapped` discard-landing batch, not a plain
+      `CardDrawn` one — discovered while writing it that `CardDrawn`'s
+      destination anchor (`held`) only mounts once the pre-refetch
+      snapshot itself shows `HoldingCard`, so under the still-`AwaitingDraw`
+      bootstrap fixture a draw flight cancels on a missing anchor
+      regardless of rect stubbing, making it unusable for proving
+      deferral. `HeldSwapped`'s second flight (slot → discard) has anchors
+      that exist in every phase, so its lifetime is governed only by the
+      stubbed measure — logged here since it's a real (pre-existing,
+      not CAM-31-introduced) anchor-availability characteristic of the
+      flight layer, not a change to the gate's own logic.
 
 ## Surprises & notes for the root plan
 

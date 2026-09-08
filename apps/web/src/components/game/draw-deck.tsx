@@ -38,9 +38,11 @@ import { cn } from "@cambio/ui"
  */
 export interface DrawDeckProps {
   count: number
-  /** The draw affordance (T1: `DrawFromDeck` iff `deckCount > 0 ||
-   * discard.length > 1`) — omit entirely when drawing isn't legal right
-   * now; the deck then renders as a static, non-interactive stack. */
+  /** The draw affordance (T1: `DrawFromDeck` iff `deckCount > 0` — ADR-0040
+   * made the reshuffle eager, so a resting deck-empty state is never
+   * reshufflable and the old `|| discard.length > 1` fuel disjunction is
+   * gone) — omit entirely when drawing isn't legal right now; the deck then
+   * renders as a static, non-interactive stack. */
   onClick?: () => void
   /** `draw`: the top card is mid-flight to the holder (CH1) — `reshuffling`:
    * the discard-minus-top is mid-flight into the deck (CH2, step 13). Both
@@ -66,7 +68,10 @@ export function DrawDeck({ count, onClick, state, slamWindow = false, className 
     count === 0 ? (
       <span
         aria-hidden
-        className="block border-2 border-dashed border-ink-inverse/55 card-frame card-md"
+        className={cn(
+          "block border-2 border-dashed border-ink-inverse/55 card-frame card-md",
+          (state === "draw" || state === "reshuffling") && "animate-pulse-soft",
+        )}
       />
     ) : (
       <div

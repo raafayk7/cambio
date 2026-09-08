@@ -243,6 +243,19 @@ typecheck lint test`, 25/25 tasks) — contract wire frozen, frontend M5
       Backend implementation (M1–M4) complete; backend's M6 share
       (HANDOFF/cambio-rules amendments, dev-data wipe) deferred to close
       out alongside frontend M5. Full detail in the backend child plan.
+- [x] 2026-09-08 15:20 — M5 (frontend, steps 1-4): affordance mirror
+      simplified to `deckCount > 0`; stale-surface sweep (fixture, CH1
+      comment, gallery label); canon r-bumps (`draw-deck.md` r5,
+      `discard-pile.md` r3) landed before the empty-branch motion fix per
+      the plan's pre-authorized-gate convention; the reshuffle sequencing
+      gate (`causeFlightIdRef`/`runAfterCausingFlight`) composed beside the
+      existing slam-reveal gate in `use-game.ts`. `@cambio/web`: 260/260
+      green; full gate green, 25/25. One deviation logged in the frontend
+      child plan's Surprises (the sequencing test uses a discard-landing
+      batch, not a draw batch — a pre-existing anchor-availability
+      characteristic of the flight layer, not a gate-logic change).
+      Clauses 13–16 covered. M6 (docs, dev-data wipe, rendered walkthrough,
+      final gate) next.
 
 ## Decision log
 

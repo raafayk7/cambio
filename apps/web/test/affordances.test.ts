@@ -100,9 +100,14 @@ describe("affordancesFor — AwaitingDraw", () => {
     expect(result).toMatchObject({ drawFromDeck: false })
   })
 
-  it("holder: Draw stays enabled with an empty deck if the discard has more than its top (reshuffle fuel)", () => {
-    const result = affordancesFor(view({ deckCount: 0, discard: ["KH", "3S"] }), ME)
-    expect(result).toMatchObject({ drawFromDeck: true })
+  it("holder: opening state — empty discard, Take off, Draw on, Call on (ADR-0039)", () => {
+    const result = affordancesFor(view({ deckCount: 44, discard: [] }), ME)
+    expect(result).toMatchObject({
+      holder: true,
+      callCambio: true,
+      takeDiscard: false,
+      drawFromDeck: true,
+    })
   })
 
   it("non-holder: nothing", () => {
